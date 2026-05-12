@@ -1,0 +1,37 @@
+{
+  "name": "contracts",
+  "version": "0.0.0",
+  "private": true,
+  "license": "GPL-3.0",
+  "scripts": {
+    "build": "mud build",
+    "clean": "forge clean && rimraf src/codegen",
+    "deploy:garnet": "mud deploy --profile=garnet",
+    "deploy:local": "mud deploy",
+    "deploy:redstone": "mud deploy --profile=redstone",
+    "deploy:base-sepolia": "mud deploy --profile=base-sepolia",
+    "deploy:base": "mud deploy --profile=base",
+    "deploy:optimism": "mud deploy --profile=optimism",
+    "dev": "mud dev-contracts",
+    "lint": "pnpm run prettier && pnpm run solhint",
+    "prettier": "prettier --write 'src/**/*.sol'",
+    "solhint": "solhint --config ./.solhint.json 'src/**/*.sol' --fix",
+    "test": "tsc --noEmit && mud test"
+  },
+  "dependencies": {
+    "@latticexyz/cli": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f",
+    "@latticexyz/schema-type": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f",
+    "@latticexyz/store": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f",
+    "@latticexyz/world": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f",
+    "@latticexyz/world-modules": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f"
+  },
+  "devDependencies": {
+    "@types/node": "^18.15.11",
+    "ds-test": "https://github.com/dapphub/ds-test.git#e282159d5170298eb2455a6c05280ab5a73a4ef0",
+    "forge-std": "https://github.com/foundry-rs/forge-std.git#3b20d60d14b343ee4f908cb8079495c07f5e8981",
+    "prettier-plugin-solidity": "1.3.1",
+    "solhint": "4.5.4",
+    "solhint-config-mud": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f",
+    "solhint-plugin-mud": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["vite/client"],
+    "module": "ESNext",
+    "esModuleInterop": true,
+    "moduleResolution": "Bundler",
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "useDefineForClassFields": false,
+    "noErrorTruncation": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@df/*": ["./src/Shared/*"],
+      "@mud/*": ["./src/mud/*"],
+      "@hooks/*": ["./src/hooks/*"],
+      "@wallet/*": ["./src/wallet/*"],
+      "@frontend/*": ["./src/Frontend/*"],
+      "@backend/*": ["./src/Backend/*"]
+    }
+  },
+  "include": [
+    "./src/**/*.ts",
+    "./src/**/*.tsx",
+    "./src/_types/file-loader/FileWorkerTypes.ts",
+    "embedded_plugins/**/*"
+  ],
+  "exclude": [
+    // should be moved into a publishable separate package
+  ]
+}

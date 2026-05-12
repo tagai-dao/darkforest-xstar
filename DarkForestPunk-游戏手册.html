@@ -1,0 +1,1717 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dark Forest Punk · 游戏手册</title>
+    <style>
+      :root {
+        --bg: #0a0a14;
+        --bg-2: #111126;
+        --bg-3: #1a1a33;
+        --text: #dcdcf0;
+        --muted: #8a8aa8;
+        --pink: #ff69b4;
+        --green: #00dc82;
+        --blue: #6ab6ff;
+        --gold: #f5c542;
+        --red: #ff5a5f;
+        --purple: #b380ff;
+        --border: #2a2a44;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: radial-gradient(
+            1200px 800px at 10% -10%,
+            #1a1237 0%,
+            transparent 50%
+          ),
+          radial-gradient(1000px 700px at 100% 0%, #22103a 0%, transparent 50%),
+          var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial,
+          sans-serif;
+        line-height: 1.75;
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 40px 28px 80px;
+      }
+      header.hero {
+        text-align: center;
+        padding: 40px 0 28px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 30px;
+      }
+      header.hero h1 {
+        font-size: 42px;
+        margin: 0 0 8px;
+        background: linear-gradient(
+          90deg,
+          var(--pink),
+          var(--purple),
+          var(--blue)
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        letter-spacing: 2px;
+      }
+      header.hero p.subtitle {
+        color: var(--muted);
+        font-style: italic;
+        margin: 0;
+      }
+      .toc {
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 20px 26px;
+        margin-bottom: 40px;
+      }
+      .toc h2 {
+        margin: 0 0 10px;
+        font-size: 18px;
+        color: var(--pink);
+      }
+      .toc ol {
+        columns: 2;
+        column-gap: 30px;
+        margin: 0;
+        padding-left: 18px;
+      }
+      .toc li {
+        margin: 4px 0;
+      }
+      .toc a {
+        color: var(--text);
+        text-decoration: none;
+        border-bottom: 1px dashed transparent;
+      }
+      .toc a:hover {
+        color: var(--pink);
+        border-color: var(--pink);
+      }
+      section {
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 26px 30px;
+        margin: 22px 0;
+      }
+      h2 {
+        margin-top: 0;
+        color: var(--pink);
+        border-left: 4px solid var(--pink);
+        padding-left: 12px;
+        font-size: 24px;
+      }
+      h3 {
+        color: var(--blue);
+        margin: 26px 0 10px;
+        font-size: 18px;
+      }
+      h4 {
+        color: var(--gold);
+        margin: 18px 0 6px;
+        font-size: 16px;
+      }
+      p,
+      li {
+        color: var(--text);
+      }
+      strong {
+        color: #fff;
+      }
+      em {
+        color: var(--gold);
+        font-style: normal;
+      }
+      .pink {
+        color: var(--pink);
+      }
+      .green {
+        color: var(--green);
+      }
+      .blue {
+        color: var(--blue);
+      }
+      .gold {
+        color: var(--gold);
+      }
+      .red {
+        color: var(--red);
+      }
+      .purple {
+        color: var(--purple);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      code,
+      pre {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        background: #000010;
+        color: var(--green);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+      pre {
+        padding: 14px 16px;
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        line-height: 1.5;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0;
+        font-size: 14px;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--bg-3);
+        color: var(--pink);
+      }
+      tr:nth-child(even) td {
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .tag {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        margin-right: 4px;
+        border: 1px solid currentColor;
+      }
+      .tag.off {
+        color: var(--red);
+      }
+      .tag.def {
+        color: var(--blue);
+      }
+      .tag.prod {
+        color: var(--green);
+      }
+      .tag.gen {
+        color: var(--gold);
+      }
+      .callout {
+        border-left: 4px solid var(--blue);
+        background: rgba(106, 182, 255, 0.08);
+        padding: 10px 16px;
+        margin: 14px 0;
+        border-radius: 4px;
+      }
+      .callout.warn {
+        border-color: var(--red);
+        background: rgba(255, 90, 95, 0.08);
+      }
+      .callout.tip {
+        border-color: var(--green);
+        background: rgba(0, 220, 130, 0.08);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px;
+      }
+      .card {
+        background: var(--bg-3);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px 18px;
+      }
+      .card h4 {
+        margin-top: 0;
+        color: var(--pink);
+      }
+      footer {
+        margin-top: 50px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        border-top: 1px solid var(--border);
+        padding-top: 24px;
+      }
+      ul,
+      ol {
+        padding-left: 22px;
+      }
+      li {
+        margin: 4px 0;
+      }
+      kbd {
+        background: var(--bg-3);
+        border: 1px solid var(--border);
+        border-bottom: 2px solid var(--border);
+        border-radius: 4px;
+        padding: 2px 8px;
+        font-family: "SF Mono", Menlo, monospace;
+        font-size: 12px;
+        color: var(--green);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <h1>🦑 Dark Forest Punk 🪐</h1>
+        <p class="subtitle">"These violent delights have violent ends."</p>
+        <p class="muted">
+          基于 MUD 引擎构建的社区驱动版《Dark Forest》· 完整游戏手册
+        </p>
+      </header>
+
+      <div class="toc">
+        <h2>目录</h2>
+        <ol>
+          <li><a href="#intro">一、游戏初衷与目的</a></li>
+          <li><a href="#concept">二、核心概念与名词解释</a></li>
+          <li><a href="#universe">三、宇宙结构</a></li>
+          <li><a href="#planets">四、星球详解</a></li>
+          <li><a href="#start">五、如何开始游戏</a></li>
+          <li><a href="#solo">六、单人玩法</a></li>
+          <li><a href="#multi">七、多人玩法</a></li>
+          <li><a href="#artifacts">八、神器系统（Artifacts）</a></li>
+          <li><a href="#junk">九、太空垃圾（Space Junk）</a></li>
+          <li><a href="#guild">十、公会玩法</a></li>
+          <li><a href="#score">十一、积分与获胜条件</a></li>
+          <li><a href="#strategy">十二、进阶策略</a></li>
+          <li><a href="#params">十三、关键参数速查</a></li>
+          <li><a href="#hotkeys">十四、快捷键</a></li>
+        </ol>
+      </div>
+
+      <!-- ============ 一、游戏初衷 ============ -->
+      <section id="intro">
+        <h2>一、游戏初衷与目的</h2>
+
+        <h3>1.1 游戏初衷</h3>
+        <p>
+          <span class="pink">Dark Forest Punk（简称 DF Punk）</span>源自经典的
+          zk‑SNARK 链上游戏 <em>Dark Forest</em>。原版 Dark Forest
+          把刘慈欣《三体》中的"黑暗森林"法则搬进了区块链： 整个宇宙默认被"<span
+            class="blue"
+            >迷雾</span
+          >"覆盖，只有玩家通过客户端本地哈希挖矿才能看到世界。
+          你不知道敌人在哪里，敌人也看不到你；一旦被发现，就可能遭到毁灭性的打击。
+        </p>
+        <p>
+          DF Punk 由 <span class="pink">DFArchon</span> 团队在
+          <a style="color: #6ab6ff" href="https://mud.dev/" target="_blank"
+            >MUD 引擎</a
+          >
+          上重构，目标是：
+        </p>
+        <ul>
+          <li>
+            把 Dark Forest
+            这种"全链上、零知识信息差"的游戏范式在新一代引擎上跑通；
+          </li>
+          <li>
+            探索<strong>社区共建</strong>：新神器、公会系统、材料经济都是社区驱动；
+          </li>
+          <li>定期举办赛季（Round），让所有人参与测试并赢取奖励。</li>
+        </ul>
+
+        <h3>1.2 游戏目的</h3>
+        <p>
+          在一个被"黑暗森林法则"支配的<strong>有限时间的赛季宇宙</strong>中，通过探索、生产、
+          掠夺与结盟，积累
+          <span class="gold">积分（Score）</span
+          >，并在赛季结束时冲上排行榜瓜分奖池。
+        </p>
+        <p>具体来说，你的目标是：</p>
+        <ul>
+          <li>在宇宙中发现尽可能多的星球，并占领对你有价值的那些；</li>
+          <li>
+            在 <em>ASTEROID_FIELD</em>（小行星带/<span class="gold">银矿</span
+            >）和 <em>FOUNDRY</em>（铸造厂）中积攒
+            <span class="gold">银币（Silver）</span>和<span class="gold"
+              >材料（Material）</span
+            >；
+          </li>
+          <li>
+            把资源运到
+            <em>SPACETIME_RIP</em
+            >（时空裂缝）提现，每一点提现的银币都记入你的积分；
+          </li>
+          <li>
+            尽量加入或创建<span class="pink">公会</span
+            >，因为本赛季奖金由公会汇总后再分发；
+          </li>
+          <li>
+            必要时动用<span class="purple">神器</span
+            >：虫洞拉近距离、光子加农炮远程偷袭、粉色炸弹摧毁敌星。
+          </li>
+        </ul>
+
+        <div class="callout">
+          <strong>本赛季核心口号：</strong>
+          <span class="pink">"Guild Silver Accumulation Battle"</span> ——
+          公会银币积累战。排名以<strong>公会成员累计提现的银币总量</strong>为准。
+        </div>
+      </section>
+
+      <!-- ============ 二、核心概念 ============ -->
+      <section id="concept">
+        <h2>二、核心概念与名词解释</h2>
+
+        <p>这一节先把游戏中反复出现的高频名词摆在最前面，后面章节都会用到。</p>
+
+        <div class="grid">
+          <div class="card">
+            <h4>宇宙 / 世界半径</h4>
+            <p>
+              宇宙是一个有限大的圆盘。本赛季半径为
+              <code>100000</code>，越靠近中心等级越高，越值钱。
+            </p>
+          </div>
+          <div class="card">
+            <h4>坐标（Coords）</h4>
+            <p>
+              每个星球有一个二维坐标
+              <code>(x, y)</code
+              >。坐标由哈希隐藏，只有你自己或对方主动"<em>揭示</em>"才会暴露在链上。
+            </p>
+          </div>
+          <div class="card">
+            <h4>迷雾</h4>
+            <p>
+              未被你探索过的区域。即使星球已存在，你也看不到。必须通过本地挖矿才能"点亮"区块。
+            </p>
+          </div>
+          <div class="card">
+            <h4>Chunk（区块）</h4>
+            <p>
+              客户端把宇宙切成固定大小的方块，一次挖矿就是对一个 chunk
+              里所有点的哈希枚举。挖过的 chunk 会被记录下来，迷雾消散。
+            </p>
+          </div>
+          <div class="card">
+            <h4>星球（Planet）</h4>
+            <p>
+              宇宙中的可交互实体。每颗星球都有等级、类型、空间类型、生物群系、人口/银币/材料等属性。
+            </p>
+          </div>
+          <div class="card">
+            <h4>飞船 / 舰队（Move）</h4>
+            <p>
+              把人口/银币/神器从一颗星球送到另一颗星球的"舰队"，也就是链上的一次
+              <code>move</code>。飞船在途中是虚线，到达后变实线。
+            </p>
+          </div>
+          <div class="card">
+            <h4>人口（Population / Energy）</h4>
+            <p>
+              星球的"能量"，既是 HP
+              也是攻击值。发射舰队要消耗人口，自然增长会随时间恢复，到达上限
+              <code>populationCap</code>。
+            </p>
+          </div>
+          <div class="card">
+            <h4>银矿（Asteroid Field）</h4>
+            <p>
+              以 <em>ASTEROID_FIELD</em> 类型存在的星球，专门产出
+              <span class="gold">银币/材料</span>，防御只有普通星球的一半。
+            </p>
+          </div>
+          <div class="card">
+            <h4>银币（Silver）</h4>
+            <p>
+              升级星球、兑换积分的主要资源。星球达到满上限后会停止增长，必须及时运走。
+            </p>
+          </div>
+          <div class="card">
+            <h4>材料（Material）</h4>
+            <p>
+              本项目新增的资源类型，共 11
+              种（如水晶、活木、风钢……），每种生物群系的小行星带产对应材料。
+            </p>
+          </div>
+          <div class="card">
+            <h4>揭示（Reveal）</h4>
+            <p>
+              花费 ZK
+              证明把某颗星球的真实坐标写入链上，让所有人都能看到。对自己是信号，对敌人是靶子。<br />
+              冷却：<code>14400</code> tick。
+            </p>
+          </div>
+          <div class="card">
+            <h4>PK / 攻击</h4>
+            <p>
+              向他人的星球发射舰队即进入 <em>attack</em> 状态。舰队人口 ×
+              距离损耗抵达后，若大于对方防御折算值即易主。
+            </p>
+          </div>
+          <div class="card">
+            <h4>增援</h4>
+            <p>
+              向自己的或同公会成员的星球送人口，就是"增援"。此时不会被防御衰减，直接叠加人口上限为止。
+            </p>
+          </div>
+          <div class="card">
+            <h4>距离（Distance）</h4>
+            <p>
+              欧氏距离。飞行时间
+              <code>= distance * 100 / speed</code
+              >。人口会随距离指数衰减，影响能不能打穿对方防线。
+            </p>
+          </div>
+          <div class="card">
+            <h4>神器（Artifact）</h4>
+            <p>
+              可装备在星球上的 ERC‑721
+              道具。目前有粉色炸弹、光子加农炮、虫洞、绽放滤镜四种。
+            </p>
+          </div>
+          <div class="card">
+            <h4>公会（Guild）</h4>
+            <p>
+              最多 6 人组队，公会成员互相不能
+              PK，提现银币会累计进公会积分。创建费 0.005 ETH。
+            </p>
+          </div>
+          <div class="card">
+            <h4>积分（Score）</h4>
+            <p>
+              个人积分 = 累计从时空裂缝提现的银币 + 材料加权分；公会积分 =
+              所有成员积分之和。
+            </p>
+          </div>
+          <div class="card">
+            <h4>Tick</h4>
+            <p>
+              链上游戏时间单位。Ticker 按固定速率（本赛季
+              <code>rate=1</code>）递增，所有冷却、飞行时间都按 tick 计算。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 三、宇宙结构 ============ -->
+      <section id="universe">
+        <h2>三、宇宙结构</h2>
+
+        <h3>3.1 四种空间类型（Space Type）</h3>
+        <p>
+          宇宙由
+          <em>Perlin 噪声</em
+          >染色，距离原点越远，噪声值越低，空间越危险、星球等级上限越高、产出也越好：
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Space Type</th>
+              <th>中文</th>
+              <th>Perlin 阈值</th>
+              <th>最大星球等级</th>
+              <th>特点</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>NEBULA</td>
+              <td>星云</td>
+              <td>≥ 15</td>
+              <td>4</td>
+              <td>新手区，出生地，安全但产出低。</td>
+            </tr>
+            <tr>
+              <td>SPACE</td>
+              <td>太空</td>
+              <td>≥ 14</td>
+              <td>5</td>
+              <td>常规区，开始出现高级星。</td>
+            </tr>
+            <tr>
+              <td>DEEP_SPACE</td>
+              <td>深空</td>
+              <td>≥ 19（外圈越深）</td>
+              <td>9</td>
+              <td>高风险高收益，出传奇级神器。</td>
+            </tr>
+            <tr>
+              <td>DEAD_SPACE</td>
+              <td>死空</td>
+              <td>最危险</td>
+              <td>9</td>
+              <td>
+                群系固定为
+                <em>CORRUPTED</em>，产黑合金、腐化水晶（最高倍率材料）。
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>3.2 同心分区（Universe Zone）</h3>
+        <p>宇宙又按半径切成 6 个同心环，越内圈星球等级上限越高：</p>
+        <pre>
+边界 (borders):     [37500, 50000, 62500, 75000, 87500]
+各区域最高等级:      zone0=9  zone1=8  zone2=7  zone3=6  zone4=5  zone5=8
+各区域额外等级加成:  zone0=+1, 其他=0</pre
+        >
+        <p>
+          中心 37500 以内的 <span class="pink">zone0</span> 是最诱人的地方：最高
+          9 级 + 1 级加成，也是高手云集的修罗场。
+        </p>
+
+        <h3>3.3 内圈与压缩</h3>
+        <p>宇宙还有一个<strong>内圈（Inner Circle）</strong>，参数：</p>
+        <pre>
+radius        = 75000     // 内圈半径
+radiusx1000   = 75,000,000
+speed         = 87         // 内圈会慢慢收缩</pre
+        >
+        <p>
+          随着游戏推进，内圈会缩小，被推到外面的区域会对玩家不利，促使大家向中心汇聚。
+        </p>
+      </section>
+
+      <!-- ============ 四、星球详解 ============ -->
+      <section id="planets">
+        <h2>四、星球详解</h2>
+
+        <h3>4.1 五种星球类型</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>类型</th>
+              <th>角色</th>
+              <th>特性</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="blue">PLANET</td>
+              <td>普通行星</td>
+              <td>唯一可<strong>升级</strong>的星球类型，是你的主要领土。</td>
+            </tr>
+            <tr>
+              <td class="gold">ASTEROID_FIELD</td>
+              <td>小行星带（银矿）</td>
+              <td>
+                防御 ×0.5，银币容量 ×2，初始银币 = 上限一半。第一次被占领并
+                <em>addJunk</em> 时会初始化材料。
+              </td>
+            </tr>
+            <tr>
+              <td class="purple">FOUNDRY</td>
+              <td>铸造厂</td>
+              <td>
+                专门用来
+                <em>探测（prospect）→ 发现神器（find）</em>。没有银币产出。
+              </td>
+            </tr>
+            <tr>
+              <td class="green">SPACETIME_RIP</td>
+              <td>时空裂缝</td>
+              <td>
+                <strong>唯一能提现银币/材料/神器的星球</strong
+                >。没有银币增长，只能接收他人转运。
+              </td>
+            </tr>
+            <tr>
+              <td class="red">QUASAR</td>
+              <td>类星体</td>
+              <td>
+                人口上限 ×5、银币上限 ×10、速度
+                ×2，但<strong>没有增长</strong>。作为中转仓库用。距离惩罚减半。
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>4.2 星球等级（Planet Level）</h3>
+        <p>共 10 级（0~9）。等级越高容量、产量、防御成比例增长：</p>
+        <pre>
+等级阈值: [100, 500, 4000, 8000, 30000, 65520, 262128, 1048561, 4194292]</pre
+        >
+        <p>
+          等级 0（初生之地）只会出现为 <em>PLANET</em>，这是每个玩家的出生条件。
+        </p>
+
+        <h3>4.3 生物群系（Biome）</h3>
+        <p>
+          星球在空间类型基础上再按 <em>biomeBase</em> 分成 10
+          种生物群系，每种对应一种材料：
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>群系</th>
+              <th>材料</th>
+              <th>提现倍率</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>OCEAN 海洋</td>
+              <td>WATER_CRYSTALS 水晶</td>
+              <td>×1.05</td>
+            </tr>
+            <tr>
+              <td>FOREST 森林</td>
+              <td>LIVING_WOOD 活木</td>
+              <td>×1.10</td>
+            </tr>
+            <tr>
+              <td>GRASSLAND 草原</td>
+              <td>WINDSTEEL 风钢</td>
+              <td>×1.20</td>
+            </tr>
+            <tr>
+              <td>TUNDRA 苔原</td>
+              <td>AURORIUM 极光金</td>
+              <td>×1.30</td>
+            </tr>
+            <tr>
+              <td>SWAMP 沼泽</td>
+              <td>MYCELIUM 菌丝</td>
+              <td>×1.50</td>
+            </tr>
+            <tr>
+              <td>DESERT 沙漠</td>
+              <td>SANDGLASS 沙玻</td>
+              <td>×1.80</td>
+            </tr>
+            <tr>
+              <td>ICE 冰原</td>
+              <td>CRYOSTONE 寒霜石</td>
+              <td>×2.00</td>
+            </tr>
+            <tr>
+              <td>WASTELAND 荒地</td>
+              <td>SCRAPIUM 废金</td>
+              <td>×2.50</td>
+            </tr>
+            <tr>
+              <td>LAVA 熔岩</td>
+              <td>PYROSTEEL 烈焰钢</td>
+              <td>×3.00</td>
+            </tr>
+            <tr>
+              <td class="red">CORRUPTED 腐化（仅 Dead Space）</td>
+              <td>BLACKALLOY 黑合金 / CORRUPTED_CRYSTAL 腐化水晶</td>
+              <td>×4 / ×6</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout tip">
+          <strong>策略提示：</strong>到 Dead Space 死空搏一把腐化水晶（×6
+          倍分），回报比普通银币高得多。
+        </div>
+
+        <h3>4.4 升级（Upgrade）</h3>
+        <p>只有 <em>PLANET</em> 类型可以升级，共三个分支：</p>
+        <ul>
+          <li>
+            <span class="blue">Range 射程</span>：每次
+            ×1.25，让舰队能到更远的地方。
+          </li>
+          <li>
+            <span class="blue">Speed 速度</span>：每次 ×1.75，舰队飞得更快。
+          </li>
+          <li>
+            <span class="blue">Defense 防御</span>：每次
+            ×1.20，被攻击时战损更小。
+          </li>
+        </ul>
+        <p>
+          升级会附带 <em>人口上限</em> ×1.20、<em>人口增长</em> ×1.20 的加成。
+        </p>
+        <p>每级消耗的银币百分比（占 <code>silverCap</code>）：</p>
+        <pre>第 0/1/2/3/4 级 → 20% / 40% / 60% / 80% / 100%</pre>
+        <p>
+          单分支最高 4 级，总等级上限按空间类型有区别（死空 5 / 深空 5 / 太空 4
+          / 星云 3）。
+        </p>
+      </section>
+
+      <!-- ============ 五、开始游戏 ============ -->
+      <section id="start">
+        <h2>五、如何开始游戏</h2>
+
+        <h3>5.1 准备</h3>
+        <ol>
+          <li>准备一个主钱包（通常是 MetaMask/Rainbow 等）。</li>
+          <li>准备一点 Gas，用于注册、交易、神器提取。</li>
+          <li>
+            进入官方站点（v0.1.2 赛季：<code>https://r2.dfmud.xyz/</code>）。
+          </li>
+        </ol>
+
+        <h3>5.2 注册玩家</h3>
+        <ol>
+          <li>
+            点击 <span class="pink">Register</span>，调用
+            <code>registerPlayer(name, burner)</code>。
+          </li>
+          <li><strong>Name</strong>：一个全服唯一的名字。</li>
+          <li>
+            <strong>Burner Wallet</strong
+            >：一次性小号钱包，用于高频签名，避免每走一步都用主钱包点确认。
+          </li>
+          <li>一个赛季玩家总数上限 <code>2000</code>，晚了可能进不来。</li>
+        </ol>
+
+        <h3>5.3 出生（Spawn）</h3>
+        <p>注册后需要在本地挖矿找到一颗合格的出生星球：</p>
+        <ul>
+          <li>
+            必须位于最外圈（zone 5 以外，<code
+              >universeZone + 1 &lt; borders.length</code
+            >）；
+          </li>
+          <li>空间类型必须是 <span class="blue">NEBULA</span>；</li>
+          <li>星球等级必须是 <code>0</code>；</li>
+          <li>
+            类型必须是 <span class="blue">PLANET</span>（不能是银矿/铸造厂等）。
+          </li>
+        </ul>
+        <p>
+          找到后调用 <code>spawnPlayer(proof, input)</code>，初始人口
+          <code>50,000</code>。
+        </p>
+
+        <h3>5.4 入场费（Entry Fee）</h3>
+        <p>
+          每一次需要 gas
+          的"游戏动作"（发射、升级、揭示、提现等）都附带一份入场费：
+        </p>
+        <pre>
+entry_fee = 1000000000000 wei  // 即 0.000001 ETH 级别，非常低</pre
+        >
+        <p>这笔费用进入 world 的余额，用于赛季奖池/公会金库。</p>
+      </section>
+
+      <!-- ============ 六、单人玩法 ============ -->
+      <section id="solo">
+        <h2>六、单人玩法</h2>
+
+        <p>
+          即使你不组公会、不与任何人互动，也能玩得非常爽快。单人路线的核心循环是：
+        </p>
+        <p class="pink" style="text-align: center; font-size: 16px">
+          挖矿 → 占领星球 → 升级 → 收集银币/材料 → 运到时空裂缝 → 提现积分
+        </p>
+
+        <h3>6.1 挖矿探索（Mining）</h3>
+        <p>左下角 <span class="green">Explore Pane</span> 控制本地挖矿：</p>
+        <ul>
+          <li><strong>Move 🎯</strong>：把"探索光标"移到任意坐标。</li>
+          <li><strong>Explore / Pause</strong>：开始或暂停挖矿（空格键）。</li>
+          <li>
+            <strong>Cores</strong>：用多少 CPU 核心，可选
+            <code>1/2/4/8/16/32</code>，核心越多哈希率越高。
+          </li>
+          <li>
+            <strong>Pattern 挖矿模式</strong>：
+            <ul>
+              <li><em>Spiral</em>：以光标为中心螺旋外扩。</li>
+              <li><em>SwissCheese</em>：带孔洞跳跃式挖矿，用于"蜻蜓点水"。</li>
+              <li><em>TowardsCenter</em>：沿直线朝宇宙中心挖。</li>
+              <li><em>TowardsCenterV2</em>：优化版的向心挖矿。</li>
+            </ul>
+          </li>
+          <li>显示 <em>Hashes/s</em>：实时哈希速率，作为算力参考。</li>
+        </ul>
+
+        <h3>6.2 占领新星球（Move 攻击）</h3>
+        <p>
+          发现一颗敌方/无主星球后，在你的星球面板中
+          <em>点击并拖拽</em>到目标，即可发起一次 <code>move</code>：
+        </p>
+        <ul>
+          <li><strong>Population（人口）</strong>：派出的兵力。</li>
+          <li><strong>Silver（银币）</strong>：顺路运的银币。</li>
+          <li><strong>Artifact（神器）</strong>：可选，随行的一件神器。</li>
+          <li><strong>Materials（材料）</strong>：可携带多种材料同时运输。</li>
+        </ul>
+        <p>到达时：</p>
+        <pre>
+// 同一拥有者/同公会 → 增援（直接相加）
+population += arrivedPopulation;
+
+// 否则发生 PK
+if (defender &gt; attacker * 100 / defense)
+    defender -= attacker * 100 / defense;   // 守住，人口扣除
+else
+    新拥有者 = 攻击者;
+    population = arrivedPopulation - defender * defense / 100;</pre
+        >
+
+        <div class="callout tip">
+          <strong>定律：</strong>防御 100 的星球按"等量换等量"抵消，防御 200
+          的星球你要付出 2 倍兵力才能破开。
+        </div>
+
+        <h3>6.3 距离衰减</h3>
+        <p>人口越飞越少，遵循指数衰减：</p>
+        <pre>alive = sent / 2^(distance / range)</pre>
+        <p>
+          所以<strong>射程 range</strong> 直接决定你能打多远还有剩。另外到
+          <em>QUASAR</em> 时距离减半、有效的
+          <em>Wormhole 虫洞</em>会把距离乘以缩放系数（0.5 / 0.25 / ... 到
+          0.031）。
+        </p>
+
+        <h3>6.4 撤回舰队（Revert Move）</h3>
+        <p>
+          舰队出发后的<strong>前半程</strong>内，如果反悔，可以调用
+          <code>revertMove(moveId, toPlanet)</code>：
+        </p>
+        <ul>
+          <li>会扣 50% 材料，50% 人口/银币作为惩罚；</li>
+          <li>
+            只能由<strong>船长（captain）</strong>本人发起，且源星球还归属于
+            captain；
+          </li>
+          <li>每条 move 只能撤一次。</li>
+        </ul>
+
+        <h3>6.5 星球升级（upgrade）</h3>
+        <p>
+          选中你的 PLANET，在 UpgradeDetailsPane 里点击 Range / Speed /
+          Defense，支持批量：
+        </p>
+        <pre>upgradePlanet(planetHash, rangeUp, speedUp, defenseUp)</pre>
+        <p>
+          需要该星球的银币量足够并且你同时是 <em>owner</em> 和
+          <em>junkOwner</em>。
+        </p>
+
+        <h3>6.6 探测神器（Prospect → Find）</h3>
+        <p>
+          这是单人玩家能稳定拿到<strong>神器</strong>的唯一方法，只能在
+          <em>FOUNDRY</em> 上做：
+        </p>
+        <ol>
+          <li>占领一颗未被探索（未打上 EXPLORED flag）的 FOUNDRY；</li>
+          <li>
+            调用 <code>prospectPlanet(planetHash)</code>，记录这一次 prospect
+            的区块号；
+          </li>
+          <li>
+            <strong>256 个区块内</strong>必须调用
+            <code>findArtifact(proof, input)</code>，否则作废；
+          </li>
+          <li>
+            成功后该 FOUNDRY 上多出一件随机神器，类型按配置概率：
+            <pre>
+indexes = [1, 4, 5, 6]  // PinkBomb / BloomFilter / Wormhole / Cannon
+各稀有度概率在 [COMMON ~ MYTHIC] 均匀分布</pre
+            >
+          </li>
+        </ol>
+
+        <h3>6.7 时空裂缝提现</h3>
+        <p>
+          找到一颗
+          <em>SPACETIME_RIP</em
+          >（只能打下来，不能在你家附近造出来）是单人玩家的首要目标：
+        </p>
+        <ul>
+          <li>
+            <code>withdrawSilver(planetHash, amount)</code
+            >：把银币变成积分。要求
+            <code>silverCap &lt;= amount * 5</code>，即一次至少提现 1/5 容量。
+          </li>
+          <li>
+            <code>withdrawMaterial(planetHash, materialType, amount)</code
+            >：把材料变成积分，乘以对应群系倍率。
+          </li>
+          <li>
+            <code>withdrawArtifact(planetHash, artifactId)</code
+            >：把神器变成你钱包中的 ERC‑721 NFT。条件：神器空闲、稀有度 &lt;
+            星球等级。
+          </li>
+          <li>
+            <code>depositArtifact(planetHash, artifactId)</code>：把钱包里的神器
+            NFT 重新放回宇宙。
+          </li>
+        </ul>
+
+        <h3>6.8 Reveal（揭示）自己或敌人</h3>
+        <p>
+          用
+          <code>revealLocation(proof, input)</code
+          >把某颗星球的坐标公开写上链。冷却 <code>14400</code> tick。
+        </p>
+        <ul>
+          <li>
+            揭示<strong>自己的</strong>星球：等于在广场上插旗，公会友军能来增援。
+          </li>
+          <li>
+            揭示<strong>敌人的</strong>星球：必要前置条件，比如
+            <em>PinkBomb</em> 要求目标先 reveal 才能定位打击。
+          </li>
+        </ul>
+      </section>
+
+      <!-- ============ 七、多人玩法 ============ -->
+      <section id="multi">
+        <h2>七、多人玩法</h2>
+
+        <h3>7.1 PK 与掠夺</h3>
+        <p>多人游戏的根基就是"<span class="pink">黑暗森林</span>"法则：</p>
+        <ul>
+          <li>你看不到别人，但一旦有人 reveal 了你的星球，你就成了靶子；</li>
+          <li>看到别人 reveal 的高等级星球，可以选择偷袭；</li>
+          <li>星球被攻击时，客户端会弹 <em>PlanetAttacked</em> 通知。</li>
+        </ul>
+
+        <h3>7.2 攻击结算公式</h3>
+        <p>（同 6.2）对方星球存活：</p>
+        <pre>
+剩余兵力 = max(0, myAttack - defender * defense / 100)
+若 defender 撑住：defender -= myAttack * 100 / defense</pre
+        >
+        <p>
+          攻击全服计数器：<code>GlobalStats.attackCount</code>、<code>PlayerStats.attackCount</code>。
+        </p>
+
+        <h3>7.3 增援（Reinforce）</h3>
+        <p>
+          只要"captain（发射者）"和目的星球拥有者是同一个地址，<strong>或者他们当前在同一公会</strong>，
+          抵达时人口按 <em>增援</em>处理，直接相加（上限
+          <code>populationCap</code>）。
+        </p>
+        <p>
+          这意味着公会内部的热线必须打通：谁的主星被围攻，队友可以迅速跨区投送补给。
+        </p>
+
+        <h3>7.4 外交（Diplomacy）</h3>
+        <p>
+          项目自带
+          <em>Diplomacy‑Ambassador</em> 插件，可以在公会之间/玩家之间签订：
+        </p>
+        <ul>
+          <li><strong>互不侵犯</strong>协议；</li>
+          <li>领土共享；</li>
+          <li>战时盟友。</li>
+        </ul>
+        <p>这些协议都不是链上强约束，而是社区的信誉约束。</p>
+
+        <h3>7.5 远程偷袭（Photoid Cannon）</h3>
+        <p>
+          一颗装了充能完毕的
+          <em>光子加农炮</em>
+          的星球，可以在发射舰队时获得极高的加速：距离、速度都大幅 buff，
+          成为"一炮打穿半个宇宙"的战术核弹。细节见
+          <a href="#artifacts">神器系统</a>。
+        </p>
+
+        <h3>7.6 炸星（PinkBomb）</h3>
+        <p>
+          直接把敌人的星球
+          <em>DESTROYED</em> 掉。被毁的星球不会再产出任何资源，积分作废。
+          这是多人战的"核威慑"。
+        </p>
+
+        <h3>7.7 虫洞网络（Wormhole）</h3>
+        <p>
+          在你和盟友各自的两颗星球之间架一条虫洞，可以把实际距离按稀有度倍率大幅压缩：
+        </p>
+        <pre>
+rarity  COMMON  RARE   EPIC   LEGEND  MYTHIC
+multi   ×0.5    ×0.25  ×0.125 ×0.062  ×0.031</pre
+        >
+        <p>
+          <strong>限制：</strong>虫洞两端必须属于同一
+          owner；关闭时会按比例恢复距离。
+        </p>
+      </section>
+
+      <!-- ============ 八、神器 ============ -->
+      <section id="artifacts">
+        <h2>八、神器系统（Artifacts）</h2>
+
+        <h3>8.1 基本属性</h3>
+        <ul>
+          <li>
+            <strong>稀有度</strong>：COMMON / RARE / EPIC / LEGENDARY / MYTHIC。
+          </li>
+          <li>
+            <strong>流派（Genre）</strong>：<span class="tag off"
+              >Offensive 攻</span
+            >
+            <span class="tag def">Defensive 防</span>
+            <span class="tag prod">Productive 产</span>
+            <span class="tag gen">General 通用</span>。
+          </li>
+          <li>
+            <strong>状态</strong>：DEFAULT / CHARGING 充能中 / READY 就绪 /
+            ACTIVE 激活 / COOLDOWN 冷却 / BROKEN。
+          </li>
+          <li>
+            <strong>同流派互斥</strong>：一颗星球同时只能激活 1 件攻、1 件防、1
+            件产（受 PlanetFlag 位控制）。
+          </li>
+        </ul>
+
+        <h3>8.2 本赛季四件神器</h3>
+
+        <h4>① PinkBomb（粉色炸弹）<span class="tag off">Offensive</span></h4>
+        <p>毁灭指定星球。流程：</p>
+        <ol>
+          <li>
+            <code>chargeArtifact</code>：充能时传入目标星球的
+            RevealInput，把目标坐标钉死到炸弹上；
+          </li>
+          <li>
+            <code>activateArtifact</code>：从发射星发射，需要付出
+            <em>指数级人口</em>（距离越远消耗越多），并记录到达 tick；
+          </li>
+          <li>
+            <strong>到达后 300 tick 内</strong>调用
+            <code>destroy(bombId, proof, input)</code>，出示目标星的 ZK
+            证明，才算炸毁；
+          </li>
+          <li>
+            爆炸半径按稀有度：<code>500/1000/1500/2000/2500</code>，只会炸中心那一颗。
+          </li>
+        </ol>
+        <div class="callout warn">
+          <strong>注意：</strong
+          >炸弹是一次性攻击，用过后需要再次获取；目标一旦带有
+          <em>Stellar Shield</em> 类防御，
+          将可能被化解（相关防御神器尚未完全开放）。
+        </div>
+
+        <h4>
+          ② PhotoidCannon（光子加农炮）<span class="tag off">Offensive</span>
+        </h4>
+        <p>
+          它不是炸弹，而是给"下一次从这颗星出发的 move"加上巨大的速度/距离
+          buff：
+        </p>
+        <ul>
+          <li>
+            <code>chargeArtifact</code>：进入充能，充能期内星球防御会被削弱；
+          </li>
+          <li><code>activateArtifact</code>：激活 BEFORE_MOVE 效果；</li>
+          <li>
+            之后你发射的第一发舰队将享受"光子炮弹"式高速飞行，极难被拦截。
+          </li>
+          <li>一颗星球同时只能装一门加农炮（<em>OneCannonOnly</em> 错误）。</li>
+        </ul>
+
+        <h4>③ Wormhole（虫洞）<span class="tag gen">General</span></h4>
+        <p>
+          已在 7.7 节介绍。关键点：两端同
+          owner、关闭后距离恢复、稀有度决定压缩比。
+        </p>
+
+        <h4>④ BloomFilter（绽放滤镜）<span class="tag gen">General</span></h4>
+        <p>
+          激活后立刻把星球人口拉满到
+          <code>populationCap</code>。效果一次性、非常简单粗暴：
+        </p>
+        <pre>planet.population = planet.populationCap;</pre>
+        <p>非常适合在"我要大举进攻但主星不够满"的时候使用。</p>
+
+        <h3>8.3 出/入神器（Withdraw / Deposit）</h3>
+        <p>
+          神器可以从时空裂缝提现到钱包（变成
+          <em>ArtifactNFT</em>），也可以重新注入回游戏：
+        </p>
+        <ul>
+          <li>
+            提现要求：<code>artifact.status == DEFAULT</code> 且
+            <code>rarity &lt; planet.level</code>；
+          </li>
+          <li>
+            存入要求：星球类型是 SPACETIME_RIP、有空槽位、神器稀有度 &lt;
+            星球等级；
+          </li>
+          <li>每颗星球最多同时持有 <strong>8 件</strong>神器。</li>
+        </ul>
+      </section>
+
+      <!-- ============ 九、太空垃圾 ============ -->
+      <section id="junk">
+        <h2>九、太空垃圾（Space Junk）</h2>
+
+        <h3>9.1 概念</h3>
+        <p>
+          每当你把舰队派到一颗<strong>从未有人移动过的</strong>星球，就会把"太空垃圾"挂在自己身上。
+          越高级的星球扔的垃圾越多：
+        </p>
+        <pre>
+PLANET_LEVEL_JUNK = [50, 55, 60, 65, 75, 100, 200, 250, 300, 500]
+                   //0   1   2   3   4    5    6    7    8    9</pre
+        >
+
+        <h3>9.2 限额与解锁</h3>
+        <ul>
+          <li>
+            初始垃圾上限：<code
+              >PlayerJunkLimit = 1000 × SPACE_JUNK_FREE_ALLOCATION</code
+            >（默认 1000）；
+          </li>
+          <li>
+            一旦 <code>playerJunk &gt; limit</code>，会阻止继续
+            addJunk（即阻止新占领无主星）；
+          </li>
+          <li>
+            通过 <code>buyJunk(amount)</code> 花 ETH 扩容：
+            <pre>
+// 2~8 段线性、9~1000 段二次方
+线性单价:  0.001 ETH  (LINEAR_BASE_PRICE)
+二次方单价: 0.001 ETH × t²</pre
+            >
+          </li>
+          <li>
+            放弃一颗星球（<code>clearJunk</code>）可以回收它所占的垃圾额度，但会失去该星所有权。
+          </li>
+        </ul>
+
+        <h3>9.3 为什么这套机制很重要？</h3>
+        <ul>
+          <li>防止大户"地毯式占领"宇宙，强行让你挑重要的打；</li>
+          <li>
+            抛弃星球的飞船会获得 <strong>速度 ×1.5、射程 ×1.5</strong>的
+            buff（<code>ABANDON_*_PERCENT = 150</code
+            >），所以弃星奔袭是一种战术；
+          </li>
+          <li>
+            拥有者和 junkOwner 必须一致才能升级、装神器、提现，避免"借壳"。
+          </li>
+        </ul>
+      </section>
+
+      <!-- ============ 十、公会 ============ -->
+      <section id="guild">
+        <h2>十、公会玩法（Guild）</h2>
+
+        <h3>10.1 公会规则</h3>
+        <ul>
+          <li>最多成员数：<code>maxMembers = 6</code>；</li>
+          <li>创建费用：<code>createFee = 0.005 ETH</code>；</li>
+          <li>
+            离队冷却：<code>cooldownTicks = 14400</code
+            >（被踢的人不受冷却限制）；
+          </li>
+          <li>
+            角色：<em>LEADER</em>（会长）&gt; <em>OFFICER</em>（干部）&gt;
+            <em>MEMBER</em>（成员）&gt; NONE。
+          </li>
+        </ul>
+
+        <h3>10.2 核心接口</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>函数</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>createGuild(name)</code></td>
+              <td>支付 0.005 ETH 创建公会，自己成为 LEADER。</td>
+            </tr>
+            <tr>
+              <td><code>inviteToGuild(invitee)</code></td>
+              <td>OFFICER 以上可以邀请未入会玩家。</td>
+            </tr>
+            <tr>
+              <td><code>acceptInvitation(guildId)</code></td>
+              <td>接受邀请加入，会检查冷却。</td>
+            </tr>
+            <tr>
+              <td><code>applyToGuild(guildId)</code></td>
+              <td>主动申请加入。</td>
+            </tr>
+            <tr>
+              <td><code>approveApplication(player)</code></td>
+              <td>OFFICER 审批申请。</td>
+            </tr>
+            <tr>
+              <td><code>leaveGuild()</code></td>
+              <td>普通成员退会，LEADER 不能直接退。</td>
+            </tr>
+            <tr>
+              <td><code>transferGuildLeadership(addr)</code></td>
+              <td>会长转让权杖。</td>
+            </tr>
+            <tr>
+              <td><code>disbandGuild()</code></td>
+              <td>解散公会（只有 LEADER 且仅剩自己一人时）。</td>
+            </tr>
+            <tr>
+              <td><code>setMemberRole(addr, role)</code></td>
+              <td>会长调整成员角色。</td>
+            </tr>
+            <tr>
+              <td><code>kickMember(addr)</code></td>
+              <td>会长踢人，被踢者免冷却。</td>
+            </tr>
+            <tr>
+              <td><code>setGrant(role)</code></td>
+              <td>设置自己愿意"授权"给哪个级别的 burner。</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>10.3 公会银币与奖励</h3>
+        <p>本赛季最关键的机制：</p>
+        <ul>
+          <li>
+            当成员调用 <code>withdrawSilver</code> 或
+            <code>withdrawMaterial</code>，提现量同时累计到
+            <em>PlayerScore</em>和 <em>Guild.silver</em>；
+          </li>
+          <li>赛季末 <strong>按公会银币总量</strong>排名，奖池由会长分发；</li>
+          <li>
+            公会之间的战争 → 控制 SPACETIME_RIP 数量 → 决定提现速度 →
+            决定公会最终积分。
+          </li>
+        </ul>
+
+        <h3>10.4 公会内协同</h3>
+        <ul>
+          <li>
+            <strong>同公会玩家之间不会互相 PK</strong>，发送人口按增援处理；
+          </li>
+          <li>
+            公会可以用 <em>GuildDelegation</em> 授权一个控制人集中调度舰队；
+          </li>
+          <li>
+            公会专属插件如
+            <em>Score-Board</em>、<em>Diplomacy-Ambassador</em>、<em
+              >Map-Filter-Export</em
+            >
+            可辅助作战。
+          </li>
+        </ul>
+      </section>
+
+      <!-- ============ 十一、积分 ============ -->
+      <section id="score">
+        <h2>十一、积分与获胜条件</h2>
+
+        <h3>11.1 个人积分（PlayerScore）</h3>
+        <p>一切积分都来源于 <strong>时空裂缝</strong>上的提现：</p>
+        <ul>
+          <li>Silver：1 银币 = 1 分；</li>
+          <li>
+            Material：材料量 × 群系倍率（见 4.3 表）：
+            <pre>
+multiplier = CORRUPTED_CRYSTAL:600,  BLACKALLOY:400, PYROSTEEL:300,
+             SCRAPIUM:250, CRYOSTONE:200, SANDGLASS:180,
+             MYCELIUM:150, AURORIUM:130, WINDSTEEL:120,
+             LIVING_WOOD:110, WATER_CRYSTALS:105</pre
+            >
+          </li>
+          <li>
+            提现受限：必须一次提走至少
+            <code>silverCap / 5</code>，避免小额刷分。
+          </li>
+        </ul>
+
+        <h3>11.2 公会积分（Guild.silver）</h3>
+        <p>等于所有成员个人积分之和 + 成员加入/退出时带入带出的历史积分。</p>
+
+        <h3>11.3 获胜条件</h3>
+        <div class="callout">
+          <strong>本赛季：</strong>公会银币积累战。<br />
+          排名以 <em>Guild.silver</em> 从高到低排序，Top 公会瓜分奖池；<br />
+          奖池金额 = 入场费 + 公会创建费 + GPT 代币购买费之和（链上
+          <code>RevenueStats</code>）。
+        </div>
+        <p>
+          此外，官方会对靠近宇宙中心、获得神器数量、总 move
+          数等维度给"荣誉赛"奖励。
+        </p>
+      </section>
+
+      <!-- ============ 十二、策略 ============ -->
+      <section id="strategy">
+        <h2>十二、进阶策略</h2>
+
+        <h3>12.1 早期（前 10% tick）</h3>
+        <ul>
+          <li>
+            只做一件事：<strong>挖矿</strong>。多开几个核心（16/32），一边
+            spiral 一边 TowardsCenterV2。
+          </li>
+          <li>抢占身边所有 &lt; 3 级的 PLANET 当补给站。</li>
+          <li>
+            等人口攒满就搬 silver，升级主星的 <em>range</em> 和
+            <em>speed</em>（速度优先）。
+          </li>
+        </ul>
+
+        <h3>12.2 中期（10% ~ 60%）</h3>
+        <ul>
+          <li>
+            <strong>找到至少 1 颗 SPACETIME_RIP</strong
+            >，否则所有银币都是"死钱"。
+          </li>
+          <li>
+            所有 ASTEROID_FIELD 优先升级 speed，否则运输太慢；QUASAR
+            用作中转仓库。
+          </li>
+          <li>加入一个公会：公会内不会 PK，互相增援，积分加倍。</li>
+          <li>每次 prospect 要卡着 256 块的窗口，错过就浪费一颗 FOUNDRY。</li>
+          <li>Dead Space 的 CORRUPTED_CRYSTAL 是×6 倍，值得一搏。</li>
+        </ul>
+
+        <h3>12.3 后期（60% ~ 结束）</h3>
+        <ul>
+          <li>Wormhole 把主星和最远的采矿区连起来，节省大量兵力损耗。</li>
+          <li>
+            用
+            <em>BloomFilter</em>
+            把主星一口气拉满后再倾巢出动，最大化一次攻击成功率。
+          </li>
+          <li>
+            用 <em>PhotoidCannon</em> +
+            <em>弃星 buff(1.5x speed/range)</em>，对高价值 SPACETIME_RIP
+            发起斩首。
+          </li>
+          <li>
+            对手的王牌 RIP 无法摧毁时，<em>PinkBomb</em>
+            是同归于尽的选择（目标会被永久 DESTROYED）。
+          </li>
+          <li>
+            临近结算：所有能提的 silver/material 全部从 RIP
+            提走，公会内集中提分。
+          </li>
+        </ul>
+
+        <h3>12.4 防御策略</h3>
+        <ul>
+          <li>主星优先升级 <em>defense</em>，能以 1:2 甚至 1:3 抵挡来袭；</li>
+          <li>
+            不要用同一颗 SPACETIME_RIP 反复提现，打散到多颗，分散被盯上的风险；
+          </li>
+          <li>
+            不要主动 <em>reveal</em> 主星——一旦暴露坐标，PinkBomb 可以定点打击；
+          </li>
+          <li>同公会多人互相守望，把增援航线提前铺好。</li>
+        </ul>
+
+        <h3>12.5 经济策略</h3>
+        <ul>
+          <li>预算你的 junk 限额；不要占一堆无用的高等级无主星造成溢出。</li>
+          <li>
+            GPT Token（<code>0.00001 ETH</code
+            >/token）可以和队友互相转账，用于购买 AI 教练建议（AIChat）。
+          </li>
+          <li>赛季后期，把用不上的神器提现为 NFT，跨赛季保留价值。</li>
+        </ul>
+      </section>
+
+      <!-- ============ 十三、参数速查 ============ -->
+      <section id="params">
+        <h2>十三、关键参数速查</h2>
+
+        <h3>13.1 宇宙与出生</h3>
+        <table>
+          <tbody>
+            <tr>
+              <td>宇宙半径 radius</td>
+              <td><code>100000</code></td>
+            </tr>
+            <tr>
+              <td>稀疏度 sparsity</td>
+              <td><code>16384</code></td>
+            </tr>
+            <tr>
+              <td>玩家上限</td>
+              <td><code>2000</code></td>
+            </tr>
+            <tr>
+              <td>入场费</td>
+              <td><code>1e12 wei</code></td>
+            </tr>
+            <tr>
+              <td>出生 Perlin</td>
+              <td><code>[1, 31]</code></td>
+            </tr>
+            <tr>
+              <td>Reveal 冷却</td>
+              <td><code>14400 tick</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>13.2 升级系数</h3>
+        <table>
+          <tbody>
+            <tr>
+              <td>人口上限倍率</td>
+              <td>×1.20 每级</td>
+            </tr>
+            <tr>
+              <td>人口增长倍率</td>
+              <td>×1.20</td>
+            </tr>
+            <tr>
+              <td>射程倍率</td>
+              <td>×1.25</td>
+            </tr>
+            <tr>
+              <td>速度倍率</td>
+              <td>×1.75</td>
+            </tr>
+            <tr>
+              <td>防御倍率</td>
+              <td>×1.20</td>
+            </tr>
+            <tr>
+              <td>单分支上限</td>
+              <td>4 级</td>
+            </tr>
+            <tr>
+              <td>总等级上限（死/深/太/星云）</td>
+              <td>5 / 5 / 4 / 3</td>
+            </tr>
+            <tr>
+              <td>银币消耗（第 n 级）</td>
+              <td>20 → 40 → 60 → 80 → 100 %</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>13.3 公会</h3>
+        <table>
+          <tbody>
+            <tr>
+              <td>创建费</td>
+              <td><code>0.005 ETH</code></td>
+            </tr>
+            <tr>
+              <td>最大成员</td>
+              <td><code>6</code></td>
+            </tr>
+            <tr>
+              <td>离队冷却</td>
+              <td><code>14400 tick</code></td>
+            </tr>
+            <tr>
+              <td>最大公会数</td>
+              <td><code>255</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>13.4 太空垃圾</h3>
+        <table>
+          <tbody>
+            <tr>
+              <td>默认额度</td>
+              <td>1000</td>
+            </tr>
+            <tr>
+              <td>星球等级对应垃圾</td>
+              <td>50/55/60/65/75/100/200/250/300/500</td>
+            </tr>
+            <tr>
+              <td>弃星速度加成</td>
+              <td>150%</td>
+            </tr>
+            <tr>
+              <td>弃星射程加成</td>
+              <td>150%</td>
+            </tr>
+            <tr>
+              <td>线性购买阈值</td>
+              <td>2~8 档</td>
+            </tr>
+            <tr>
+              <td>二次方购买阈值</td>
+              <td>9~1000 档</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>13.5 神器</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>Index</th>
+              <th>流派</th>
+              <th>核心效果</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>PinkBomb</td>
+              <td>1</td>
+              <td>Offensive</td>
+              <td>爆炸半径 500/1000/1500/2000/2500，300 tick 内触发</td>
+            </tr>
+            <tr>
+              <td>BloomFilter</td>
+              <td>4</td>
+              <td>General</td>
+              <td>立刻把人口拉满</td>
+            </tr>
+            <tr>
+              <td>Wormhole</td>
+              <td>5</td>
+              <td>General</td>
+              <td>距离 ×{0.5,0.25,0.125,0.062,0.031}</td>
+            </tr>
+            <tr>
+              <td>PhotoidCannon</td>
+              <td>6</td>
+              <td>Offensive</td>
+              <td>下一发 move 获得大幅速度/距离加成</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>13.6 时空裂缝限制</h3>
+        <ul>
+          <li>提现 silver：<code>silverCap &lt;= amount × 5</code></li>
+          <li>提现 material：<code>materialCap &lt;= amount × 5</code></li>
+          <li>提取神器：<code>rarity &lt; planet.level</code></li>
+          <li>每颗星球最多携带 <code>8</code> 件神器</li>
+        </ul>
+      </section>
+
+      <!-- ============ 十四、快捷键 ============ -->
+      <section id="hotkeys">
+        <h2>十四、快捷键</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>按键</th>
+              <th>作用</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><kbd>n</kbd></td>
+              <td>切换终端</td>
+            </tr>
+            <tr>
+              <td><kbd>m</kbd></td>
+              <td>切换周边面板</td>
+            </tr>
+            <tr>
+              <td><kbd>,</kbd></td>
+              <td>切换底部快捷键面板</td>
+            </tr>
+            <tr>
+              <td><kbd>p</kbd></td>
+              <td>钱包面板</td>
+            </tr>
+            <tr>
+              <td><kbd>h</kbd></td>
+              <td>帮助面板</td>
+            </tr>
+            <tr>
+              <td><kbd>j</kbd></td>
+              <td>设置面板</td>
+            </tr>
+            <tr>
+              <td><kbd>k</kbd></td>
+              <td>插件面板</td>
+            </tr>
+            <tr>
+              <td><kbd>;</kbd></td>
+              <td>我的星球面板</td>
+            </tr>
+            <tr>
+              <td><kbd>'</kbd></td>
+              <td>交易记录面板</td>
+            </tr>
+            <tr>
+              <td><kbd>i</kbd></td>
+              <td>诊断面板</td>
+            </tr>
+            <tr>
+              <td><kbd>g</kbd></td>
+              <td>公会面板</td>
+            </tr>
+            <tr>
+              <td><kbd>Space</kbd></td>
+              <td>暂停 / 继续挖矿</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>官方资源</h3>
+        <ul>
+          <li>
+            Twitter：<a
+              style="color: #6ab6ff"
+              href="https://x.com/darkforest_mud"
+              target="_blank"
+              >@darkforest_mud</a
+            >
+            ·
+            <a
+              style="color: #6ab6ff"
+              href="https://x.com/darkforest_punk"
+              target="_blank"
+              >@darkforest_punk</a
+            >
+          </li>
+          <li>
+            Discord：<a
+              style="color: #6ab6ff"
+              href="https://discord.gg/XpBPEnsvgX"
+              target="_blank"
+              >DFArchon Server</a
+            >
+          </li>
+          <li>
+            开发团队：<a
+              style="color: #6ab6ff"
+              href="https://x.com/DFArchon"
+              target="_blank"
+              >@DFArchon</a
+            >
+          </li>
+          <li>
+            Wiki：<a
+              style="color: #6ab6ff"
+              href="https://dfwiki.net/wiki/Main_Page"
+              target="_blank"
+              >dfwiki.net</a
+            >
+          </li>
+          <li>
+            赛季站点：<code>r1.dfmud.xyz</code>（v0.1.1） ·
+            <code>r2.dfmud.xyz</code>（v0.1.2）
+          </li>
+        </ul>
+      </section>
+
+      <footer>
+        <p>
+          本手册基于仓库
+          <code>darkforest-punk-main</code>
+          的链上合约（<code>packages/contracts</code>）与客户端（<code>packages/client</code>）代码整理。
+        </p>
+        <p>
+          © Dark Forest Punk community ·
+          本文仅用于玩法说明，祝你在黑暗森林中活得尽兴。
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

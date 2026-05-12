@@ -1,0 +1,4 @@
+.eslintrc.cjs
+*.json
+worlds.json
+packages/contracts/worlds.json

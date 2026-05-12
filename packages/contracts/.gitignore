@@ -1,0 +1,18 @@
+out/
+cache/
+node_modules/
+bindings/
+artifacts/
+broadcast/
+
+src/codegen/
+
+# Ignore MUD deploy artifacts
+deploys/**/*.json
+
+.env
+indexer.db
+
+.mud/
+
+script/test.s.sol
