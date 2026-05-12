@@ -1,5 +1,5 @@
 import { ModalName } from "@df/types";
-import React, { useState } from "react";
+import { useState } from "react";
 import styled from "styled-components";
 
 import type { Hook } from "../../_types/global/GlobalTypes";
@@ -10,9 +10,7 @@ import {
   TOGGLE_HELP_PANE,
   TOGGLE_PLUGINS_PANE,
   TOGGLE_SETTINGS_PANE,
-  TOGGLE_TRADE_PANE,
   TOGGLE_TRANSACTIONS_PANE,
-  TOGGLE_AI_CHAT_PANE,
   TOGGLE_WALLET_PANE,
   TOGGLE_YOUR_ARTIFACTS_PANE,
   TOGGLE_YOUR_PLANETS_DEX_PANE,
@@ -20,15 +18,16 @@ import {
 import { ModalToggleButton } from "./ModalIcon";
 
 export function SidebarPane({
-  aiChatHook,
+  aiChatHook: _aiChatHook,
   walletHook,
-  tradeHook,
+  tradeHook: _tradeHook,
   settingsHook,
   helpHook,
   pluginsHook,
   yourArtifactsHook,
   planetdexHook,
   transactionLogHook,
+  leaderboardHook,
   guildHook,
 }: {
   aiChatHook: Hook<boolean>;
@@ -40,6 +39,7 @@ export function SidebarPane({
   yourArtifactsHook: Hook<boolean>;
   planetdexHook: Hook<boolean>;
   transactionLogHook: Hook<boolean>;
+  leaderboardHook: Hook<boolean>;
   guildHook: Hook<boolean>;
 }) {
   const [sidebarHovered, setSidebarHovered] = useState<boolean>(false);
@@ -138,6 +138,13 @@ export function SidebarPane({
           size="stretch"
           shortcutKey={TOGGLE_TRANSACTIONS_PANE}
           shortcutText={sidebarHovered ? TOGGLE_TRANSACTIONS_PANE : undefined}
+        />
+        <EmSpacer height={0.5} />
+        <ModalToggleButton
+          modal={ModalName.Leaderboard}
+          hook={leaderboardHook}
+          text={sidebarHovered ? "Leaderboard" : undefined}
+          size="stretch"
         />
 
         <EmSpacer height={0.5} />

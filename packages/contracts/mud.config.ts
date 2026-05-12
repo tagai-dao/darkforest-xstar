@@ -148,6 +148,13 @@ export default defineWorld({
       },
       key: ["player"],
     },
+    PlayerKillStats: {
+      schema: {
+        player: "address",
+        populationDestroyed: "uint256",
+      },
+      key: ["player"],
+    },
     PlayerWithdrawMaterial: {
       schema: {
         player: "address",

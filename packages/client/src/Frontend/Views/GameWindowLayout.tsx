@@ -23,6 +23,7 @@ import GuildContextPane from "../Panes/GuildPane";
 import { HelpPane } from "../Panes/HelpPane";
 import { HotkeysArtShipPane, HotkeysMainLinePane } from "../Panes/HotKeyPane";
 import { HoverPlanetPane } from "../Panes/HoverPlanetPane";
+import { LeaderboardPane } from "../Panes/LeaderboardPane";
 import OnboardingPane from "../Panes/OnboardingPane";
 import { SelectedVoyageDisplay } from "../Components/SelectedVoyageDisplay";
 import { PlanetContextPane } from "../Panes/PlanetContextPane";
@@ -97,6 +98,9 @@ export function GameWindowLayout({
 
   const [transactionLogVisible, setTransactionLogVisible] = useState<boolean>(
     isModalOpen(ModalName.TransactionLog),
+  );
+  const [leaderboardVisible, setLeaderboardVisible] = useState<boolean>(
+    isModalOpen(ModalName.Leaderboard),
   );
 
   const [guildVisible, setGuildVisible] = useState<boolean>(
@@ -358,6 +362,10 @@ export function GameWindowLayout({
           visible={transactionLogVisible}
           onClose={() => setTransactionLogVisible(false)}
         />
+        <LeaderboardPane
+          visible={leaderboardVisible}
+          onClose={() => setLeaderboardVisible(false)}
+        />
         <PlanetDexPane
           visible={planetdexVisible}
           onClose={() => setPlanetdexVisible(false)}
@@ -442,6 +450,7 @@ export function GameWindowLayout({
                 transactionLogVisible,
                 setTransactionLogVisible,
               ]}
+              leaderboardHook={[leaderboardVisible, setLeaderboardVisible]}
               settingsHook={[settingsVisible, setSettingsVisible]}
               helpHook={[helpVisible, setHelpVisible]}
               pluginsHook={[pluginsVisible, setPluginsVisible]}

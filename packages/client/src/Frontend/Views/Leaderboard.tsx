@@ -1,6 +1,5 @@
-import type { Leaderboard } from "@df/types";
 import { ArtifactRarity } from "@df/types";
-import React, { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 
 import { Spacer } from "../Components/CoreUI";
@@ -10,37 +9,133 @@ import { Red } from "../Components/Text";
 import { TextPreview } from "../Components/TextPreview";
 import { RarityColors } from "../Styles/Colors";
 import dfstyles from "../Styles/dfstyles";
-import { useLeaderboard } from "../Utils/AppHooks";
 import { formatDuration } from "../Utils/TimeUtils";
 import { GenericErrorBoundary } from "./GenericErrorBoundary";
 import { Table } from "./Table";
 
-export function LeadboardDisplay() {
-  const { leaderboard, error } = useLeaderboard();
+type LeaderboardMode = "score" | "kills";
+type LeaderboardEntry = {
+  address: string;
+  name: string | null;
+  score: string;
+  kills: string;
+  rank: number;
+};
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ??
+  import.meta.env.VITE_LEADERBOARD_API_URL ??
+  "http://localhost:4100") as string;
+
+const toWsUrl = (httpUrl: string) => {
+  if (httpUrl.startsWith("https://"))
+    return httpUrl.replace("https://", "wss://");
+  if (httpUrl.startsWith("http://")) return httpUrl.replace("http://", "ws://");
+  return httpUrl;
+};
+
+export function LeadboardDisplay() {
+  const [mode, setMode] = useState<LeaderboardMode>("score");
+  const [rows, setRows] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const errorMessage = "Error Loading Leaderboard";
+
+  const fetchLeaderboard = useCallback(async (targetMode: LeaderboardMode) => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/leaderboard/${targetMode}?limit=100&offset=0`,
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch leaderboard: ${response.status}`);
+      }
+      const payload = (await response.json()) as { rows?: LeaderboardEntry[] };
+      setRows(payload.rows ?? []);
+      setError(null);
+    } catch (fetchError) {
+      console.error(fetchError);
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchLeaderboard(mode);
+  }, [fetchLeaderboard, mode]);
+
+  useEffect(() => {
+    const wsUrl = `${toWsUrl(API_BASE_URL)}/api/leaderboard`;
+    const ws = new WebSocket(wsUrl);
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          type?: string;
+          scoreRows?: LeaderboardEntry[];
+          killRows?: LeaderboardEntry[];
+        };
+        if (payload.type !== "leaderboard_update") return;
+        setRows(
+          mode === "score"
+            ? (payload.scoreRows ?? [])
+            : (payload.killRows ?? []),
+        );
+      } catch (wsError) {
+        console.error("Failed to parse leaderboard ws message:", wsError);
+      }
+    };
+    ws.onerror = (wsError) => {
+      console.error("Leaderboard websocket error:", wsError);
+    };
+    return () => ws.close();
+  }, [mode]);
+
+  const rankedPlayersCount = useMemo(
+    () =>
+      rows.filter((entry) => {
+        const metric = mode === "score" ? entry.score : entry.kills;
+        return BigInt(metric) > 0n;
+      }).length,
+    [mode, rows],
+  );
 
   return (
     <GenericErrorBoundary errorMessage={errorMessage}>
-      {!leaderboard && !error && (
-        <LoadingSpinner initialText={"Loading Leaderboard..."} />
+      <ModeSwitcher>
+        <ModeButton
+          type="button"
+          $active={mode === "score"}
+          onClick={() => setMode("score")}
+        >
+          Score
+        </ModeButton>
+        <ModeButton
+          type="button"
+          $active={mode === "kills"}
+          onClick={() => setMode("kills")}
+        >
+          Kills
+        </ModeButton>
+      </ModeSwitcher>
+
+      {loading && <LoadingSpinner initialText={"Loading Leaderboard..."} />}
+      {!loading && !error && (
+        <LeaderboardBody
+          rows={rows}
+          mode={mode}
+          rankedPlayersCount={rankedPlayersCount}
+        />
       )}
-      {leaderboard && <LeaderboardBody leaderboard={leaderboard} />}
-      {error && <Red>{errorMessage}</Red>}
+      {error && <Red>{error}</Red>}
     </GenericErrorBoundary>
   );
 }
 
-function scoreToString(score?: number | null) {
-  if (score === null || score === undefined) {
+function metricToString(metric: string) {
+  if (!metric) {
     return "n/a";
   }
-  score = Math.floor(score);
-  if (score < 10000) {
-    return score + "";
-  }
-
-  return score.toLocaleString();
+  return BigInt(metric).toLocaleString();
 }
 
 // pass in either an address, or a twitter handle. this function will render the appropriate
@@ -60,8 +155,8 @@ function playerToEntry(playerStr: string, color: string) {
   return <TwitterLink twitter={playerStr} color={color} />;
 }
 
-function getRankColor([rank, score]: [number, number | undefined]) {
-  if (score === undefined || score === null) {
+function getRankColor([rank, metric]: [number, string]) {
+  if (!metric || BigInt(metric) === 0n) {
     return dfstyles.colors.subtext;
   }
 
@@ -94,9 +189,12 @@ function getRankColor([rank, score]: [number, number | undefined]) {
 
 function LeaderboardTable({
   rows,
+  mode,
 }: {
-  rows: Array<[string, number | undefined]>;
+  rows: LeaderboardEntry[];
+  mode: LeaderboardMode;
 }) {
+  const metricName = mode === "score" ? "score" : "kills";
   return (
     <TableContainer>
       <Table
@@ -104,27 +202,32 @@ function LeaderboardTable({
         headers={[
           <Cell key="place">place</Cell>,
           <Cell key="player">player</Cell>,
-          <Cell key="score">score</Cell>,
+          <Cell key={metricName}>{metricName}</Cell>,
         ]}
         rows={rows}
         columns={[
-          (row: [string, number], i) => (
-            <Cell style={{ color: getRankColor([i, row[1]]) }}>
-              {row[1] === undefined || row[1] === null
-                ? "unranked"
-                : i + 1 + "."}
-            </Cell>
-          ),
-          (row: [string, number | undefined], i) => {
-            const color = getRankColor([i, row[1]]);
+          (row: LeaderboardEntry, i) => {
+            const metric = mode === "score" ? row.score : row.kills;
             return (
-              <Cell style={{ color }}>{playerToEntry(row[0], color)}</Cell>
+              <Cell style={{ color: getRankColor([i, metric]) }}>
+                {BigInt(metric) === 0n ? "unranked" : row.rank + "."}
+              </Cell>
             );
           },
-          (row: [string, number], i) => {
+          (row: LeaderboardEntry, i) => {
+            const metric = mode === "score" ? row.score : row.kills;
+            const color = getRankColor([i, metric]);
+            const playerLabel =
+              row.name && row.name.length > 0 ? row.name : row.address;
             return (
-              <Cell style={{ color: getRankColor([i, row[1]]) }}>
-                {scoreToString(row[1])}
+              <Cell style={{ color }}>{playerToEntry(playerLabel, color)}</Cell>
+            );
+          },
+          (row: LeaderboardEntry, i) => {
+            const metric = mode === "score" ? row.score : row.kills;
+            return (
+              <Cell style={{ color: getRankColor([i, metric]) }}>
+                {metricToString(metric)}
               </Cell>
             );
           },
@@ -163,33 +266,15 @@ function CountDown() {
   return <>{str}</>;
 }
 
-function LeaderboardBody({ leaderboard }: { leaderboard: Leaderboard }) {
-  const rankedPlayers = leaderboard.entries.filter(
-    (entry) => entry.score !== undefined && entry.score > 0,
-  );
-
-  leaderboard.entries.sort((a, b) => {
-    if (typeof a.score !== "number" && typeof b.score !== "number") {
-      return 0;
-    } else if (typeof a.score !== "number") {
-      return 1;
-    } else if (typeof b.score !== "number") {
-      return -1;
-    }
-
-    return b.score - a.score;
-  });
-
-  const rows: [string, number | undefined][] = leaderboard.entries.map(
-    (entry) => {
-      if (typeof entry.twitter === "string") {
-        return [entry.twitter, entry.score];
-      }
-
-      return [entry.ethAddress, entry.score];
-    },
-  );
-
+function LeaderboardBody({
+  rows,
+  mode,
+  rankedPlayersCount,
+}: {
+  rows: LeaderboardEntry[];
+  mode: LeaderboardMode;
+  rankedPlayersCount: number;
+}) {
   return (
     <div>
       <StatsTableContainer>
@@ -203,20 +288,38 @@ function LeaderboardBody({ leaderboard }: { leaderboard: Leaderboard }) {
             </tr>
             <tr>
               <td>players</td>
-              <td>{leaderboard.entries.length}</td>
+              <td>{rows.length}</td>
             </tr>
             <tr>
               <td>ranked players</td>
-              <td>{rankedPlayers.length}</td>
+              <td>{rankedPlayersCount}</td>
             </tr>
           </tbody>
         </StatsTable>
       </StatsTableContainer>
       <Spacer height={8} />
-      <LeaderboardTable rows={rows} />
+      <LeaderboardTable rows={rows} mode={mode} />
     </div>
   );
 }
+
+const ModeSwitcher = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+`;
+
+const ModeButton = styled.button<{ $active: boolean }>`
+  border: 1px solid ${dfstyles.colors.border};
+  background: ${(props) =>
+    props.$active ? dfstyles.colors.text : "transparent"};
+  color: ${(props) => (props.$active ? "black" : dfstyles.colors.text)};
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+`;
 
 const Cell = styled.div`
   padding: 4px 8px;
