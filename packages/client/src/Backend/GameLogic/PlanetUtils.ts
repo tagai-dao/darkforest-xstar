@@ -227,7 +227,20 @@ export class PlanetUtils {
         upgradeState[0] = planetData.upgrades & 0x0000ff; // defense
         useProps = planetData.useProps;
       } else {
-        throw new Error("planet data not found");
+        // PlanetConstants 已同步而 Planet 表尚未写入时（清缓存后重连、索引/RPC 滞后等），
+        // 用与「仅链下元数据」相同的规则给出初始人口/银两，避免 hardRefresh 整条链路抛错导致界面空白。
+        //
+        // useProps 必须从链上其它表推断：若已有 PlanetProps，则与链上一致走「升级属性」分支；
+        // 否则误用 PlanetMetadata + 全零 upgradeState，会导致能量/银上限与真实不一致，
+        // updatePlanetToTick 等逻辑表现异常（人口、资源、移动相关 UI）。
+        const planetPropsPeek = getComponentValue(PlanetProps, planetEntity);
+        useProps = planetPropsPeek !== undefined;
+        [population, silver] = this._initPopulationAndSilver(
+          spaceType,
+          planetType,
+          planetLevel,
+        );
+        lastUpdateTick = 0;
       }
     } else {
       universeZone = this._initZone(distSquare);

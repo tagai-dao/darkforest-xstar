@@ -25,9 +25,9 @@ export class AttribManager {
   private loc: number;
 
   /**
-   * The WebGLBuffer associated with this attribute.
+   * The WebGLBuffer associated with this attribute（着色器可能优化掉 attribute，此时为 null）。
    */
-  private buffer: WebGLBuffer;
+  private buffer: WebGLBuffer | null;
 
   /**
    * An internally managed AttribArray, which is a typed mutable array.
@@ -39,13 +39,13 @@ export class AttribManager {
    * @param gl - The WebGL context to generate this attrib on.
    * @param program - The program corresponding to this attrib.
    * @param props - An AttribProps object, containing the attrib name and other info.
-   * @param enable - Should we call gl.enableVertexAttribArray? (default true)
+   * @param _enable 保留参数以兼容旧调用；enable 已移至 bufferData，避免跨程序污染 attribute 状态。
    */
   constructor(
     gl: WebGL2RenderingContext,
     program: WebGLProgram,
     props: AttribProps,
-    enable = true,
+    _enable = true,
   ) {
     this.gl = gl;
     this.props = props;
@@ -53,13 +53,17 @@ export class AttribManager {
     gl.useProgram(program); // should not be necessary, but just in case
 
     const loc = gl.getAttribLocation(program, props.name);
+    // 被链接器优化掉的 attribute 不要建 buffer，也不要 enable（避免 WebGL 无效状态污染全局）。
+    if (loc < 0) {
+      this.loc = loc;
+      this.buffer = null;
+      this.attribArray = new AttribArray(props.type);
+      return;
+    }
+
     const buffer = gl.createBuffer();
     if (!buffer) {
       throw "Error creating buffer for attrib: " + props.name;
-    }
-
-    if (enable) {
-      gl.enableVertexAttribArray(loc);
     }
 
     this.loc = loc;
@@ -78,6 +82,7 @@ export class AttribManager {
    * @param idx - The starting vertex # to write to.
    */
   public setVertex(els: number[], idx: number): void {
+    if (this.loc < 0) return;
     this.attribArray.set(els, idx * this.props.dim);
   }
 
@@ -86,11 +91,14 @@ export class AttribManager {
    * @param n The number of vertices to send through the buffer.
    */
   public bufferData(n: number): void {
+    if (this.loc < 0 || !this.buffer) return;
+
     const { gl, loc } = this;
     const { dim, type, normalize } = this.props;
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.vertexAttribPointer(loc, dim, type, normalize, 0, 0);
+    gl.enableVertexAttribArray(loc);
     gl.bufferData(
       gl.ARRAY_BUFFER,
       this.attribArray.array,

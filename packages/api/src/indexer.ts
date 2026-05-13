@@ -8,9 +8,30 @@ import {
 import { syncToRecs } from "@latticexyz/store-sync/recs";
 import { createPublicClient, type Hex, http } from "viem";
 
-import mudConfig from "../../contracts/mud.config";
+import mudConfigImport from "contracts/mud.config";
 import type { config as configType } from "./config";
 import type { LeaderboardDb } from "./db";
+
+/**
+ * store-sync 的 `configToTables` 需要 `defineWorld` 解析后的 `namespaces`。
+ * 通过 workspace 的 `contracts` 与直接的 `@latticexyz/world`/`store` 依赖，与 client 对齐，避免 pnpm 下
+ * 仅 transitive 依赖时出现 config 形状不一致。
+ */
+function mudConfigForSync(): typeof mudConfigImport {
+  const m = mudConfigImport as unknown;
+  if (m && typeof m === "object" && "namespaces" in (m as object)) {
+    return mudConfigImport;
+  }
+  if (m && typeof m === "object" && "default" in (m as object)) {
+    const inner = (m as { default: unknown }).default;
+    if (inner && typeof inner === "object" && "namespaces" in inner) {
+      return inner as typeof mudConfigImport;
+    }
+  }
+  throw new Error(
+    "[api] contracts/mud.config 未提供带 `namespaces` 的配置。请运行 pnpm install，并确认 packages/api 依赖了 contracts 与 @latticexyz/world（与 client 同版本）。",
+  );
+}
 
 type IndexerConfig = typeof configType;
 
@@ -58,7 +79,7 @@ export class LeaderboardIndexer {
 
     const { components, latestBlock$ } = await syncToRecs({
       world: this.world,
-      config: mudConfig,
+      config: mudConfigForSync(),
       address: this.config.worldAddress as Hex,
       publicClient,
       indexerUrl: this.config.indexerUrl,

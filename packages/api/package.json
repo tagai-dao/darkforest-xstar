@@ -11,7 +11,10 @@
   },
   "dependencies": {
     "@latticexyz/recs": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f",
+    "@latticexyz/store": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f",
     "@latticexyz/store-sync": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f",
+    "@latticexyz/world": "2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f",
+    "contracts": "workspace:*",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "mysql2": "^3.12.0",

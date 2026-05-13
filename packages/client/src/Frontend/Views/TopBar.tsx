@@ -49,10 +49,24 @@ function BoardPlacement({ account }: { account: EthAddress | undefined }) {
       formattedScore = scoreAmount.toLocaleString();
     }
 
+    const formattedKills = (player.value.kills ?? 0).toLocaleString();
+
     content = (
       <Sub>
         <TooltipTrigger name={TooltipName.Score}>
           score: <Text>{formattedScore}</Text>
+        </TooltipTrigger>
+        <Text>{" · "}</Text>
+        <TooltipTrigger
+          name={TooltipName.Empty}
+          extraContent={
+            <Text>
+              累计摧毁的敌方人口总量（与排行榜 kills 一致），来自链上
+              PlayerKillStats。
+            </Text>
+          }
+        >
+          kills: <Text>{formattedKills}</Text>
         </TooltipTrigger>
       </Sub>
     );

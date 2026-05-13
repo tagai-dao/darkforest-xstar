@@ -132,14 +132,28 @@ export const GamePassAdminPanel = () => {
       throw new Error("Please connect an admin wallet first.");
     }
 
+    const account = walletClient.account;
+    const chain = walletClient.chain;
+
+    const isLocalAnvil = publicClient.chain?.id === 31337;
+    const chainAlignedNonce = isLocalAnvil
+      ? await publicClient.getTransactionCount({
+          address: account.address,
+          blockTag: "pending",
+        })
+      : undefined;
+
     const tx = await (
       walletClient as unknown as {
-        writeContract: (request: Record<string, unknown>) => Promise<`0x${string}`>;
+        writeContract: (
+          request: Record<string, unknown>,
+        ) => Promise<`0x${string}`>;
       }
     ).writeContract({
-      account: walletClient.account,
-      chain: walletClient.chain,
+      account,
+      chain,
       ...request,
+      ...(chainAlignedNonce !== undefined ? { nonce: chainAlignedNonce } : {}),
     });
     await waitForTransaction(tx);
     return tx;
@@ -168,7 +182,10 @@ export const GamePassAdminPanel = () => {
   const handleSingleTokenMint = async () => {
     try {
       setStatus("Minting test tokens...");
-      await mintToken(normalizeAddress(tokenRecipient), parseTokenAmount(tokenAmount));
+      await mintToken(
+        normalizeAddress(tokenRecipient),
+        parseTokenAmount(tokenAmount),
+      );
       setStatus("Test tokens minted.");
     } catch (error) {
       console.error(error);
@@ -189,7 +206,9 @@ export const GamePassAdminPanel = () => {
       setStatus(`Batch token mint complete: ${rows.length} recipients.`);
     } catch (error) {
       console.error(error);
-      setStatus(error instanceof Error ? error.message : "Batch token mint failed.");
+      setStatus(
+        error instanceof Error ? error.message : "Batch token mint failed.",
+      );
     }
   };
 
@@ -208,7 +227,9 @@ export const GamePassAdminPanel = () => {
     try {
       if (!gamePassAddress) throw new Error("GamePassNFT is not configured.");
       const recipients = parseAddressRows(batchNftRows);
-      setStatus(`Minting Game Pass NFTs for ${recipients.length} recipients...`);
+      setStatus(
+        `Minting Game Pass NFTs for ${recipients.length} recipients...`,
+      );
       await writeAndWait({
         address: gamePassAddress,
         abi: GAME_PASS_ABI,
@@ -218,7 +239,9 @@ export const GamePassAdminPanel = () => {
       setStatus(`Batch NFT mint complete: ${recipients.length} recipients.`);
     } catch (error) {
       console.error(error);
-      setStatus(error instanceof Error ? error.message : "Batch NFT mint failed.");
+      setStatus(
+        error instanceof Error ? error.message : "Batch NFT mint failed.",
+      );
     }
   };
 
@@ -232,7 +255,10 @@ export const GamePassAdminPanel = () => {
         <div>Mock token: {paymentToken ?? "-"}</div>
         <div>Mock token owner: {tokenOwner ?? "-"}</div>
         <div>
-          NFT price: {passPrice === undefined ? "-" : `${formatUnits(passPrice, 18)} tokens`}
+          NFT price:{" "}
+          {passPrice === undefined
+            ? "-"
+            : `${formatUnits(passPrice, 18)} tokens`}
         </div>
       </div>
 
@@ -241,13 +267,13 @@ export const GamePassAdminPanel = () => {
         <input
           value={tokenRecipient}
           onChange={(event) => setTokenRecipient(event.target.value)}
-          className="mb-2 block w-full rounded border border-gray-300 px-3 py-2"
+          className="mb-2 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
           placeholder="Recipient address"
         />
         <input
           value={tokenAmount}
           onChange={(event) => setTokenAmount(event.target.value)}
-          className="mb-3 block w-full rounded border border-gray-300 px-3 py-2"
+          className="mb-3 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
           placeholder="Token amount, e.g. 100000"
         />
         <button
@@ -261,8 +287,10 @@ export const GamePassAdminPanel = () => {
         <textarea
           value={batchTokenRows}
           onChange={(event) => setBatchTokenRows(event.target.value)}
-          className="mt-4 block h-28 w-full rounded border border-gray-300 px-3 py-2"
-          placeholder={"Batch format, one per line:\n0xabc...,100000\n0xdef...,50000"}
+          className="mt-4 block h-28 w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
+          placeholder={
+            "Batch format, one per line:\n0xabc...,100000\n0xdef...,50000"
+          }
         />
         <button
           type="button"
@@ -278,7 +306,7 @@ export const GamePassAdminPanel = () => {
         <input
           value={nftRecipient}
           onChange={(event) => setNftRecipient(event.target.value)}
-          className="mb-3 block w-full rounded border border-gray-300 px-3 py-2"
+          className="mb-3 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
           placeholder="Recipient address"
         />
         <button
@@ -292,8 +320,10 @@ export const GamePassAdminPanel = () => {
         <textarea
           value={batchNftRows}
           onChange={(event) => setBatchNftRows(event.target.value)}
-          className="mt-4 block h-28 w-full rounded border border-gray-300 px-3 py-2"
-          placeholder={"Batch NFT recipients, one address per line:\n0xabc...\n0xdef..."}
+          className="mt-4 block h-28 w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
+          placeholder={
+            "Batch NFT recipients, one address per line:\n0xabc...\n0xdef..."
+          }
         />
         <button
           type="button"
@@ -304,7 +334,11 @@ export const GamePassAdminPanel = () => {
         </button>
       </div>
 
-      {status && <div className="mt-4 rounded bg-gray-100 p-3 text-sm">{status}</div>}
+      {status && (
+        <div className="mt-4 rounded bg-gray-100 p-3 text-sm text-gray-900">
+          {status}
+        </div>
+      )}
     </div>
   );
 };

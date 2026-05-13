@@ -10,6 +10,8 @@ export type Player = {
   lastRevealTick: number;
   silver: number;
   score: number;
+  /** 累计摧毁的敌方人口（链上 PlayerKillStats.populationDestroyed），用于排行榜 kills */
+  kills: number;
   junk: number;
   junkLimit: number;
 };

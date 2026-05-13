@@ -174,6 +174,7 @@ export class ContractsAPI extends EventEmitter {
   private planetAddJunkTickSubscription: Subscription;
   private moveSubscription: Subscription;
   private playerScoreSubscription: Subscription;
+  private playerKillStatsSubscription: Subscription;
   private tickerRateSubscription: Subscription;
   private setPlanetEmojiSubscription: Subscription;
 
@@ -477,6 +478,17 @@ export class ContractsAPI extends EventEmitter {
 
     this.playerScoreSubscription =
       this.components.PlayerScore.update$.subscribe((update) => {
+        const entity = update.entity;
+        const [nextValue] = update.value;
+        const playerAddr = hexToEthAddress(entity.toString() as Hex);
+
+        if (nextValue) {
+          this.emit(ContractsAPIEvent.PlayerUpdate, playerAddr);
+        }
+      });
+
+    this.playerKillStatsSubscription =
+      this.components.PlayerKillStats.update$.subscribe((update) => {
         const entity = update.entity;
         const [nextValue] = update.value;
         const playerAddr = hexToEthAddress(entity.toString() as Hex);
@@ -1012,6 +1024,7 @@ export class ContractsAPI extends EventEmitter {
     this.planetAddJunkTickSubscription.unsubscribe();
     this.moveSubscription.unsubscribe();
     this.playerScoreSubscription.unsubscribe();
+    this.playerKillStatsSubscription.unsubscribe();
     this.tickerRateSubscription.unsubscribe();
     this.setPlanetEmojiSubscription.unsubscribe();
     this.guildSubscription.unsubscribe();
@@ -1518,6 +1531,7 @@ export class ContractsAPI extends EventEmitter {
       LastReveal,
       PlayerWithdrawSilver,
       PlayerScore,
+      PlayerKillStats,
       PlayerJunk,
       PlayerJunkLimit,
     } = this.components;
@@ -1549,6 +1563,17 @@ export class ContractsAPI extends EventEmitter {
       player: addressToHex(playerId),
     });
     const playerScore = getComponentValue(PlayerScore, playerScoreKey);
+
+    const playerKillStatsKey = encodeEntity(
+      PlayerKillStats.metadata.keySchema,
+      {
+        player: addressToHex(playerId),
+      },
+    );
+    const playerKillStats = getComponentValue(
+      PlayerKillStats,
+      playerKillStatsKey,
+    );
 
     const playerJunkKey = encodeEntity(PlayerJunk.metadata.keySchema, {
       owner: addressToHex(playerId),
@@ -1582,6 +1607,7 @@ export class ContractsAPI extends EventEmitter {
       lastRevealTick: lastReveal ? Number(lastReveal.tickNumber) : 0,
       silver: playerSilver ? Number(playerSilver.silver) : 0,
       score: playerScore ? Number(playerScore.score) : 0,
+      kills: playerKillStats ? Number(playerKillStats.populationDestroyed) : 0,
       junk: playerJunk ? Number(playerJunk.junk) : 0,
       junkLimit: playerJunkLimit ? Number(playerJunkLimit.junk) : 0,
     };

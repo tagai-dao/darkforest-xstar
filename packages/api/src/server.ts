@@ -17,6 +17,23 @@ export class LeaderboardServer {
   }
 
   public setupRoutes() {
+    // 前端（如 Vite :3000）与 API（:4100）不同源时，浏览器会校验 CORS；本 API 无 cookie 鉴权，开发环境用 * 即可。
+    this.app.use((_req, res, next) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        (_req.headers["access-control-request-headers"] as
+          | string
+          | undefined) ?? "Content-Type",
+      );
+      if (_req.method === "OPTIONS") {
+        res.sendStatus(204);
+        return;
+      }
+      next();
+    });
+
     this.app.get("/health", (_request, response) => {
       response.json({ ok: true });
     });

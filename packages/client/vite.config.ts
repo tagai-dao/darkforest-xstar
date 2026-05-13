@@ -40,6 +40,8 @@ export default defineConfig({
     devSourcemap: false,
   },
   assetsInclude: ["**/*.zkey", "**/*.wasm"],
+  // 强制 DEV=false：本地 `pnpm dev` 时也不挂载 @latticexyz/dev-tools（index.tsx 里 `if (import.meta.env.DEV)`），避免右侧开发栏无法关闭。
+  // 代价：getNetworkConfig 里依赖 DEV 的逻辑会按「非开发」走——例如本地需加 `?useBurner` 才会 useBurner；`?asAdmin` 依赖 DEV 的 anvil 默认私钥不会自动启用。
   define: {
     "import.meta.env.DEV": false,
   },

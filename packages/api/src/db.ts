@@ -36,10 +36,11 @@ export class LeaderboardDb {
       )
     `);
 
+    // MySQL DECIMAL 精度上限为 65；链上 uint256 最多约 78 位十进制，此处用 65 足以覆盖常见游戏数值。
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS player_scores (
         address VARCHAR(42) PRIMARY KEY,
-        score DECIMAL(78,0) NOT NULL DEFAULT 0,
+        score DECIMAL(65,0) NOT NULL DEFAULT 0,
         updated_at_block BIGINT UNSIGNED NOT NULL DEFAULT 0,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_player_scores_players FOREIGN KEY (address) REFERENCES players(address) ON DELETE CASCADE
@@ -49,7 +50,7 @@ export class LeaderboardDb {
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS player_kill_stats (
         address VARCHAR(42) PRIMARY KEY,
-        population_destroyed DECIMAL(78,0) NOT NULL DEFAULT 0,
+        population_destroyed DECIMAL(65,0) NOT NULL DEFAULT 0,
         updated_at_block BIGINT UNSIGNED NOT NULL DEFAULT 0,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_player_kill_stats_players FOREIGN KEY (address) REFERENCES players(address) ON DELETE CASCADE

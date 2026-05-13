@@ -202,14 +202,29 @@ export class GenericRenderer<
    * @param drawMode The drawing mode for the buffered vertices. Default: Triangles.
    */
   public flush(drawMode: DrawMode = DrawMode.Triangles) {
+    const { gl } = this.manager;
+
+    // 无顶点时仍清理 attribute：上一帧其它 program 可能留下了 enable 但未绑定的槽位，
+    // 若本帧所有 renderer 都 early-return，会导致后续 drawArrays INVALID_OPERATION。
     if (this.verts === 0) {
+      gl.useProgram(this.program);
+      const maxAttribs = gl.getParameter(gl.MAX_VERTEX_ATTRIBS) as number;
+      for (let i = 0; i < maxAttribs; i++) {
+        gl.disableVertexAttribArray(i);
+      }
       return;
     }
 
-    const { gl } = this.manager;
     gl.useProgram(this.program);
 
     this.setUniforms();
+
+    // 多个 GenericRenderer 共用同一 gl 时，各程序在构造阶段 enable 的 attribute 会一直保持启用；
+    // 切换 useProgram 后若仍有「已启用但未绑定当前 VBO」的槽位，drawArrays 会报 INVALID_OPERATION。
+    const maxAttribs = gl.getParameter(gl.MAX_VERTEX_ATTRIBS) as number;
+    for (let i = 0; i < maxAttribs; i++) {
+      gl.disableVertexAttribArray(i);
+    }
 
     for (const attrib in this.attribManagers) {
       this.attribManagers[attrib].bufferData(this.verts);

@@ -51,6 +51,7 @@
     "ethers": "5.7",
     "fastq": "1.17.1",
     "file-saver": "2.0.5",
+    "focus-visible": "^5.1.0",
     "gl-matrix": "3.4.3",
     "howler": "^2.2.4",
     "idb": "8.0.0",

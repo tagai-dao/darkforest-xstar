@@ -3,7 +3,6 @@ import { useComponentValue } from "@latticexyz/react";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
 import { useEffect, useState } from "react";
-import { encodeFunctionData } from "viem";
 import { useWalletClient } from "wagmi";
 
 export const PlayPauseTickButton = () => {
@@ -101,7 +100,7 @@ export const PlayPauseTickButton = () => {
         id="tickerNewValue"
         value={Number(tickerNewValue)}
         onChange={(e) => setTickerNewValue(BigInt(e.target.value))}
-        className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+        className="mt-1 block w-full min-w-[8rem] rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
         placeholder="new tick"
       />
       <button

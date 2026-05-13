@@ -294,12 +294,25 @@ export const RedPillRegisterPlayer = ({
     request: Record<string, unknown>,
   ) => {
     const writeClient = walletClient as WalletClient & {
-      writeContract: (request: Record<string, unknown>) => Promise<`0x${string}`>;
+      writeContract: (
+        request: Record<string, unknown>,
+      ) => Promise<`0x${string}`>;
     };
+
+    const account = walletClient.account;
+    const isLocalAnvil = publicClient.chain?.id === 31337;
+    const chainAlignedNonce = isLocalAnvil
+      ? await publicClient.getTransactionCount({
+          address: account.address,
+          blockTag: "pending",
+        })
+      : undefined;
+
     const tx = await writeClient.writeContract({
       chain: publicClient.chain,
-      account: walletClient.account,
+      account,
       ...request,
+      ...(chainAlignedNonce !== undefined ? { nonce: chainAlignedNonce } : {}),
     });
     await waitForTransaction(tx);
     return tx;
@@ -581,7 +594,9 @@ export const RedPillRegisterPlayer = ({
 
       // Use the viem wallet client created from ethConnection
       const sendClient = redPillWalletClient as WalletClient & {
-        sendTransaction: (request: Record<string, unknown>) => Promise<`0x${string}`>;
+        sendTransaction: (
+          request: Record<string, unknown>,
+        ) => Promise<`0x${string}`>;
       };
       const txResponse = await sendClient.sendTransaction(txData);
       console.log("Transaction sent:", txResponse);
@@ -616,6 +631,21 @@ export const RedPillRegisterPlayer = ({
       gamePassRequirement.passPrice !== undefined &&
       gamePassRequirement.tokenBalance < gamePassRequirement.passPrice;
 
+    let accessStatus: React.ReactNode;
+    if (gamePassRequirement.isLoading) {
+      accessStatus = "Checking...";
+    } else if (gamePassRequirement.isBound) {
+      accessStatus = <Green>Game Pass already bound</Green>;
+    } else if (gamePassRequirement.hasUnboundPass) {
+      accessStatus = (
+        <Green>Unbound Game Pass found, registration will bind it</Green>
+      );
+    } else {
+      accessStatus = (
+        <Red>No Game Pass found, registration will try to buy one</Red>
+      );
+    }
+
     return (
       <div className="max-w-xl rounded-lg border border-pink-400 bg-black/40 p-4 text-sm text-white">
         <div className="mb-2 text-lg font-semibold text-pink-300">
@@ -627,20 +657,10 @@ export const RedPillRegisterPlayer = ({
           bind one with MockToken first.
         </div>
         <div className="mt-3 space-y-1">
+          <div>Access status: {accessStatus}</div>
           <div>
-            Access status:{" "}
-            {gamePassRequirement.isLoading ? (
-              "Checking..."
-            ) : gamePassRequirement.isBound ? (
-              <Green>Game Pass already bound</Green>
-            ) : gamePassRequirement.hasUnboundPass ? (
-              <Green>Unbound Game Pass found, registration will bind it</Green>
-            ) : (
-              <Red>No Game Pass found, registration will try to buy one</Red>
-            )}
-          </div>
-          <div>
-            NFT price: {formatTokenAmount(gamePassRequirement.passPrice)} MockToken
+            NFT price: {formatTokenAmount(gamePassRequirement.passPrice)}{" "}
+            MockToken
           </div>
           <div>
             Current wallet MockToken balance:{" "}
