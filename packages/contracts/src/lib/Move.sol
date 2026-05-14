@@ -18,6 +18,7 @@ import { MoveInput } from "libraries/VerificationInput.sol";
 import { DFUtils } from "libraries/DFUtils.sol";
 import { JunkConfig } from "codegen/tables/JunkConfig.sol";
 import { GlobalStats } from "codegen/tables/GlobalStats.sol";
+import { PlayerKillStats } from "codegen/tables/PlayerKillStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
 
 library MoveLib {
@@ -122,7 +123,7 @@ library MoveLib {
     }
     // if time == 0, unload immediately
     if (time == 0) {
-      arrivedAt(move, to);
+      arrivedAtRecordKills(move, to);
     } else {
       to.pushMove(move);
     }
@@ -138,6 +139,46 @@ library MoveLib {
     _unloadMaterials(move, planet);
 
     return (move, planet);
+  }
+
+  function arrivedAtRecordKills(
+    MoveData memory move,
+    Planet memory planet
+  ) public returns (MoveData memory, Planet memory) {
+    assert(move.arrivalTick == planet.lastUpdateTick);
+    _recordEnemyPopulationDestroyed(move, planet);
+    _unloadPopulation(move, planet);
+    _unloadSilver(move, planet);
+    _unloadArtifact(move, planet);
+    _unloadMaterials(move, planet);
+
+    return (move, planet);
+  }
+
+  function _recordEnemyPopulationDestroyed(MoveData memory move, Planet memory to) internal {
+    address defenderOwner = to.owner;
+    if (defenderOwner == address(0)) {
+      return;
+    }
+    if (move.captain == defenderOwner || GuildUtils.inSameGuild(move.captain, defenderOwner, move.arrivalTick)) {
+      return;
+    }
+
+    uint256 defenderPopulation = to.population;
+    uint256 arrivedPopulation = move.population;
+    uint256 defense = to.defense;
+    uint256 destroyed;
+    if (defenderPopulation > (arrivedPopulation * 100) / defense) {
+      destroyed = (arrivedPopulation * 100) / defense;
+    } else {
+      destroyed = defenderPopulation;
+    }
+    if (destroyed == 0) {
+      return;
+    }
+
+    address attacker = move.captain;
+    PlayerKillStats.set(attacker, PlayerKillStats.get(attacker) + destroyed);
   }
 
   function _unloadPopulation(MoveData memory move, Planet memory to) internal view {

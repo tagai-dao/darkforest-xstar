@@ -1,35 +1,39 @@
+import type { EthConnection } from "@df/network";
 import { addressToHex } from "@df/serde";
+import type { EthAddress } from "@df/types";
 import { Green, Red } from "@frontend/Components/Text";
+import { transactionQueue, writeObserver } from "@latticexyz/common/actions";
+import { observer } from "@latticexyz/explorer/observer";
 import { getComponentValue } from "@latticexyz/recs";
 import { encodeEntity, singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
 import React, { useCallback, useEffect, useState } from "react";
 import styled from "styled-components";
 import {
+  type Address,
   createWalletClient,
   encodeFunctionData,
   formatUnits,
   http,
   parseAbi,
-  zeroAddress,
-  type Address,
   type WalletClient,
+  zeroAddress,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import type { EthConnection } from "@df/network";
-import { observer } from "@latticexyz/explorer/observer";
-import { transactionQueue, writeObserver } from "@latticexyz/common/actions";
-import type { EthAddress } from "@df/types";
 
 const GAME_PASS_ABI = parseAbi([
   "function paymentToken() view returns (address)",
   "function price() view returns (uint256)",
-  "function isBoundToCurrentRound(address player) view returns (bool)",
+  "function activeWorld() view returns (address)",
+  "function activeSeason() view returns (uint8)",
+  "function isSeasonOpen() view returns (bool)",
+  "function isPlayerInActiveSeason(address player) view returns (bool)",
+  "function isTokenInGame(uint256 tokenId) view returns (bool)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function balanceOf(address owner) view returns (uint256)",
-  "function tokenBoundPlayer(uint256 tokenId) view returns (address)",
   "function buyPass() returns (uint256)",
-  "function bindToCurrentRound(uint256 tokenId)",
+  "function joinSeason(uint256 tokenId)",
+  "function unbind(uint256 tokenId)",
 ]);
 
 const ERC20_ABI = parseAbi([
@@ -41,8 +45,11 @@ const ERC20_ABI = parseAbi([
 type GamePassRequirement = {
   isEnabled: boolean;
   isLoading: boolean;
-  isBound: boolean;
-  hasUnboundPass: boolean;
+  isSeasonOpen: boolean;
+  isJoined: boolean;
+  hasJoinablePass: boolean;
+  activeWorld?: Address;
+  activeSeason?: number;
   tokenBalance?: bigint;
   passPrice?: bigint;
   paymentToken?: Address;
@@ -195,8 +202,9 @@ export const RedPillRegisterPlayer = ({
     useState<GamePassRequirement>({
       isEnabled: false,
       isLoading: false,
-      isBound: false,
-      hasUnboundPass: false,
+      isSeasonOpen: false,
+      isJoined: false,
+      hasJoinablePass: false,
     });
 
   // Convert EthAddress to 0x hex string
@@ -241,7 +249,7 @@ export const RedPillRegisterPlayer = ({
   }, [ethConnection, waitForTransaction, publicClient]);
 
   useEffect(() => {
-    const checkPlayerRegistration = async () => {
+    const checkPlayerRegistration = () => {
       if (playerEntity && ethConnection) {
         const address = ethConnection.getAddress();
         if (address) {
@@ -318,7 +326,7 @@ export const RedPillRegisterPlayer = ({
     return tx;
   };
 
-  const findUnboundOwnedPass = async (
+  const findJoinableOwnedPass = async (
     passAddress: Address,
     playerAddress: Address,
   ) => {
@@ -336,14 +344,14 @@ export const RedPillRegisterPlayer = ({
         functionName: "tokenOfOwnerByIndex",
         args: [playerAddress, i],
       });
-      const boundPlayer = await publicClient.readContract({
+      const inGame = await publicClient.readContract({
         address: passAddress,
         abi: GAME_PASS_ABI,
-        functionName: "tokenBoundPlayer",
+        functionName: "isTokenInGame",
         args: [tokenId],
       });
 
-      if (boundPlayer === zeroAddress) {
+      if (!inGame) {
         return tokenId;
       }
     }
@@ -358,8 +366,9 @@ export const RedPillRegisterPlayer = ({
       setGamePassRequirement({
         isEnabled: !!passAddress,
         isLoading: false,
-        isBound: false,
-        hasUnboundPass: false,
+        isSeasonOpen: false,
+        isJoined: false,
+        hasJoinablePass: false,
       });
       return;
     }
@@ -372,12 +381,34 @@ export const RedPillRegisterPlayer = ({
     }));
 
     try {
-      const [isBound, paymentToken, passPrice] = await Promise.all([
+      const [
+        isSeasonOpen,
+        isJoined,
+        activeWorld,
+        activeSeason,
+        paymentToken,
+        passPrice,
+      ] = await Promise.all([
         publicClient.readContract({
           address: passAddress,
           abi: GAME_PASS_ABI,
-          functionName: "isBoundToCurrentRound",
+          functionName: "isSeasonOpen",
+        }),
+        publicClient.readContract({
+          address: passAddress,
+          abi: GAME_PASS_ABI,
+          functionName: "isPlayerInActiveSeason",
           args: [playerAddress],
+        }),
+        publicClient.readContract({
+          address: passAddress,
+          abi: GAME_PASS_ABI,
+          functionName: "activeWorld",
+        }),
+        publicClient.readContract({
+          address: passAddress,
+          abi: GAME_PASS_ABI,
+          functionName: "activeSeason",
         }),
         publicClient.readContract({
           address: passAddress,
@@ -391,21 +422,24 @@ export const RedPillRegisterPlayer = ({
         }),
       ]);
 
-      const [tokenBalance, unboundTokenId] = await Promise.all([
+      const [tokenBalance, joinableTokenId] = await Promise.all([
         publicClient.readContract({
           address: paymentToken,
           abi: ERC20_ABI,
           functionName: "balanceOf",
           args: [playerAddress],
         }),
-        findUnboundOwnedPass(passAddress, playerAddress),
+        findJoinableOwnedPass(passAddress, playerAddress),
       ]);
 
       setGamePassRequirement({
         isEnabled: true,
         isLoading: false,
-        isBound,
-        hasUnboundPass: unboundTokenId !== undefined,
+        isSeasonOpen,
+        isJoined,
+        hasJoinablePass: joinableTokenId !== undefined,
+        activeWorld,
+        activeSeason: Number(activeSeason),
         tokenBalance,
         passPrice,
         paymentToken,
@@ -415,8 +449,9 @@ export const RedPillRegisterPlayer = ({
       setGamePassRequirement({
         isEnabled: true,
         isLoading: false,
-        isBound: false,
-        hasUnboundPass: false,
+        isSeasonOpen: false,
+        isJoined: false,
+        hasJoinablePass: false,
         error: "Unable to load Game Pass status. Please refresh and try again.",
       });
     }
@@ -433,16 +468,29 @@ export const RedPillRegisterPlayer = ({
     playerAddress: Address,
     walletClient: WalletClient,
   ) => {
-    const alreadyBound = await publicClient.readContract({
-      address: passAddress,
-      abi: GAME_PASS_ABI,
-      functionName: "isBoundToCurrentRound",
-      args: [playerAddress],
-    });
-    if (alreadyBound) return;
+    const [isSeasonOpen, alreadyJoined] = await Promise.all([
+      publicClient.readContract({
+        address: passAddress,
+        abi: GAME_PASS_ABI,
+        functionName: "isSeasonOpen",
+      }),
+      publicClient.readContract({
+        address: passAddress,
+        abi: GAME_PASS_ABI,
+        functionName: "isPlayerInActiveSeason",
+        args: [playerAddress],
+      }),
+    ]);
+
+    if (!isSeasonOpen) {
+      throw new Error(
+        "The current season is not open yet. Wait for the admin to start a new season, or unbind your Game Pass during the off-season window.",
+      );
+    }
+    if (alreadyJoined) return;
 
     setRegistrationMessage("Preparing Game Pass...");
-    let tokenId = await findUnboundOwnedPass(passAddress, playerAddress);
+    let tokenId = await findJoinableOwnedPass(passAddress, playerAddress);
 
     if (!tokenId) {
       const paymentToken = await publicClient.readContract({
@@ -506,11 +554,11 @@ export const RedPillRegisterPlayer = ({
       });
     }
 
-    setRegistrationMessage("Binding Game Pass to this season...");
+    setRegistrationMessage("Joining the current season with your Game Pass...");
     await writeAndWait(walletClient, {
       address: passAddress,
       abi: GAME_PASS_ABI,
-      functionName: "bindToCurrentRound",
+      functionName: "joinSeason",
       args: [tokenId],
     });
   };
@@ -625,8 +673,9 @@ export const RedPillRegisterPlayer = ({
     }
 
     const needsMoreTokens =
-      !gamePassRequirement.isBound &&
-      !gamePassRequirement.hasUnboundPass &&
+      gamePassRequirement.isSeasonOpen &&
+      !gamePassRequirement.isJoined &&
+      !gamePassRequirement.hasJoinablePass &&
       gamePassRequirement.tokenBalance !== undefined &&
       gamePassRequirement.passPrice !== undefined &&
       gamePassRequirement.tokenBalance < gamePassRequirement.passPrice;
@@ -634,11 +683,20 @@ export const RedPillRegisterPlayer = ({
     let accessStatus: React.ReactNode;
     if (gamePassRequirement.isLoading) {
       accessStatus = "Checking...";
-    } else if (gamePassRequirement.isBound) {
-      accessStatus = <Green>Game Pass already bound</Green>;
-    } else if (gamePassRequirement.hasUnboundPass) {
+    } else if (!gamePassRequirement.isSeasonOpen) {
       accessStatus = (
-        <Green>Unbound Game Pass found, registration will bind it</Green>
+        <Red>
+          Season closed. Wait for a new season, or unbind stale Game Pass
+          bindings before transferring.
+        </Red>
+      );
+    } else if (gamePassRequirement.isJoined) {
+      accessStatus = <Green>Game Pass already joined for this season</Green>;
+    } else if (gamePassRequirement.hasJoinablePass) {
+      accessStatus = (
+        <Green>
+          Joinable Game Pass found, registration will join this season
+        </Green>
       );
     } else {
       accessStatus = (
@@ -652,12 +710,14 @@ export const RedPillRegisterPlayer = ({
           Game Pass NFT Required
         </div>
         <div>
-          To enter this season, your main wallet must own and bind a Game Pass
-          NFT. If you do not already have one, registration will try to buy and
-          bind one with MockToken first.
+          To enter this season, your main wallet must own a Game Pass NFT and
+          join the official active world/season. If you do not already have one,
+          registration will try to buy and join with MockToken first.
         </div>
         <div className="mt-3 space-y-1">
           <div>Access status: {accessStatus}</div>
+          <div>Active world: {gamePassRequirement.activeWorld ?? "-"}</div>
+          <div>Active season: {gamePassRequirement.activeSeason ?? "-"}</div>
           <div>
             NFT price: {formatTokenAmount(gamePassRequirement.passPrice)}{" "}
             MockToken

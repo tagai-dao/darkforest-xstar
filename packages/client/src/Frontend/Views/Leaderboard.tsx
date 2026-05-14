@@ -135,7 +135,8 @@ function metricToString(metric: string) {
   if (!metric) {
     return "n/a";
   }
-  return BigInt(metric).toLocaleString();
+  // 链上 score / kills 与银矿一样按 1000 为展示单位
+  return Number(BigInt(metric) / 1000n).toLocaleString();
 }
 
 // pass in either an address, or a twitter handle. this function will render the appropriate

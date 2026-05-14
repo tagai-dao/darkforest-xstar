@@ -16,7 +16,6 @@ import { usePlayer, useUIManager } from "../Utils/AppHooks";
 import { DFZIndex } from "../Utils/constants";
 import { useEmitterSubscribe, useEmitterValue } from "../Utils/EmitterHooks";
 import { ModalToggleButton } from "./ModalIcon";
-import { NetworkHealth } from "./NetworkHealth";
 import { Paused } from "./Paused";
 
 const TopBarContainer = styled.div`
@@ -49,7 +48,9 @@ function BoardPlacement({ account }: { account: EthAddress | undefined }) {
       formattedScore = scoreAmount.toLocaleString();
     }
 
-    const formattedKills = (player.value.kills ?? 0).toLocaleString();
+    const formattedKills = Math.floor(
+      (player.value.kills ?? 0) / 1000,
+    ).toLocaleString();
 
     content = (
       <Sub>
@@ -75,7 +76,7 @@ function BoardPlacement({ account }: { account: EthAddress | undefined }) {
   return <Numbers>{content}</Numbers>;
 }
 
-function PlayerSilver({ account }: { account: EthAddress | undefined }) {
+function _PlayerSilver({ account }: { account: EthAddress | undefined }) {
   const uiManager = useUIManager();
   const player = usePlayer(uiManager, account);
 

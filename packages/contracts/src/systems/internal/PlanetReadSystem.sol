@@ -53,9 +53,36 @@ contract PlanetReadSystem is BaseSystem {
     return _syncTo(planet, tickNumber);
   }
 
+  /**
+   * @notice Sync a planet for state-changing systems and record attacker kill stats.
+   * @dev View-only reads must keep using `readPlanet` so eth_call does not write tables.
+   */
+  function readPlanetWithKillStats(
+    uint256 planetHash,
+    uint256 perlin,
+    uint256 distanceSquare
+  ) public returns (Planet memory planet) {
+    planet.planetHash = planetHash;
+    planet.perlin = perlin;
+    planet.distSquare = distanceSquare;
+    planet.readFromStore();
+    return _syncWithKillStats(planet);
+  }
+
+  function readPlanetWithKillStats(uint256 planetHash) public returns (Planet memory planet) {
+    planet.planetHash = planetHash;
+    planet.readFromStore();
+    return _syncWithKillStats(planet);
+  }
+
   function _sync(Planet memory planet) internal view returns (Planet memory) {
     uint256 untilTick = Ticker.getTickNumber();
     return _syncTo(planet, untilTick);
+  }
+
+  function _syncWithKillStats(Planet memory planet) internal returns (Planet memory) {
+    uint256 untilTick = Ticker.getTickNumber();
+    return _syncToWithKillStats(planet, untilTick);
   }
 
   function _syncTo(Planet memory planet, uint256 untilTick) internal view returns (Planet memory) {
@@ -63,6 +90,17 @@ contract PlanetReadSystem is BaseSystem {
     while (uint256(move.from) != 0) {
       planet.naturalGrowth(move.arrivalTick);
       (move, planet) = move.arrivedAt(planet);
+      move = planet.popArrivedMove(untilTick);
+    }
+    planet.naturalGrowth(untilTick);
+    return planet;
+  }
+
+  function _syncToWithKillStats(Planet memory planet, uint256 untilTick) internal returns (Planet memory) {
+    MoveData memory move = planet.popArrivedMove(untilTick);
+    while (uint256(move.from) != 0) {
+      planet.naturalGrowth(move.arrivalTick);
+      (move, planet) = move.arrivedAtRecordKills(planet);
       move = planet.popArrivedMove(untilTick);
     }
     planet.naturalGrowth(untilTick);

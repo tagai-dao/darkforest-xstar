@@ -220,10 +220,13 @@ contract PostDeploy is Script {
 
     address gamePassAddress = toml.readAddress(".game_pass.nft_address");
     if (gamePassAddress == address(0)) {
-      gamePassAddress = address(new GamePassNFT(paymentTokenAddress, worldAddress, toml.readUint(".game_pass.price") * 1 ether));
+      gamePassAddress = address(new GamePassNFT(paymentTokenAddress, toml.readUint(".game_pass.price") * 1 ether));
     }
 
     GamePassNFTTable.set(gamePassAddress);
+
+    uint8 roundNum = abi.decode(toml.parseRaw(".round.number"), (uint8));
+    GamePassNFT(gamePassAddress).setActiveSeason(worldAddress, roundNum);
   }
 
   function _setArtifactNFTConfig(address artifactNftAddress) internal {

@@ -3,12 +3,12 @@ import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
 import { useEffect, useMemo, useState } from "react";
 import {
+  type Address,
   formatUnits,
   isAddress,
   parseAbi,
   parseUnits,
   zeroAddress,
-  type Address,
 } from "viem";
 import { useWalletClient } from "wagmi";
 
@@ -16,8 +16,13 @@ const GAME_PASS_ABI = parseAbi([
   "function owner() view returns (address)",
   "function paymentToken() view returns (address)",
   "function price() view returns (uint256)",
+  "function activeWorld() view returns (address)",
+  "function activeSeason() view returns (uint8)",
+  "function isSeasonOpen() view returns (bool)",
   "function ownerMint(address to) returns (uint256)",
   "function ownerMintBatch(address[] recipients)",
+  "function setActiveSeason(address world, uint8 season)",
+  "function clearActiveSeason()",
 ]);
 
 const MOCK_TOKEN_ABI = parseAbi([
@@ -65,7 +70,7 @@ const parseAddressRows = (rows: string): Address[] =>
 
 export const GamePassAdminPanel = () => {
   const {
-    network: { publicClient, waitForTransaction },
+    network: { publicClient, waitForTransaction, worldContract },
     components: { GamePassNFT },
   } = useMUD();
   const { data: walletClient } = useWalletClient();
@@ -80,12 +85,52 @@ export const GamePassAdminPanel = () => {
   const [gamePassOwner, setGamePassOwner] = useState<Address>();
   const [tokenOwner, setTokenOwner] = useState<Address>();
   const [passPrice, setPassPrice] = useState<bigint>();
+  const [activeWorld, setActiveWorld] = useState<Address>();
+  const [activeSeason, setActiveSeason] = useState<number>();
+  const [isSeasonOpen, setIsSeasonOpen] = useState(false);
+  const [seasonWorldInput, setSeasonWorldInput] = useState("");
+  const [seasonNumberInput, setSeasonNumberInput] = useState("1");
   const [tokenRecipient, setTokenRecipient] = useState("");
   const [tokenAmount, setTokenAmount] = useState("100000");
   const [batchTokenRows, setBatchTokenRows] = useState("");
   const [nftRecipient, setNftRecipient] = useState("");
   const [batchNftRows, setBatchNftRows] = useState("");
   const [status, setStatus] = useState("");
+
+  const configuredWorldAddress = useMemo(() => {
+    const world = worldContract as { address?: Address } | undefined;
+    return world?.address;
+  }, [worldContract]);
+
+  useEffect(() => {
+    if (!seasonWorldInput && configuredWorldAddress) {
+      setSeasonWorldInput(configuredWorldAddress);
+    }
+  }, [configuredWorldAddress, seasonWorldInput]);
+
+  const loadSeasonState = async (passAddress: Address) => {
+    const [world, season, open] = await Promise.all([
+      publicClient.readContract({
+        address: passAddress,
+        abi: GAME_PASS_ABI,
+        functionName: "activeWorld",
+      }),
+      publicClient.readContract({
+        address: passAddress,
+        abi: GAME_PASS_ABI,
+        functionName: "activeSeason",
+      }),
+      publicClient.readContract({
+        address: passAddress,
+        abi: GAME_PASS_ABI,
+        functionName: "isSeasonOpen",
+      }),
+    ]);
+
+    setActiveWorld(world === zeroAddress ? undefined : world);
+    setActiveSeason(season === 0 ? undefined : Number(season));
+    setIsSeasonOpen(open);
+  };
 
   useEffect(() => {
     const loadGamePassInfo = async () => {
@@ -112,6 +157,7 @@ export const GamePassAdminPanel = () => {
       setGamePassOwner(owner);
       setPaymentToken(token);
       setPassPrice(price);
+      await loadSeasonState(gamePassAddress);
 
       const ownerOfToken = await publicClient.readContract({
         address: token,
@@ -159,7 +205,7 @@ export const GamePassAdminPanel = () => {
     return tx;
   };
 
-  const mintToken = async (recipient: Address, amount: bigint) => {
+  const mintToken = (recipient: Address, amount: bigint) => {
     if (!paymentToken) throw new Error("Mock token is not configured.");
     return writeAndWait({
       address: paymentToken,
@@ -169,7 +215,7 @@ export const GamePassAdminPanel = () => {
     });
   };
 
-  const mintNft = async (recipient: Address) => {
+  const mintNft = (recipient: Address) => {
     if (!gamePassAddress) throw new Error("GamePassNFT is not configured.");
     return writeAndWait({
       address: gamePassAddress,
@@ -177,6 +223,55 @@ export const GamePassAdminPanel = () => {
       functionName: "ownerMint",
       args: [recipient],
     });
+  };
+
+  const handleSetActiveSeason = async () => {
+    try {
+      if (!gamePassAddress) throw new Error("GamePassNFT is not configured.");
+      const world = normalizeAddress(seasonWorldInput);
+      const season = Number(seasonNumberInput);
+      if (!Number.isInteger(season) || season <= 0 || season > 255) {
+        throw new Error("Season must be an integer between 1 and 255.");
+      }
+
+      setStatus("Setting active season...");
+      await writeAndWait({
+        address: gamePassAddress,
+        abi: GAME_PASS_ABI,
+        functionName: "setActiveSeason",
+        args: [world, season],
+      });
+      await loadSeasonState(gamePassAddress);
+      setStatus(`Active season set to world ${world}, season ${season}.`);
+    } catch (error) {
+      console.error(error);
+      setStatus(
+        error instanceof Error ? error.message : "Failed to set active season.",
+      );
+    }
+  };
+
+  const handleClearActiveSeason = async () => {
+    try {
+      if (!gamePassAddress) throw new Error("GamePassNFT is not configured.");
+      setStatus("Clearing active season...");
+      await writeAndWait({
+        address: gamePassAddress,
+        abi: GAME_PASS_ABI,
+        functionName: "clearActiveSeason",
+      });
+      await loadSeasonState(gamePassAddress);
+      setStatus(
+        "Active season cleared. Players can unbind and transfer passes.",
+      );
+    } catch (error) {
+      console.error(error);
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Failed to clear active season.",
+      );
+    }
   };
 
   const handleSingleTokenMint = async () => {
@@ -198,7 +293,6 @@ export const GamePassAdminPanel = () => {
       const rows = parseTokenRows(batchTokenRows);
       setStatus(`Minting test tokens for ${rows.length} recipients...`);
 
-      // MockGameToken exposes single mint only; keep the batch flow simple and explicit.
       for (const row of rows) {
         await mintToken(row.recipient, row.amount);
       }
@@ -260,6 +354,39 @@ export const GamePassAdminPanel = () => {
             ? "-"
             : `${formatUnits(passPrice, 18)} tokens`}
         </div>
+        <div>Active world: {activeWorld ?? "-"}</div>
+        <div>Active season: {activeSeason ?? "-"}</div>
+        <div>Season open: {isSeasonOpen ? "yes" : "no"}</div>
+      </div>
+
+      <div className="mb-8 rounded border border-gray-200 p-4">
+        <h3 className="mb-3 text-lg font-medium">Official Season</h3>
+        <input
+          value={seasonWorldInput}
+          onChange={(event) => setSeasonWorldInput(event.target.value)}
+          className="mb-2 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
+          placeholder="World address"
+        />
+        <input
+          value={seasonNumberInput}
+          onChange={(event) => setSeasonNumberInput(event.target.value)}
+          className="mb-3 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
+          placeholder="Season number, e.g. 1"
+        />
+        <button
+          type="button"
+          onClick={handleSetActiveSeason}
+          className="mb-3 w-full rounded bg-emerald-500 px-4 py-2 text-white hover:bg-emerald-600"
+        >
+          Set Active Season
+        </button>
+        <button
+          type="button"
+          onClick={handleClearActiveSeason}
+          className="w-full rounded bg-gray-700 px-4 py-2 text-white hover:bg-gray-800"
+        >
+          Clear Active Season
+        </button>
       </div>
 
       <div className="mb-8 rounded border border-gray-200 p-4">

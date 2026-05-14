@@ -6,6 +6,7 @@ import { BaseTest } from "./BaseTest.t.sol";
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { Ticker, TickerData, PendingMove, PendingMoveData, Move, MoveData } from "../src/codegen/index.sol";
 import { Planet as PlanetTable, Counter, TempConfigSet } from "../src/codegen/index.sol";
+import { PlayerKillStats } from "../src/codegen/tables/PlayerKillStats.sol";
 import { PlanetType, SpaceType, MaterialType } from "../src/codegen/common.sol";
 import { Planet } from "../src/lib/Planet.sol";
 import { Proof } from "../src/lib/SnarkProof.sol";
@@ -176,6 +177,58 @@ contract MoveTest is BaseTest {
       PlanetTable.getPopulation(bytes32(planet2.planetHash))
     );
     assertEq(planet2.silver + move2.silver, PlanetTable.getSilver(bytes32(planet2.planetHash)));
+  }
+
+  function testEnemyKillStatsRecorded() public {
+    vm.warp(block.timestamp + 1000);
+    Planet memory planet1 = IWorld(worldAddress).df__readPlanet(1);
+    Planet memory planet2 = IWorld(worldAddress).df__readPlanet(2);
+
+    Proof memory proof;
+    MoveInput memory input;
+    input.fromPlanetHash = planet1.planetHash;
+    input.toPlanetHash = planet2.planetHash;
+    input.distance = 320;
+    vm.prank(user1);
+    IWorld(worldAddress).df__move(proof, input, 100000, 1000, 0, new MaterialMove[](0));
+
+    input.distance /= 2;
+    planet1 = IWorld(worldAddress).df__readPlanet(1);
+    vm.prank(user1);
+    IWorld(worldAddress).df__move(proof, input, 110000, 1000, 0, new MaterialMove[](0));
+
+    PendingMoveData memory pendingMove = PendingMove.get(bytes32(planet2.planetHash));
+    uint256 index = _getIndexAt(pendingMove, 1);
+    MoveData memory move2 = Move.get(bytes32(planet2.planetHash), uint8(index));
+
+    input.distance *= 2;
+    vm.warp(_getTimestampAtTick(move2.arrivalTick));
+    planet2 = IWorld(worldAddress).df__readPlanet(2);
+    vm.prank(user1);
+    IWorld(worldAddress).df__move(proof, input, 120000, 1000, 0, new MaterialMove[](0));
+
+    uint256 expectedDestroyed = (move2.population * 100) / planet2.defense;
+    assertEq(PlayerKillStats.get(user1), expectedDestroyed);
+  }
+
+  function testNeutralPlanetAttackDoesNotRecordKills() public {
+    vm.startPrank(admin);
+    IWorld(worldAddress).df__createPlanet(3, address(0), 0, 1, PlanetType.PLANET, SpaceType.NEBULA, 200000, 10000, 0);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 1000);
+    Planet memory planet1 = IWorld(worldAddress).df__readPlanet(1);
+    Planet memory neutralPlanet = IWorld(worldAddress).df__readPlanet(3);
+
+    Proof memory proof;
+    MoveInput memory input;
+    input.fromPlanetHash = planet1.planetHash;
+    input.toPlanetHash = neutralPlanet.planetHash;
+    input.distance = 80;
+    vm.prank(user1);
+    IWorld(worldAddress).df__move(proof, input, 100000, 1000, 0, new MaterialMove[](0));
+
+    assertEq(PlayerKillStats.get(user1), 0);
   }
 
   function testCapturePlanet() public {

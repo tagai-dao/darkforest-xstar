@@ -86,10 +86,10 @@ library DFUtils {
   /**
    * Used to add global checks based on planet reading system.
    */
-  function readInitedPlanet(address worldAddress, uint256 planetHash) internal view returns (Planet memory planet) {
+  function readInitedPlanet(address worldAddress, uint256 planetHash) internal returns (Planet memory planet) {
     // Note.
     // Use World.call would cost more gas due to manually decoding the returned planet data.
-    planet = IPlanetReadSystem(worldAddress).df__readPlanet(planetHash);
+    planet = IPlanetReadSystem(worldAddress).df__readPlanetWithKillStats(planetHash);
     if (planet.isInitializing) {
       revert Errors.PlanetNotInitialized();
     }
@@ -106,8 +106,8 @@ library DFUtils {
     uint256 planetHash,
     uint256 perlin,
     uint256 distanceSquare
-  ) internal view returns (Planet memory planet) {
-    planet = IPlanetReadSystem(worldAddress).df__readPlanet(planetHash, perlin, distanceSquare);
+  ) internal returns (Planet memory planet) {
+    planet = IPlanetReadSystem(worldAddress).df__readPlanetWithKillStats(planetHash, perlin, distanceSquare);
     if (planet.status != PlanetStatus.DEFAULT) {
       revert Errors.PlanetNotAvailable();
     }

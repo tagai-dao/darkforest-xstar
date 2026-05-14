@@ -168,7 +168,12 @@ contract PlayerSystem is BaseSystem {
 
   function _requireGamePass(address player) internal view {
     address pass = GamePassNFT.get();
-    if (pass != address(0) && !IGamePassNFT(pass).isBoundToCurrentRound(player)) {
+    if (pass == address(0)) {
+      return;
+    }
+
+    IGamePassNFT gamePass = IGamePassNFT(pass);
+    if (!gamePass.isPlayerInActiveSeason(player) || gamePass.activeWorld() != _world()) {
       revert GamePassRequired();
     }
   }
