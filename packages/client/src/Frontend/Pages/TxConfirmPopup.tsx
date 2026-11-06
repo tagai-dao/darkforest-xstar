@@ -1,4 +1,5 @@
 import { FIXED_DIGIT_NUMBER, TOKEN_NAME } from "@df/constants";
+import { WORLD_NAME } from "@df/constants";
 import { gweiToWei, weiToEth } from "@df/network";
 import { address } from "@df/serde";
 import { ArtifactType, Setting } from "@df/types";
@@ -14,7 +15,6 @@ import { Checkbox } from "../Components/Input";
 import { Row } from "../Components/Row";
 import dfstyles from "../Styles/dfstyles";
 import { getSetting, setBooleanSetting } from "../Utils/SettingsHooks";
-import { WORLD_NAME } from "@df/constants";
 
 const StyledTxConfirmPopup = styled.div`
   width: 100%;
@@ -281,6 +281,11 @@ export function TxConfirmPopup() {
 
   const buyJunkFee = localStorage.getItem(`${account}-buySpaceJunk-fee`);
   const buyJunkFeeEth = buyJunkFee ? Number(buyJunkFee) : 0;
+
+  const buySilverTier = localStorage.getItem(`${account}-buySilver-tier`);
+  const buySilverPlanet = localStorage.getItem(`${account}-buySilver-planet`);
+  const buySilverPrice = localStorage.getItem(`${account}-buySilver-price`);
+  const buySilverSilver = localStorage.getItem(`${account}-buySilver-silver`);
   // function isTypeOK() {
   //     if (butArtifactType === undefined) return false;
   //     const val = Number(butArtifactType);
@@ -518,6 +523,27 @@ export function TxConfirmPopup() {
               <span>
                 {buyJunkFeeEth} ${TOKEN_NAME}
               </span>
+            </Row>
+          </>
+        )}
+
+        {method === "df__buySilver" && (
+          <>
+            <Row>
+              <b>Planet</b>
+              <span className="mono">{buySilverPlanet}</span>
+            </Row>
+            <Row>
+              <b>Tier</b>
+              <span>{buySilverTier}</span>
+            </Row>
+            <Row>
+              <b>Pay</b>
+              <span>{buySilverPrice} wei (community token)</span>
+            </Row>
+            <Row>
+              <b>Silver</b>
+              <span>{buySilverSilver}</span>
             </Row>
           </>
         )}

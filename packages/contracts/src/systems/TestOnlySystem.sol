@@ -20,6 +20,7 @@ import { PlanetBiomeConfig, PlanetBiomeConfigData } from "codegen/tables/PlanetB
 import { PlanetMaterialStorage } from "codegen/tables/PlanetMaterialStorage.sol";
 import { PlanetMaterial } from "codegen/tables/PlanetMaterial.sol";
 import { PlayerJunkLimit } from "codegen/tables/PlayerJunkLimit.sol";
+import { DFXStarConfig } from "codegen/tables/DFXStarConfig.sol";
 
 contract TestOnlySystem is BaseSystem {
   // function createPlanet(
@@ -167,6 +168,17 @@ contract TestOnlySystem is BaseSystem {
    */
   function addGPTTokens(address player, uint256 amount) public {
     GPTTokens.set(player, GPTTokens.get(player) + amount);
+  }
+
+  /// @notice Local /test page: wire Nutbox addresses after TagAI Init + World deploy.
+  function setDFXStarConfig(
+    address scoreStakingPool,
+    address paymentToken,
+    address stakingFactory,
+    address community,
+    address buySilverSystem
+  ) public {
+    DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem);
   }
 
   function addMaterial(uint256 planetHash, MaterialType materialType, uint256 amount) public {

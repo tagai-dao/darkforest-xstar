@@ -4,13 +4,13 @@ import type { ModalId, ModalPosition, WorldCoords } from "@df/types";
 import { CursorState, ModalManagerEvent } from "@df/types";
 import { EventEmitter } from "events";
 
-import type PersistentChunkStore from "../../Backend/Storage/PersistentChunkStore";
+import type { WatchChunkStore } from "../../Backend/Save/FileChunkSource";
 
 class ModalManager extends EventEmitter {
   static instance: ModalManager;
   private lastIndex: number;
   private cursorState: CursorState;
-  private persistentChunkStore: PersistentChunkStore;
+  private persistentChunkStore: WatchChunkStore;
   private modalPositions: Map<ModalId, ModalPosition>;
 
   public modalPositions$: Monomitter<Map<ModalId, ModalPosition>>;
@@ -18,7 +18,7 @@ class ModalManager extends EventEmitter {
   public readonly modalPositionChanged$: Monomitter<ModalId>;
 
   private constructor(
-    persistentChunkStore: PersistentChunkStore,
+    persistentChunkStore: WatchChunkStore,
     modalPositions: Map<ModalId, ModalPosition>,
   ) {
     super();
@@ -30,7 +30,7 @@ class ModalManager extends EventEmitter {
   }
 
   public static async create(
-    persistentChunkStore: PersistentChunkStore,
+    persistentChunkStore: WatchChunkStore,
   ): Promise<ModalManager> {
     const modalPositions = await persistentChunkStore.loadModalPositions();
     return new ModalManager(persistentChunkStore, modalPositions);

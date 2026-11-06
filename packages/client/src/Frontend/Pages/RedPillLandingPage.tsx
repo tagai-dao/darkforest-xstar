@@ -8,11 +8,12 @@ import {
   TOKEN_NAME,
   VERSION,
 } from "@df/constants";
+import { WORLD_NAME } from "@df/constants";
 import type { EthConnection } from "@df/network";
 import { neverResolves, weiToEth } from "@df/network";
 import { address } from "@df/serde";
 import { addressToHex } from "@df/serde";
-import type { UnconfirmedUseKey } from "@df/types";
+import type { EthAddress, UnconfirmedUseKey } from "@df/types";
 import { reversed } from "@df/utils/list";
 import { bigIntFromKey } from "@df/whitelist";
 import { RegisterPlayerComponent } from "@frontend/Components/RegisterPlayerComponent";
@@ -26,7 +27,9 @@ import {
   encodeEntity,
   singletonEntity,
 } from "@latticexyz/store-sync/recs";
+import { getNetworkConfig } from "@mud/getNetworkConfig";
 import { useMUD } from "@mud/MUDContext";
+import { RedPillRegisterPlayer } from "@redpill/RedPillRegisterPlayer";
 import { LOW_BALANCE_THRESHOLD, RECOMMENDED_BALANCE } from "@wallet/utils";
 import { utils, Wallet } from "ethers";
 import React, {
@@ -48,6 +51,7 @@ import { GameUIManager } from "../../Backend/GameLogic/GameUIManager";
 import TutorialManager, {
   TutorialState,
 } from "../../Backend/GameLogic/TutorialManager";
+import { toExploredChunk } from "../../Backend/Miner/ChunkUtils";
 import { addAccount, getAccounts } from "../../Backend/Network/AccountManager";
 import {
   getEthConnection,
@@ -61,6 +65,20 @@ import {
   submitInterestedEmail,
   submitPlayerEmail,
 } from "../../Backend/Network/UtilityServerAPI";
+import {
+  type ActionRecord,
+  type BoardCursor,
+  readWalletTail,
+  readWatchedHome,
+} from "../../Backend/Save/FileChunkSource";
+import { type FolderCard, readFolderCard } from "../../Backend/Save/FolderCard";
+import type { GameSaveFiles } from "../../Backend/Save/GameSave";
+import { loadSelectedGame } from "../../Backend/Save/loadSelectedGame";
+import {
+  directoryPermission,
+  loadWalletDirectory,
+  saveWalletDirectory,
+} from "../../Backend/Save/WalletFolderCache";
 import { getWhitelistArgs } from "../../Backend/Utils/WhitelistSnarkArgsHelper";
 import type { BrowserCompatibleState } from "../Components/BrowserIssues";
 import { BrowserIssues } from "../Components/BrowserIssues";
@@ -75,6 +93,7 @@ import { MythicLabelText } from "../Components/Labels/MythicLabel";
 import type { MiniMapHandle } from "../Components/MiniMap";
 import { MiniMap } from "../Components/MiniMap";
 import { TextMask } from "../Components/TextMask";
+import Viewport from "../Game/Viewport";
 import dfstyles from "../Styles/dfstyles";
 import { TopLevelDivProvider, UIManagerProvider } from "../Utils/AppHooks";
 import type { Incompatibility } from "../Utils/BrowserChecks";
@@ -84,8 +103,8 @@ import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 import { GameWindowLayout } from "../Views/GameWindowLayout";
 import type { TerminalHandle } from "../Views/Terminal";
 import { Terminal } from "../Views/Terminal";
-import { RedPillRegisterPlayer } from "@redpill/RedPillRegisterPlayer";
-import { WORLD_NAME } from "@df/constants";
+import { HomeLobby } from "./HomeLobby";
+import { useHomeAssets } from "./useHomeAssets";
 const enum TerminalPromptStep {
   NONE,
   COMPATIBILITY_CHECKS_PASSED,
@@ -199,6 +218,34 @@ export function RedPillLandingPage() {
   const [browserIssues, setBrowserIssues] = useState<Incompatibility[]>([]);
   const [isMiniMapOn, setMiniMapOn] = useState(false);
   const [spectate, setSpectate] = useState(false);
+  const [folderSave, setFolderSave] = useState<GameSaveFiles | undefined>();
+  const [watchToken, setWatchToken] = useState(0);
+  const [homeReady, setHomeReady] = useState(false);
+  const [actionLog, setActionLog] = useState<ActionRecord[]>([]);
+  const [priceText, setPriceText] = useState<string | undefined>();
+  const [folderLoad, setFolderLoad] = useState<
+    | { kind: "idle" }
+    | { kind: "busy"; done: number; total: number; label: string }
+    | { kind: "blocked"; title: string; detail: string }
+  >({ kind: "idle" });
+  const folderHandleRef = useRef<FileSystemDirectoryHandle | undefined>(
+    undefined,
+  );
+  // 离开游戏时递增，停掉还在等终端输入的那一轮。
+  const sessionRef = useRef(0);
+  const [folderCard, setFolderCard] = useState<FolderCard | undefined>();
+  const homeAssets = useHomeAssets(folderCard?.address);
+  const boardCursorRef = useRef<BoardCursor>({
+    offset: 0,
+    homeModified: 0,
+    homeSize: 0,
+    actionsOffset: 0,
+    priceModified: 0,
+    priceSize: 0,
+  });
+  const gateSeededRef = useRef(false);
+  const gameManagerRef = useRef(gameManager);
+  gameManagerRef.current = gameManager;
 
   // NOTE: round 2
   const useZkWhitelist = true;
@@ -237,162 +284,12 @@ export function RedPillLandingPage() {
   const isProd = import.meta.env.VITE_NODE_ENV === "production";
 
   const advanceStateFromCompatibilityPassed = useCallback(
-    async (
-      terminal: React.MutableRefObject<TerminalHandle | undefined>,
-      { showHelp }: TerminalStateOptions = {
-        showHelp: true,
-      },
-    ) => {
-      const accounts = getAccounts();
-      const totalAccounts = accounts.length;
-
-      if (showHelp) {
-        terminal.current?.newline();
-        terminal.current?.newline();
-
-        terminal.current?.print("Player guide: ", TerminalTextStyle.Pink);
-
-        terminal.current?.printLink(
-          "Please Click Here",
-          () => {
-            window.open(PLAYER_GUIDE);
-          },
-          TerminalTextStyle.Blue,
-        );
-
-        terminal.current?.println(
-          " <= New player please check this guide !!!",
-          TerminalTextStyle.Pink,
-        );
-
-        terminal.current?.newline();
-
-        if (isLobby) {
-          terminal.current?.newline();
-          terminal.current?.printElement(
-            <MythicLabelText text={`You are joining a ${WORLD_NAME} lobby`} />,
-          );
-          terminal.current?.newline();
-          terminal.current?.newline();
-        } else {
-          terminal.current?.newline();
-          terminal.current?.println(
-            "Login or create an account.",
-            TerminalTextStyle.Green,
-          );
-          terminal.current?.println(
-            "Choose an option, type its symbol and press ENTER.",
-          );
-          terminal.current?.newline();
-        }
-        if (totalAccounts > 0) {
-          terminal.current?.println(
-            `Found ${totalAccounts} account${totalAccounts > 1 ? "s" : ""} on this device.`,
-          );
-          terminal.current?.println(``);
-          terminal.current?.println(
-            "(a) Login with existing account.",
-            TerminalTextStyle.Sub,
-          );
-        }
-
-        terminal.current?.println(
-          "(n) Generate new burner wallet account.",
-          TerminalTextStyle.Sub,
-        );
-        terminal.current?.println(`(i) Import private key.`);
-
-        terminal.current?.println(`(s) Spectate.`, TerminalTextStyle.Sub);
-        terminal.current?.println(``);
-
-        terminal.current?.println(
-          totalAccounts > 0
-            ? "Select one of the options above [a], [n], [i] or [s], then press [enter]."
-            : "Select one of the options above [n], [i] or [s], then press [enter].",
-          TerminalTextStyle.Sub,
-        );
-      }
-
-      if (selectedAddress !== null) {
-        terminal.current?.println(
-          `Selecting account ${selectedAddress} from url...`,
-          TerminalTextStyle.Green,
-        );
-
-        // Search accounts backwards in case a player has used a private key more than once.
-        // In that case, we want to take the most recently created account.
-        const account = reversed(getAccounts()).find(
-          (a) => a.address === selectedAddress,
-        );
-        if (!account) {
-          terminal.current?.println(
-            "Unrecognized account found in url.",
-            TerminalTextStyle.Red,
-          );
-          return;
-        }
-
-        try {
-          await ethConnection?.setAccount(account.privateKey);
-          setStep(TerminalPromptStep.ACCOUNT_SET);
-        } catch (e) {
-          // unwanted state, client will need to reload browser here
-          terminal.current?.println(
-            "An unknown error occurred. please refresh the client",
-            TerminalTextStyle.Red,
-          );
-        }
-        return;
-      }
-
-      const userInput = (await terminal.current?.getInput())?.trim() ?? "";
-
-      // stop options, go to next step
-      switch (true) {
-        case userInput === "a" && totalAccounts > 0:
-          setStep(TerminalPromptStep.DISPLAY_ACCOUNTS);
-          return;
-        case userInput === "n":
-          setStep(TerminalPromptStep.GENERATE_ACCOUNT);
-          return;
-        case userInput === "i":
-          setStep(TerminalPromptStep.IMPORT_ACCOUNT);
-          return;
-        case userInput === "s":
-          setStep(TerminalPromptStep.SPECTATING);
-          return;
-      }
-
-      // continue waiting for user input
-      switch (true) {
-        case userInput === "clear": {
-          terminal.current?.clear();
-          showHelp = false;
-          advanceStateFromCompatibilityPassed(terminal, {
-            showHelp,
-          });
-          break;
-        }
-        case userInput === "h" || userInput === "help": {
-          showHelp = true;
-          advanceStateFromCompatibilityPassed(terminal, {
-            showHelp,
-          });
-          break;
-        }
-        default: {
-          terminal.current?.println(
-            "Invalid option, please try press [help]",
-            TerminalTextStyle.Pink,
-          );
-          showHelp = false;
-          advanceStateFromCompatibilityPassed(terminal, {
-            showHelp,
-          });
-        }
-      }
+    async (_terminal: React.MutableRefObject<TerminalHandle | undefined>) => {
+      // 人只看。选账号、新建和导入先不出现，直接进入观战。
+      setSpectate(true);
+      setStep(TerminalPromptStep.SPECTATING);
     },
-    [isLobby, ethConnection, selectedAddress],
+    [],
   );
 
   const advanceStateFromDisplayAccounts = useCallback(
@@ -1072,7 +969,14 @@ export function RedPillLandingPage() {
           throw new Error("no eth connection");
         }
 
-        const mainAccount = ethConnection.getAddress();
+        if (spectate && !folderSave) {
+          terminal.current?.println("打开这一局的钱包目录。");
+          return;
+        }
+
+        const mainAccount = folderSave
+          ? (folderSave.agent.address as EthAddress)
+          : ethConnection.getAddress();
 
         newGameManager = await GameManager.create({
           mainAccount: mainAccount,
@@ -1081,6 +985,7 @@ export function RedPillLandingPage() {
           contractAddress,
           components,
           spectate,
+          fileSave: folderSave,
         });
       } catch (e) {
         console.error(e);
@@ -1123,10 +1028,12 @@ export function RedPillLandingPage() {
       terminal.current?.println("Welcome to " + WORLD_NAME + ".");
       terminal.current?.newline();
 
-      //register Player
-      terminal.current?.printElement(
-        <RedPillRegisterPlayer ethConnection={ethConnection} />,
-      );
+      // 观战不注册玩家，也不弹出操作面板。
+      if (!spectate) {
+        terminal.current?.printElement(
+          <RedPillRegisterPlayer ethConnection={ethConnection} />,
+        );
+      }
 
       //NOTE: round 3 don't collect those information
       // terminal.current?.println('We collect a minimal set of statistics such as SNARK proving');
@@ -1162,7 +1069,7 @@ export function RedPillLandingPage() {
         setStep(TerminalPromptStep.ALL_CHECKS_PASS);
       }
     },
-    [ethConnection, contractAddress, spectate],
+    [ethConnection, contractAddress, spectate, folderSave, components],
   );
 
   const advanceStateFromAskAddAccount = useCallback(
@@ -1200,15 +1107,8 @@ export function RedPillLandingPage() {
       if (gameUIManager) {
         try {
           if (spectate) {
-            const innerRadius = Math.ceil(gameUIManager.getInnerRadius());
-
-            if (await gameUIManager.addAccount({ x: innerRadius + 1, y: 0 })) {
-              terminal.current?.println("Successfully added account.");
-              terminal.current?.println("Initializing game...");
-              setStep(TerminalPromptStep.ALL_CHECKS_PASS);
-            } else {
-              throw "Invalid home coordinates.";
-            }
+            // 家坐标来自钱包目录，观看页不再写一个临时坐标。
+            setStep(TerminalPromptStep.ALL_CHECKS_PASS);
           } else {
             terminal.current?.println("x: ", TerminalTextStyle.Blue);
             const x = parseInt((await terminal.current?.getInput()) || "");
@@ -1546,6 +1446,15 @@ export function RedPillLandingPage() {
       terminal: React.MutableRefObject<TerminalHandle | undefined>,
       showHelp = true,
     ) => {
+      // 观战不再等玩家按回车，进图后关掉终端。
+      if (spectate) {
+        setStep(TerminalPromptStep.COMPLETE);
+        setInitRenderState(InitRenderState.COMPLETE);
+        setTerminalVisible(false);
+        terminal.current?.clear();
+        return;
+      }
+
       if (showHelp) {
         terminal.current?.println("Enter game.", TerminalTextStyle.Green);
         terminal.current?.println("Press [enter] to begin");
@@ -1599,12 +1508,16 @@ export function RedPillLandingPage() {
       terminal.current?.println("Try running: df.getAccount()");
       terminal.current?.println("");
     },
-    [],
+    [spectate],
   );
 
   const advanceStateFromComplete = useCallback(
     async (terminal: React.MutableRefObject<TerminalHandle | undefined>) => {
+      const session = sessionRef.current;
       const input = (await terminal.current?.getInput()) || "";
+      if (session !== sessionRef.current) {
+        return;
+      }
       let res = "";
       try {
         // indrect eval call: http://perfectionkills.com/global-eval-what-are-the-options/
@@ -1615,6 +1528,9 @@ export function RedPillLandingPage() {
       } catch (e) {
         res = (e as Error).message;
         terminal.current?.println(`ERROR: ${res}`, TerminalTextStyle.Red);
+      }
+      if (session !== sessionRef.current) {
+        return;
       }
       advanceStateFromComplete(terminal);
     },
@@ -1766,6 +1682,108 @@ export function RedPillLandingPage() {
     }
   }, [terminalHandle, topLevelContainer, advanceState]);
 
+  useEffect(() => {
+    let stopped = false;
+    loadWalletDirectory()
+      .then(async (handle) => {
+        if (stopped || !handle) {
+          return;
+        }
+        const permission = await directoryPermission(handle, false);
+        if (stopped) {
+          return;
+        }
+        if (permission !== "granted") {
+          setFolderCard({ folderName: handle.name });
+          return;
+        }
+        setFolderCard(await readFolderCard(handle));
+      })
+      .catch((error) => console.error(error));
+    return () => {
+      stopped = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handle = folderHandleRef.current;
+    if (!handle || watchToken === 0) {
+      return;
+    }
+    let stopped = false;
+    let centeredOnHome = false;
+
+    const watch = async () => {
+      while (!stopped) {
+        try {
+          const {
+            chunks,
+            replace,
+            homeText,
+            actions,
+            priceText: nextPrice,
+          } = await readWalletTail(handle, boardCursorRef.current);
+          if (stopped) {
+            return;
+          }
+          if (actions.length > 0) {
+            setActionLog((current) => [...current, ...actions]);
+          }
+          if (nextPrice) {
+            setPriceText(nextPrice);
+          }
+          const manager = gameManagerRef.current;
+          if (manager) {
+            if (replace) {
+              for (const previous of [...manager.getExploredChunks()]) {
+                manager.deleteChunk(previous);
+              }
+            }
+            for (const chunk of chunks) {
+              manager.ingestWatchedChunk(toExploredChunk(chunk));
+            }
+            const home = readWatchedHome(homeText);
+            if (home && !manager.getHomeCoords()) {
+              manager.adoptWatchedHome(home);
+            }
+            if (home) {
+              setHomeReady(true);
+            }
+            // 家的文件可能比画面晚到。镜头还没建好就先记着，下一轮再移到家。
+            if (home && !centeredOnHome) {
+              try {
+                Viewport.getInstance().focus(home.coords, 96);
+                centeredOnHome = true;
+              } catch {
+                // Viewport 尚未初始化。
+              }
+            }
+          }
+        } catch (error) {
+          console.error(error);
+        }
+        // 等这一帧画完再读下一轮。没有新字节时也不会空等 1 秒。
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        });
+      }
+    };
+    void watch();
+    return () => {
+      stopped = true;
+    };
+  }, [watchToken]);
+
+  useEffect(() => {
+    if (
+      gameManager &&
+      folderLoad.kind === "busy" &&
+      folderLoad.label === "正在进入游戏"
+    ) {
+      setFolderLoad({ kind: "idle" });
+    }
+  }, [gameManager, folderLoad]);
+
   if (syncSign === false) {
     return (
       <LoadingContent>
@@ -1784,9 +1802,182 @@ export function RedPillLandingPage() {
     );
   }
 
+  function returnToHome() {
+    gateSeededRef.current = false;
+    folderHandleRef.current = undefined;
+    boardCursorRef.current = {
+      offset: 0,
+      homeModified: 0,
+      homeSize: 0,
+      actionsOffset: 0,
+      priceModified: 0,
+      priceSize: 0,
+    };
+    setActionLog([]);
+    setPriceText(undefined);
+    setWatchToken(0);
+    setFolderSave(undefined);
+    setHomeReady(false);
+    setFolderLoad({ kind: "idle" });
+  }
+
+  function leaveGame() {
+    sessionRef.current += 1;
+    try {
+      gameUIManagerRef.current?.destroy();
+    } catch (error) {
+      console.error(error);
+    }
+    gameUIManagerRef.current = null;
+    window.df = undefined;
+    window.ui = undefined;
+    setGameManager(undefined);
+    setInitRenderState(InitRenderState.NONE);
+    setTerminalVisible(false);
+    setStep(TerminalPromptStep.SPECTATING);
+    returnToHome();
+  }
+
+  async function openWalletFolder(forcePick: boolean) {
+    const picker = (
+      window as Window & {
+        showDirectoryPicker?: (options: {
+          mode: "read";
+        }) => Promise<FileSystemDirectoryHandle>;
+      }
+    ).showDirectoryPicker;
+    try {
+      let handle: FileSystemDirectoryHandle | undefined;
+      if (!forcePick) {
+        handle = await loadWalletDirectory();
+        if (handle && (await directoryPermission(handle, true)) !== "granted") {
+          handle = undefined;
+        }
+      }
+      if (!handle) {
+        if (!picker) {
+          setFolderLoad({
+            kind: "blocked",
+            title: "无法选择目录",
+            detail: "这个浏览器没有目录选择窗口。",
+          });
+          return;
+        }
+        handle = await picker({ mode: "read" });
+      }
+      setFolderLoad({
+        kind: "busy",
+        done: 0,
+        total: 0,
+        label: "正在读取文件",
+      });
+      const result = await loadSelectedGame(
+        handle,
+        getNetworkConfig().chain.id,
+        (progress) => {
+          setFolderLoad({ kind: "busy", ...progress });
+        },
+      );
+      if (!result.ok) {
+        setFolderLoad({
+          kind: "blocked",
+          title: result.title,
+          detail: result.detail,
+        });
+        return;
+      }
+      await saveWalletDirectory(result.directory);
+      setFolderCard(await readFolderCard(result.directory));
+      gateSeededRef.current = true;
+      folderHandleRef.current = result.directory;
+      boardCursorRef.current = {
+        offset: result.boardOffset,
+        homeModified: 0,
+        homeSize: 0,
+        actionsOffset: 0,
+        priceModified: 0,
+        priceSize: 0,
+      };
+      setActionLog([]);
+      setPriceText(undefined);
+      setHomeReady(result.homeReady);
+      setFolderSave(result.save);
+      setWatchToken((token) => token + 1);
+      setFolderLoad({
+        kind: "busy",
+        done: 1,
+        total: 1,
+        label: "正在进入游戏",
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setFolderLoad({ kind: "idle" });
+        return;
+      }
+      console.error(error);
+      setFolderLoad({
+        kind: "blocked",
+        title: "无法打开目录",
+        detail: error instanceof Error ? error.message : "请再选一次钱包目录。",
+      });
+    }
+  }
+
   return (
     <>
       <Wrapper initRender={initRenderState} terminalEnabled={terminalVisible}>
+        {folderLoad.kind !== "idle" && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(0, 0, 0, 0.86)",
+              color: "#d7ffe4",
+              fontFamily: "'Start Press 2P', sans-serif",
+            }}
+          >
+            <div style={{ maxWidth: 560, lineHeight: 1.8, fontSize: 12 }}>
+              {folderLoad.kind === "busy" ? (
+                <>
+                  <div>{folderLoad.label}</div>
+                  <div>
+                    {folderLoad.total > 0
+                      ? `${folderLoad.done} / ${folderLoad.total}`
+                      : "请稍候"}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>{folderLoad.title}</div>
+                  <div style={{ marginTop: 12 }}>{folderLoad.detail}</div>
+                  <button
+                    type="button"
+                    style={{ marginTop: 18 }}
+                    onClick={returnToHome}
+                  >
+                    回到首页
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {!gameManager && (
+          <HomeLobby
+            card={folderCard}
+            assets={homeAssets}
+            onImport={() => {
+              void openWalletFolder(false);
+            }}
+            onChangeFolder={() => {
+              void openWalletFolder(true);
+            }}
+          />
+        )}
         <GameWindowWrapper
           initRender={initRenderState}
           terminalEnabled={terminalVisible}
@@ -1800,44 +1991,55 @@ export function RedPillLandingPage() {
                     terminalVisible={terminalVisible}
                     setTerminalVisible={setTerminalVisible}
                     spectate={spectate}
+                    showPublicStatus={spectate}
+                    homeReady={homeReady}
+                    actions={actionLog}
+                    priceText={priceText}
+                    onReturnHome={spectate ? leaveGame : undefined}
                   />
                 </UIManagerProvider>
               </TopLevelDivProvider>
             )}
 
-          <TerminalToggler
-            terminalEnabled={terminalVisible}
-            setTerminalEnabled={setTerminalVisible}
-          />
+          {!spectate && (
+            <TerminalToggler
+              terminalEnabled={terminalVisible}
+              setTerminalEnabled={setTerminalVisible}
+            />
+          )}
         </GameWindowWrapper>
 
-        <TerminalWrapper
-          initRender={initRenderState}
-          terminalEnabled={terminalVisible}
-        >
-          <MythicLabelText
-            text={`Welcome To ${WORLD_NAME} ${VERSION} `}
-            style={{
-              fontFamily: "'Start Press 2P', sans-serif",
-              display:
-                initRenderState !== InitRenderState.COMPLETE ? "block" : "none",
-            }}
-          />
-          <div>
-            step: {syncProgress.step} percent: {syncProgress.percentage} %
-          </div>
+        <div style={{ display: gameManager ? "contents" : "none" }}>
+          <TerminalWrapper
+            initRender={initRenderState}
+            terminalEnabled={terminalVisible}
+          >
+            <MythicLabelText
+              text={`Welcome To ${WORLD_NAME} ${VERSION} `}
+              style={{
+                fontFamily: "'Start Press 2P', sans-serif",
+                display:
+                  initRenderState !== InitRenderState.COMPLETE
+                    ? "block"
+                    : "none",
+              }}
+            />
+            <div>
+              step: {syncProgress.step} percent: {syncProgress.percentage} %
+            </div>
 
-          <BrowserIssues
-            issues={browserIssues}
-            state={browserCompatibleState}
-          />
-          <Terminal
-            ref={terminalHandle}
-            promptCharacter={">"}
-            visible={browserCompatibleState === "supported"}
-            useCaretElement={initRenderState !== InitRenderState.COMPLETE}
-          />
-        </TerminalWrapper>
+            <BrowserIssues
+              issues={browserIssues}
+              state={browserCompatibleState}
+            />
+            <Terminal
+              ref={terminalHandle}
+              promptCharacter={">"}
+              visible={browserCompatibleState === "supported"}
+              useCaretElement={initRenderState !== InitRenderState.COMPLETE}
+            />
+          </TerminalWrapper>
+        </div>
 
         <div ref={topLevelContainer}></div>
         <div>

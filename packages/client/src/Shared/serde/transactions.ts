@@ -13,6 +13,7 @@ import type {
   UnconfirmedBuyHat,
   UnconfirmedBuyJunk,
   UnconfirmedBuyPlanet,
+  UnconfirmedBuySilver,
   UnconfirmedBuySpaceship,
   UnconfirmedCapturePlanet,
   UnconfirmedChangeArtifactImageType,
@@ -202,6 +203,12 @@ export function isUnconfirmedBuyJunk(
   txIntent: TxIntent,
 ): txIntent is UnconfirmedBuyJunk {
   return txIntent.methodName === "df__buyJunk";
+}
+
+export function isUnconfirmedBuySilver(
+  txIntent: TxIntent,
+): txIntent is UnconfirmedBuySilver {
+  return txIntent.methodName === "df__buySilver";
 }
 
 export function isUnconfirmedSetPlanetEmoji(
@@ -502,6 +509,12 @@ export function isUnconfirmedBuyJunkTx(
   tx: Transaction,
 ): tx is Transaction<UnconfirmedBuyJunk> {
   return isUnconfirmedBuyJunk(tx.intent);
+}
+
+export function isUnconfirmedBuySilverTx(
+  tx: Transaction,
+): tx is Transaction<UnconfirmedBuySilver> {
+  return isUnconfirmedBuySilver(tx.intent);
 }
 
 export function isUnconfirmedSetPlanetEmojiTx(

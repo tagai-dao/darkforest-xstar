@@ -84,7 +84,12 @@ class Viewport {
     this.viewportWidth = viewportWidth; // width / height
     this.viewportHeight = viewportHeight;
 
-    this.mouseLastCoords = centerWorldCoords;
+    // 这里必须是画布像素，不能放世界坐标。
+    // 出生点在 80000 一带时，下一帧的缩放会把这个数当成鼠标像素，镜头会被甩出已挖的块，画面就是一片黑。
+    this.mouseLastCoords = {
+      x: viewportWidth / 2,
+      y: viewportHeight / 2,
+    };
     this.canvas = canvas;
 
     const scroll = localStorage.getItem("scrollSpeed");
@@ -213,9 +218,12 @@ class Viewport {
 
     viewport.setDiagnosticUpdater(gameUIManager);
 
-    // set starting position based on storage
+    // 目录里已经有家时，打开页面就站在家的坐标上，不用上次离开时的镜头。
+    const hasHome = homeCoords.x !== 0 || homeCoords.y !== 0;
     const stored = viewport.getStorage();
-    if (!stored) {
+    if (hasHome) {
+      viewport.focus(homeCoords, 96);
+    } else if (!stored) {
       viewport.zoomPlanet(gameUIManager.getHomePlanet());
     } else {
       viewport.setData(stored);
@@ -546,6 +554,13 @@ class Viewport {
       return false;
     }
     return true;
+  }
+
+  public focus(coords: WorldCoords, width?: number): void {
+    this.centerCoords(coords);
+    if (width !== undefined) {
+      this.setWorldWidth(width);
+    }
   }
 
   private isValidWorldWidth(width: number) {

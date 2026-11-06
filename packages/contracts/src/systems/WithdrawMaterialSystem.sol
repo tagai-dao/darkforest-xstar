@@ -12,6 +12,7 @@ import { Guild } from "codegen/tables/Guild.sol";
 import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
 import { Errors } from "interfaces/errors.sol";
+import { DFXStarStakingLib } from "libraries/DFXStarStakingLib.sol";
 
 contract WithdrawMaterialSystem is BaseSystem {
   /**
@@ -83,6 +84,7 @@ contract WithdrawMaterialSystem is BaseSystem {
     // Add score points to player's score
     uint256 currentPlayerScore = PlayerScore.get(executor);
     PlayerScore.set(executor, currentPlayerScore + scorePoints);
+    DFXStarStakingLib.stakeScoreDelta(executor, scorePoints);
 
     // Add score points to guild if player is in a guild
     uint8 guildId = GuildUtils.getCurrentGuildId(executor);

@@ -1,0 +1,46 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  actionHistoryWidth,
+  aiproPriceLabel,
+  formatActionTime,
+} from "../../Frontend/Components/ActionHistory";
+import { asActionRecord, parseCompleteJsonLines } from "./FileChunkSource";
+
+describe("action log", () => {
+  it("keeps the strategy filename on a complete line", () => {
+    const line =
+      '{"time":"t","strategy":"aggressive.md","action":"buy-silver","detail":"tier 0","tx":"0x1"}\n';
+    const parsed = parseCompleteJsonLines(`${line}{"action":"cut`);
+    expect(parsed.byteLength).toBe(line.length);
+    expect(asActionRecord(parsed.values[0])?.strategy).toBe("aggressive.md");
+  });
+
+  it("reads a time written under at", () => {
+    const parsed = parseCompleteJsonLines(
+      '{"at":"2026-11-06T04:51:48Z","strategy":"aggressive.md","action":"tick"}\n',
+    );
+    expect(asActionRecord(parsed.values[0])?.time).toBe("2026-11-06T04:51:48Z");
+  });
+
+  it("labels an action with the local time", () => {
+    const source = "2026-11-05T08:34:00.000Z";
+    const date = new Date(source);
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+    expect(formatActionTime(source)).toContain(`${hour}:${minute}`);
+    expect(formatActionTime(undefined)).toBe("时间未知");
+  });
+
+  it("widens the log to the longest row and stops at 80 percent", () => {
+    expect(actionHistoryWidth(400, 1000)).toBe(424);
+    expect(actionHistoryWidth(900, 1000)).toBe(800);
+  });
+
+  it("shows the empty price hook as not connected", () => {
+    expect(
+      aiproPriceLabel('{"token":"AIPRO","source":null,"price":null}'),
+    ).toBe("价格未接入");
+    expect(aiproPriceLabel('{"price":1.25}')).toBe("1.25");
+  });
+});

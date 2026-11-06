@@ -1,20 +1,21 @@
 import { resourceToHex } from "@latticexyz/common";
-import GPTSystemAbi from "contracts/out/GPTTokensSystem.sol/GPTTokensSystem.abi.json";
 import ArtifactCreateSystemAbi from "contracts/out/ArtifactCreateSystem.sol/ArtifactCreateSystem.abi.json";
-import ArtifactSystemAbi from "contracts/out/ArtifactSystem.sol/ArtifactSystem.abi.json";
 import ArtifactPortalSystemAbi from "contracts/out/ArtifactPortalSystem.sol/ArtifactPortalSystem.abi.json";
+import ArtifactSystemAbi from "contracts/out/ArtifactSystem.sol/ArtifactSystem.abi.json";
+import BuySilverSystemAbi from "contracts/out/BuySilverSystem.sol/BuySilverSystem.abi.json";
+import GPTSystemAbi from "contracts/out/GPTTokensSystem.sol/GPTTokensSystem.abi.json";
 import GuildSystemAbi from "contracts/out/GuildSystem.sol/GuildSystem.abi.json";
 import MoveSystemAbi from "contracts/out/MoveSystem.sol/MoveSystem.abi.json";
 import PinkBombSystemAbi from "contracts/out/PinkBombSystem.sol/PinkBombSystem.abi.json";
 import PlanetEmojiSystemAbi from "contracts/out/PlanetEmojiSystem.sol/PlanetEmojiSystem.abi.json";
+import PlanetJunkSystemAbi from "contracts/out/PlanetJunkSystem.sol/PlanetJunkSystem.abi.json";
 import PlanetRevealSystemAbi from "contracts/out/PlanetRevealSystem.sol/PlanetRevealSystem.abi.json";
 import PlanetUpgradeSystemAbi from "contracts/out/PlanetUpgradeSystem.sol/PlanetUpgradeSystem.abi.json";
 import PlanetWithdrawSilverSystemAbi from "contracts/out/PlanetWithdrawSilverSystem.sol/PlanetWithdrawSilverSystem.abi.json";
-import WithdrawMaterialSystemAbi from "contracts/out/WithdrawMaterialSystem.sol/WithdrawMaterialSystem.abi.json";
-import PlanetJunkSystemAbi from "contracts/out/PlanetJunkSystem.sol/PlanetJunkSystem.abi.json";
 import PlayerSystemAbi from "contracts/out/PlayerSystem.sol/PlayerSystem.abi.json";
 import TestOnlySystemAbi from "contracts/out/TestOnlySystem.sol/TestOnlySystem.abi.json";
 import TickSystemAbi from "contracts/out/TickSystem.sol/TickSystem.abi.json";
+import WithdrawMaterialSystemAbi from "contracts/out/WithdrawMaterialSystem.sol/WithdrawMaterialSystem.abi.json";
 import type { Abi } from "viem";
 
 export const MOVE_SYSTEM_ID = resourceToHex({
@@ -73,6 +74,14 @@ export const PLANET_WITHDRAW_SILVER_SYSTEM_ABI: Abi =
   PlanetWithdrawSilverSystemAbi;
 
 export const WITHDRAW_MATERIAL_SYSTEM_ABI: Abi = WithdrawMaterialSystemAbi;
+
+export const BUY_SILVER_SYSTEM_ID = resourceToHex({
+  type: "system",
+  namespace: "df",
+  name: "BuySilverSystem",
+});
+
+export const BUY_SILVER_SYSTEM_ABI: Abi = BuySilverSystemAbi;
 
 export const PLAYER_SYSTEM_ID = resourceToHex({
   type: "system",
@@ -167,6 +176,8 @@ export const get_ABI_from_FunctionName = (functionName: string) => {
     return PLANET_WITHDRAW_SILVER_SYSTEM_ABI;
   } else if (functionName === "withdrawMaterial") {
     return WITHDRAW_MATERIAL_SYSTEM_ABI;
+  } else if (functionName === "buySilver") {
+    return BUY_SILVER_SYSTEM_ABI;
   } else if (functionName === "setPlanetEmoji") {
     return PLANET_EMOJI_SYSTEM_ABI;
   } else if (functionName === "initializePlayer") {
@@ -257,6 +268,8 @@ export const get_SystemId_from_FunctionName = (functionName: string) => {
     return PLANET_WITHDRAW_SILVER_SYSTEM_ID;
   } else if (functionName === "withdrawMaterial") {
     return WITHDRAW_MATERIAL_SYSTEM_ID;
+  } else if (functionName === "buySilver") {
+    return BUY_SILVER_SYSTEM_ID;
   } else if (functionName === "initializePlayer") {
     return PLAYER_SYSTEM_ID;
   } else if (

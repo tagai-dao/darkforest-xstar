@@ -1,16 +1,35 @@
+import { mudFoundry } from "@latticexyz/common/chains";
 import { useComponentValue } from "@latticexyz/react";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
+import {
+  connectMetaMask,
+  sendMetaMaskTransaction,
+  walletErrorMessage,
+} from "@wallet/addLocalChain";
 import { useEffect, useMemo, useState } from "react";
 import {
   type Address,
+  createWalletClient,
+  custom,
   formatUnits,
   isAddress,
   parseAbi,
+  parseEther,
   parseUnits,
   zeroAddress,
 } from "viem";
-import { useWalletClient } from "wagmi";
+
+// 管理操作必须由浏览器里的 MetaMask 签名。Rainbow 没连上时按钮不会有任何弹窗。
+const openMetaMaskWallet = async () => {
+  const { account, ethereum } = await connectMetaMask();
+  const client = createWalletClient({
+    account,
+    chain: mudFoundry,
+    transport: custom(ethereum),
+  });
+  return { account, client };
+};
 
 const GAME_PASS_ABI = parseAbi([
   "function owner() view returns (address)",
@@ -73,7 +92,6 @@ export const GamePassAdminPanel = () => {
     network: { publicClient, waitForTransaction, worldContract },
     components: { GamePassNFT },
   } = useMUD();
-  const { data: walletClient } = useWalletClient();
   const gamePassConfig = useComponentValue(GamePassNFT, singletonEntity);
 
   const gamePassAddress = useMemo(() => {
@@ -90,6 +108,8 @@ export const GamePassAdminPanel = () => {
   const [isSeasonOpen, setIsSeasonOpen] = useState(false);
   const [seasonWorldInput, setSeasonWorldInput] = useState("");
   const [seasonNumberInput, setSeasonNumberInput] = useState("1");
+  const [nativeRecipient, setNativeRecipient] = useState("");
+  const [nativeAmount, setNativeAmount] = useState("1");
   const [tokenRecipient, setTokenRecipient] = useState("");
   const [tokenAmount, setTokenAmount] = useState("100000");
   const [batchTokenRows, setBatchTokenRows] = useState("");
@@ -174,31 +194,29 @@ export const GamePassAdminPanel = () => {
   }, [gamePassAddress, publicClient]);
 
   const writeAndWait = async (request: Record<string, unknown>) => {
-    if (!walletClient) {
-      throw new Error("Please connect an admin wallet first.");
+    const { account, client } = await openMetaMaskWallet();
+    if (tokenOwner && account.toLowerCase() !== tokenOwner.toLowerCase()) {
+      throw new Error(
+        `MetaMask 当前账户是 ${account}，铸币管理员是 ${tokenOwner}。请在 MetaMask 里切换到管理员后再点一次。`,
+      );
     }
-
-    const account = walletClient.account;
-    const chain = walletClient.chain;
 
     const isLocalAnvil = publicClient.chain?.id === 31337;
     const chainAlignedNonce = isLocalAnvil
       ? await publicClient.getTransactionCount({
-          address: account.address,
+          address: account,
           blockTag: "pending",
         })
       : undefined;
 
-    const tx = await (
-      walletClient as unknown as {
-        writeContract: (
-          request: Record<string, unknown>,
-        ) => Promise<`0x${string}`>;
-      }
-    ).writeContract({
-      account,
-      chain,
-      ...request,
+    setStatus("请在 MetaMask 里确认这笔交易。");
+    const tx = await client.writeContract({
+      ...(request as {
+        address: Address;
+        abi: readonly unknown[];
+        functionName: string;
+        args?: readonly unknown[];
+      }),
       ...(chainAlignedNonce !== undefined ? { nonce: chainAlignedNonce } : {}),
     });
     await waitForTransaction(tx);
@@ -223,6 +241,17 @@ export const GamePassAdminPanel = () => {
       functionName: "ownerMint",
       args: [recipient],
     });
+  };
+
+  const handleAddLocalChain = async () => {
+    try {
+      setStatus("请在 MetaMask 里连接账户。");
+      const { account } = await connectMetaMask();
+      setStatus(`已连接 ${account}。链 ID 31337。`);
+    } catch (error) {
+      console.error(error);
+      setStatus(walletErrorMessage(error));
+    }
   };
 
   const handleSetActiveSeason = async () => {
@@ -271,6 +300,46 @@ export const GamePassAdminPanel = () => {
           ? error.message
           : "Failed to clear active season.",
       );
+    }
+  };
+
+  // 原生币只付手续费。通行证要的 DFPT 仍由下面的铸造完成。
+  const handleSendNative = async () => {
+    try {
+      const recipient = normalizeAddress(nativeRecipient);
+      const value = parseEther(nativeAmount.trim());
+      if (value <= 0n) {
+        throw new Error("金额要大于 0。");
+      }
+
+      const { account } = await openMetaMaskWallet();
+      const balance = await publicClient.getBalance({ address: account });
+      if (balance < value) {
+        throw new Error(
+          `当前账户 ${account} 只有 ${formatUnits(balance, 18)} ETH，不够发送 ${nativeAmount}。请换到有余额的管理员账户。`,
+        );
+      }
+
+      const nonce =
+        publicClient.chain?.id === 31337
+          ? await publicClient.getTransactionCount({
+              address: account,
+              blockTag: "pending",
+            })
+          : undefined;
+
+      setStatus("请在 MetaMask 里确认这笔转账。");
+      const tx = await sendMetaMaskTransaction({
+        from: account,
+        to: recipient,
+        value,
+        ...(nonce !== undefined ? { nonce } : {}),
+      });
+      await waitForTransaction(tx);
+      setStatus(`已向 ${recipient} 发送 ${nativeAmount} ETH。`);
+    } catch (error) {
+      console.error(error);
+      setStatus(walletErrorMessage(error));
     }
   };
 
@@ -343,6 +412,20 @@ export const GamePassAdminPanel = () => {
     <div className="w-full max-w-xl rounded-lg bg-white p-6 text-gray-900 shadow-lg">
       <h2 className="mb-4 text-2xl font-semibold">Game Pass Admin</h2>
 
+      {status && (
+        <div className="mb-4 rounded bg-gray-100 p-3 text-sm text-gray-900">
+          {status}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={handleAddLocalChain}
+        className="mb-6 w-full rounded bg-amber-500 px-4 py-2 text-white hover:bg-amber-600"
+      >
+        添加本机链到 MetaMask
+      </button>
+
       <div className="mb-6 space-y-1 break-all text-sm">
         <div>GamePassNFT: {gamePassAddress ?? "Not configured"}</div>
         <div>GamePass owner: {gamePassOwner ?? "-"}</div>
@@ -390,7 +473,38 @@ export const GamePassAdminPanel = () => {
       </div>
 
       <div className="mb-8 rounded border border-gray-200 p-4">
+        <h3 className="mb-3 text-lg font-medium">发送原生币</h3>
+        <p className="mb-3 text-sm text-gray-600">
+          从 MetaMask 当前账户转出本机链的 ETH，给指定地址付手续费。默认 1
+          ETH。买通行证用的 DFPT 请用下面的铸造。
+        </p>
+        <input
+          value={nativeRecipient}
+          onChange={(event) => setNativeRecipient(event.target.value)}
+          className="mb-2 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
+          placeholder="接收地址"
+        />
+        <input
+          value={nativeAmount}
+          onChange={(event) => setNativeAmount(event.target.value)}
+          className="mb-3 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
+          placeholder="ETH 数量，例如 1"
+        />
+        <button
+          type="button"
+          onClick={handleSendNative}
+          className="w-full rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+        >
+          发送 ETH
+        </button>
+      </div>
+
+      <div className="mb-8 rounded border border-gray-200 p-4">
         <h3 className="mb-3 text-lg font-medium">Mint Test Tokens</h3>
+        <p className="mb-3 text-sm text-gray-600">
+          点击后由浏览器里的 MetaMask 签名。当前账户必须是上面的 Mock token
+          owner。
+        </p>
         <input
           value={tokenRecipient}
           onChange={(event) => setTokenRecipient(event.target.value)}
@@ -460,12 +574,6 @@ export const GamePassAdminPanel = () => {
           Batch Mint NFTs
         </button>
       </div>
-
-      {status && (
-        <div className="mt-4 rounded bg-gray-100 p-3 text-sm text-gray-900">
-          {status}
-        </div>
-      )}
     </div>
   );
 };

@@ -2,6 +2,7 @@ import WalletButton from "@wallet/WalletButton";
 
 import { CreateMoveForm } from "./CreateMoveFormTest";
 import { CreatePlanetForm } from "./CreatePlanetFormTest";
+import { DFXStarIntegrationPanel } from "./DFXStarIntegrationPanel";
 import { GamePassAdminPanel } from "./GamePassAdminPanel";
 import { PlanetReadForm } from "./PlanetReadForm";
 import { PlanetUpgradeBranchForm } from "./PlanetUpgradeFormBranchTest";
@@ -70,6 +71,9 @@ export const PlanetTestPage = () => {
       </div>
       <div className="mb-4">
         <GamePassAdminPanel />
+      </div>
+      <div className="mb-4">
+        <DFXStarIntegrationPanel />
       </div>
       <div className="flex items-start gap-4">
         <div className="mt-6">

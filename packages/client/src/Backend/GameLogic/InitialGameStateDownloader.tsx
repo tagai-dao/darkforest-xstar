@@ -1,3 +1,4 @@
+import { WORLD_NAME } from "@df/constants";
 import { locationIdFromHexStr } from "@df/serde";
 import type {
   Artifact,
@@ -21,9 +22,8 @@ import type { LoadingBarHandle } from "../../Frontend/Components/TextLoadingBar"
 import { DarkForestTips } from "../../Frontend/Views/DarkForestTips";
 import type { TerminalHandle } from "../../Frontend/Views/Terminal";
 import { tryGetAllTwitters } from "../Network/UtilityServerAPI";
-import type PersistentChunkStore from "../Storage/PersistentChunkStore";
+import type { WatchChunkStore } from "../Save/FileChunkSource";
 import type { ContractsAPI } from "./ContractsAPI";
-import { WORLD_NAME } from "@df/constants";
 
 export interface InitialGameState {
   contractConstants: ContractConstants;
@@ -71,7 +71,7 @@ export class InitialGameStateDownloader {
 
   async download(
     contractsAPI: ContractsAPI,
-    persistentChunkStore: PersistentChunkStore,
+    persistentChunkStore: WatchChunkStore,
   ): Promise<InitialGameState> {
     const isDev = import.meta.env.VITE_NODE_ENV !== "production";
 

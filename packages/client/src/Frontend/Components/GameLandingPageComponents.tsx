@@ -24,7 +24,8 @@ const StyledWrapper = styled.div<{
   initRender: InitRenderState;
 }>`
   width: 100%;
-  height: 100%;
+  /* 终端藏起后没有在文档流里的子元素，百分比高度会变成 0，地图就只剩顶栏。 */
+  height: 100vh;
   margin: 0;
   padding: 0;
   display: flex;

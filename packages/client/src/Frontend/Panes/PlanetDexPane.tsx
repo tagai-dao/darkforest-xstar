@@ -160,7 +160,7 @@ export function PlanetDexPane({
     }
     const ownedPlanets = uiManager
       .getAllOwnedPlanets()
-      .filter((planet) => planet.owner === myAddr);
+      .filter((planet) => planet.owner.toLowerCase() === myAddr.toLowerCase());
     setPlanets(ownedPlanets);
   }, [visible, uiManager]);
 
@@ -183,7 +183,9 @@ export function PlanetDexPane({
       }
       const ownedPlanets = uiManager
         .getAllOwnedPlanets()
-        .filter((planet) => planet.owner === myAddr);
+        .filter(
+          (planet) => planet.owner.toLowerCase() === myAddr.toLowerCase(),
+        );
       setPlanets(ownedPlanets);
     };
 

@@ -206,6 +206,12 @@ export function PlanetCard({
             <EmSpacer width={0.5} />
           </InlineBlock>
         </AlignCenterHorizontally>
+        <StatRow>
+          <Sub>
+            坐标 ({Math.round(planet.location.coords.x)},{" "}
+            {Math.round(planet.location.coords.y)})
+          </Sub>
+        </StatRow>
         {active && (
           <>
             <EmSpacer height={0.5} />

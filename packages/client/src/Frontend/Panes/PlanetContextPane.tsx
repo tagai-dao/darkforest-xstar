@@ -40,6 +40,7 @@ import {
 } from "../Views/PlanetNotifications";
 import { SendResources } from "../Views/SendResources";
 import { WithdrawSilver } from "../Views/WithdrawSilver";
+import { BuySilverPane } from "./BuySilverPane";
 
 export const PlanetPaneName = {
   Capture: "Capture",
@@ -325,6 +326,8 @@ function PlanetContextPaneContent({
         />
 
         <ManageJunkButton wrapper={planet} />
+
+        <BuySilverPane planetWrapper={planet} />
 
         <MineArtifactButton planetWrapper={planet} />
         {/* {captureRow} */}

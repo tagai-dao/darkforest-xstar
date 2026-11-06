@@ -39,6 +39,7 @@ export type ContractMethodName =
   | "df__addJunk"
   | "df__clearJunk"
   | "df__buyJunk"
+  | "df__buySilver"
   | "df__setPlanetEmoji"
   | "df__revertMove"
   | "useKey"
@@ -309,6 +310,17 @@ export type UnconfirmedClearJunk = TxIntent & {
 export type UnconfirmedBuyJunk = TxIntent & {
   methodName: "df__buyJunk";
   amount: number;
+};
+
+/**
+ * @hidden
+ */
+export type UnconfirmedBuySilver = TxIntent & {
+  methodName: "df__buySilver";
+  locationId: LocationId;
+  tier: number;
+  tokenPrice: string;
+  silverAmount: number;
 };
 
 /**

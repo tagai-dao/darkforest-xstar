@@ -2017,6 +2017,11 @@ export class GameUIManager extends EventEmitter {
     return this.gameManager.getWorldRadius();
   }
 
+  /** 链上成功出生过的玩家数。注册了名字但还没出生的不算。 */
+  public getSpawnedPlayerCount(): number {
+    return this.gameManager.contractsAPI.getGlobalStats().spawnPlayerCount;
+  }
+
   public getInnerRadius(): number {
     return this.gameManager.getInnerRadius();
   }

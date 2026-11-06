@@ -114,14 +114,15 @@ import type {
   UnconfirmedBuyArtifact,
   UnconfirmedBuyGPTTokens,
   UnconfirmedBuyHat,
+  UnconfirmedBuyJunk,
   UnconfirmedBuyPlanet,
+  UnconfirmedBuySilver,
   UnconfirmedBuySpaceship,
   UnconfirmedCapturePlanet,
   UnconfirmedChangeArtifactImageType,
   UnconfirmedChargeArtifact,
   UnconfirmedClaim,
   UnconfirmedClearJunk,
-  UnconfirmedBuyJunk,
   UnconfirmedCreateGuild,
   UnconfirmedDeactivateArtifact,
   UnconfirmedDepositArtifact,
@@ -139,8 +140,8 @@ import type {
   UnconfirmedPlanetTransfer,
   UnconfirmedProspectPlanet,
   UnconfirmedRefreshPlanet,
-  UnconfirmedRevertMove,
   UnconfirmedReveal,
+  UnconfirmedRevertMove,
   UnconfirmedSendGPTTokens,
   UnconfirmedSetGrant,
   UnconfirmedSetMemberRole,
@@ -240,7 +241,8 @@ import {
   verifyTwitterHandle,
 } from "../Network/UtilityServerAPI";
 import type { SerializedPlugin } from "../Plugins/SerializedPlugin";
-import type PersistentChunkStore from "../Storage/PersistentChunkStore";
+import type { WatchChunkStore } from "../Save/FileChunkSource";
+import type { GameSaveFiles } from "../Save/GameSave";
 import { easeInAnimation, emojiEaseOutAnimation } from "../Utils/Animation";
 import type SnarkArgsHelper from "../Utils/SnarkArgsHelper";
 import { hexifyBigIntNestedArray } from "../Utils/Utils";
@@ -325,7 +327,7 @@ export class GameManager extends EventEmitter {
    * @todo it also persists other game data to IndexedDB. This class needs to be renamed `GameSaver`
    * or something like that.
    */
-  public readonly persistentChunkStore: PersistentChunkStore;
+  public readonly persistentChunkStore: WatchChunkStore;
 
   /**
    * Responsible for generating snark proofs.
@@ -508,7 +510,7 @@ export class GameManager extends EventEmitter {
     unprocessedPlanetArrivalIds: Map<LocationId, VoyageId[]>,
     contractsAPI: ContractsAPI,
     contractConstants: ContractConstants,
-    persistentChunkStore: PersistentChunkStore,
+    persistentChunkStore: WatchChunkStore,
     snarkHelper: SnarkArgsHelper,
     homeLocation: WorldLocation | undefined,
     useMockHash: boolean,
@@ -917,6 +919,7 @@ export class GameManager extends EventEmitter {
     contractAddress,
     components,
     spectate = false,
+    fileSave,
   }: {
     mainAccount: EthAddress | undefined;
     connection: EthConnection;
@@ -924,6 +927,7 @@ export class GameManager extends EventEmitter {
     contractAddress: EthAddress;
     components: ClientComponents;
     spectate: boolean;
+    fileSave?: GameSaveFiles;
   }): Promise<GameManager> {
     return GameManagerFactory.create({
       mainAccount,
@@ -932,6 +936,7 @@ export class GameManager extends EventEmitter {
       contractAddress,
       components,
       spectate,
+      fileSave,
     });
   }
 
@@ -1481,6 +1486,22 @@ export class GameManager extends EventEmitter {
    */
   public getExploredChunks(): Iterable<Chunk> {
     return this.persistentChunkStore.allChunks();
+  }
+
+  /**
+   * 镜头范围内的块。有格子索引时只查附近几格，避免每帧扫完整张图。
+   */
+  public chunksNear(
+    left: number,
+    bottom: number,
+    right: number,
+    top: number,
+  ): Iterable<Chunk> {
+    const near = this.persistentChunkStore.chunksNear;
+    if (near) {
+      return near(left, bottom, right, top);
+    }
+    return this.getExploredChunks();
   }
 
   /**
@@ -2110,7 +2131,7 @@ export class GameManager extends EventEmitter {
     return this.persistentChunkStore.getChunkByFootprint(chunkFootprint);
   }
 
-  getChunkStore(): PersistentChunkStore {
+  getChunkStore(): WatchChunkStore {
     return this.persistentChunkStore;
   }
 
@@ -5443,6 +5464,118 @@ export class GameManager extends EventEmitter {
     }
   }
 
+  public async buySilver(
+    locationId: LocationId,
+    tier: number,
+  ): Promise<Transaction<UnconfirmedBuySilver>> {
+    try {
+      if (!this.account) {
+        throw new Error("no account");
+      }
+      if (tier < 0 || tier > 2) {
+        throw new Error("invalid silver purchase tier");
+      }
+
+      const planet = this.entityStore.getPlanetWithId(locationId);
+      if (!planet) {
+        throw new Error("tried to buy silver on an unknown planet");
+      }
+      if (planet.planetType === PlanetType.TRADING_POST) {
+        throw new Error("cannot buy silver on a spacetime rip");
+      }
+      if (planet.owner !== this.account) {
+        throw new Error("must own the planet to buy silver");
+      }
+      if (planet.junkOwner !== this.account || !planet.addJunkTick) {
+        throw new Error("planet junk must be active before buying silver");
+      }
+
+      const dfxConfig = getComponentValue(
+        this.components.DFXStarConfig,
+        singletonEntity,
+      );
+      if (
+        !dfxConfig?.scoreStakingPool ||
+        dfxConfig.scoreStakingPool === EMPTY_ADDRESS
+      ) {
+        throw new Error("DFXStar pool is not configured");
+      }
+      if (!dfxConfig.paymentToken || dfxConfig.paymentToken === EMPTY_ADDRESS) {
+        throw new Error("DFXStar payment token is not configured");
+      }
+
+      const purchaseConfig = getComponentValue(
+        this.components.SilverPurchaseConfig,
+        singletonEntity,
+      );
+      if (!purchaseConfig?.tierPrices || !purchaseConfig.tierSilverAmounts) {
+        throw new Error("silver purchase tiers are not configured");
+      }
+
+      const packageSilverRaw = Number(
+        purchaseConfig.tierSilverAmounts[tier] ?? 0,
+      );
+      const packageSilver = packageSilverRaw / CONTRACT_PRECISION;
+      if (packageSilver <= 0) {
+        throw new Error("invalid silver purchase tier");
+      }
+      if (planet.silver + packageSilver > planet.silverCap) {
+        throw new Error("not enough planet silver capacity for this package");
+      }
+
+      const tokenPrice = purchaseConfig.tierPrices[tier]?.toString() ?? "0";
+      if (tokenPrice === "0") {
+        throw new Error("invalid silver purchase price");
+      }
+
+      localStorage.setItem(
+        `${this.ethConnection.getAddress()?.toLowerCase()}-buySilver-tier`,
+        tier.toString(),
+      );
+      localStorage.setItem(
+        `${this.ethConnection.getAddress()?.toLowerCase()}-buySilver-planet`,
+        locationId,
+      );
+      localStorage.setItem(
+        `${this.ethConnection.getAddress()?.toLowerCase()}-buySilver-price`,
+        tokenPrice,
+      );
+      localStorage.setItem(
+        `${this.ethConnection.getAddress()?.toLowerCase()}-buySilver-silver`,
+        packageSilver.toString(),
+      );
+
+      const delegator = this.getAccount();
+      if (!delegator) {
+        throw Error("no delegator account");
+      }
+
+      const txIntent: UnconfirmedBuySilver = {
+        delegator,
+        methodName: "df__buySilver",
+        contract: this.contractsAPI.contract,
+        args: Promise.resolve([locationIdToDecStr(locationId), tier]),
+        locationId,
+        tier,
+        tokenPrice,
+        silverAmount: packageSilver,
+      };
+
+      const transactionFee = this.getTransactionFee();
+      const tx = await this.contractsAPI.submitTransaction(txIntent, {
+        value: transactionFee,
+      });
+
+      return tx;
+    } catch (e) {
+      this.getNotificationsManager().txInitError(
+        "df__buySilver",
+        (e as Error).message,
+      );
+      throw e;
+    }
+  }
+
   public async setPlanetEmoji(
     locationId: LocationId,
     emoji: string,
@@ -6502,6 +6635,39 @@ export class GameManager extends EventEmitter {
       }
     }
     return this;
+  }
+
+  /**
+   * 观看页读到一块新文件时调用。同一块被重写过，就先丢掉旧的再画新的。
+   */
+  ingestWatchedChunk(chunk: Chunk): GameManager {
+    const existing = this.persistentChunkStore.getChunkByFootprint(
+      chunk.chunkFootprint,
+    );
+    const sameFootprint =
+      existing &&
+      existing.chunkFootprint.bottomLeft.x ===
+        chunk.chunkFootprint.bottomLeft.x &&
+      existing.chunkFootprint.bottomLeft.y ===
+        chunk.chunkFootprint.bottomLeft.y &&
+      existing.chunkFootprint.sideLength === chunk.chunkFootprint.sideLength;
+    if (existing && sameFootprint) {
+      this.deleteChunk(existing);
+    }
+    return this.addNewChunk(chunk);
+  }
+
+  /**
+   * 出生点文件比开局更晚出现时，记下坐标。不启动本页挖矿。
+   * 已经有家时不再覆盖。
+   */
+  adoptWatchedHome(location: WorldLocation): boolean {
+    if (this.homeLocation) {
+      return false;
+    }
+    this.homeLocation = location;
+    void this.persistentChunkStore.confirmHomeLocation(location);
+    return true;
   }
 
   /**

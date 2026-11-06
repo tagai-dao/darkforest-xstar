@@ -5,6 +5,8 @@ import { AmbiencePane } from "@frontend/Panes/AmbiencePane";
 import { useCallback, useEffect, useState } from "react";
 import styled from "styled-components";
 
+import type { ActionRecord } from "../../Backend/Save/FileChunkSource";
+import { ActionHistory } from "../Components/ActionHistory";
 import { BorderlessPane } from "../Components/CoreUI";
 import {
   CanvasContainer,
@@ -13,6 +15,8 @@ import {
   UpperLeft,
   WindowWrapper,
 } from "../Components/GameWindowComponents";
+import { PublicGameStatus } from "../Components/PublicGameStatus";
+import { SelectedVoyageDisplay } from "../Components/SelectedVoyageDisplay";
 import ControllableCanvas from "../Game/ControllableCanvas";
 import { AIChatPane } from "../Panes/AIChatPane";
 import { ArtifactHoverPane } from "../Panes/ArtifactHoverPane";
@@ -25,7 +29,6 @@ import { HotkeysArtShipPane, HotkeysMainLinePane } from "../Panes/HotKeyPane";
 import { HoverPlanetPane } from "../Panes/HoverPlanetPane";
 import { LeaderboardPane } from "../Panes/LeaderboardPane";
 import OnboardingPane from "../Panes/OnboardingPane";
-import { SelectedVoyageDisplay } from "../Components/SelectedVoyageDisplay";
 import { PlanetContextPane } from "../Panes/PlanetContextPane";
 import { PlanetDexPane } from "../Panes/PlanetDexPane";
 import { PlayerArtifactsPane } from "../Panes/PlayerArtifactsPane";
@@ -63,10 +66,20 @@ export function GameWindowLayout({
   terminalVisible,
   setTerminalVisible,
   spectate,
+  showPublicStatus = false,
+  homeReady = false,
+  actions = [],
+  priceText,
+  onReturnHome,
 }: {
   terminalVisible: boolean;
   setTerminalVisible: (visible: boolean) => void;
   spectate?: boolean;
+  showPublicStatus?: boolean;
+  homeReady?: boolean;
+  actions?: ActionRecord[];
+  priceText?: string;
+  onReturnHome?: () => void;
 }) {
   const uiManager = useUIManager();
   const modalManager = uiManager.getModalManager();
@@ -179,18 +192,23 @@ export function GameWindowLayout({
 
   const account = uiManager.getAccount();
 
-  //Terminal
+  // 观看页自己把终端关掉。这里再和本地设置对写，两边会来回改，页面会卡死。
   useEffect(() => {
-    if (uiManager.getAccount()) {
-      setTerminalVisible(uiManager.getBooleanSetting(Setting.TerminalVisible));
+    if (spectate || !uiManager.getAccount()) {
+      return;
     }
-  }, [account, uiManager, setTerminalVisible]);
+    setTerminalVisible(uiManager.getBooleanSetting(Setting.TerminalVisible));
+  }, [account, spectate, uiManager, setTerminalVisible]);
 
   useEffect(() => {
+    if (spectate) {
+      return;
+    }
     if (userTerminalVisibleSetting !== terminalVisible) {
       setUserTerminalVisibleSetting(terminalVisible);
     }
   }, [
+    spectate,
     userTerminalVisibleSetting,
     setUserTerminalVisibleSetting,
     terminalVisible,
@@ -342,6 +360,10 @@ export function GameWindowLayout({
 
   return (
     <WindowWrapper>
+      {showPublicStatus && (
+        <PublicGameStatus homeReady={homeReady} priceText={priceText} />
+      )}
+      {showPublicStatus && <ActionHistory actions={actions} />}
       <TopBarPaneContainer>
         {paneVisible && (
           <BorderlessPane>
@@ -403,10 +425,12 @@ export function GameWindowLayout({
           visible={playerArtifactsVisible}
           onClose={() => setPlayerArtifactsVisible(false)}
         />
-        <PlanetContextPane
-          visible={selectedPlanetVisible}
-          onClose={() => setSelectedPlanetVisible(false)}
-        />
+        {!spectate && (
+          <PlanetContextPane
+            visible={selectedPlanetVisible}
+            onClose={() => setSelectedPlanetVisible(false)}
+          />
+        )}
         <DiagnosticsPane
           visible={diagnosticsVisible}
           onClose={() => setDiagnosticsVisible(false)}
@@ -437,11 +461,16 @@ export function GameWindowLayout({
       <MainWindow>
         <CanvasContainer>
           <UpperLeft>
+            {onReturnHome && (
+              <ReturnHomeButton type="button" onClick={onReturnHome}>
+                返回首页
+              </ReturnHomeButton>
+            )}
             <AmbiencePane />
             {paneVisible && <ZoomPane />}
           </UpperLeft>
 
-          {paneVisible && (
+          {!spectate && paneVisible && (
             <SidebarPane
               aiChatHook={[aiChatVisible, setAIChatVisible]}
               walletHook={[walletVisible, setWalletVisible]}
@@ -468,7 +497,8 @@ export function GameWindowLayout({
           <NotificationsPane />
           {paneVisible && <CoordsPane />}
           {paneVisible && <ExplorePane />}
-          {bottomHotkeyVisible &&
+          {!spectate &&
+            bottomHotkeyVisible &&
             !userHotKeysVisibleSetting &&
             userExperimentalVisibleSetting && (
               <>
@@ -490,6 +520,18 @@ export function GameWindowLayout({
     </WindowWrapper>
   );
 }
+
+const ReturnHomeButton = styled.button`
+  margin: 8px;
+  z-index: 6;
+  padding: 8px 10px;
+  border: 1px solid #00dc82;
+  background: rgba(0, 0, 0, 0.82);
+  color: #d7ffe4;
+  font-family: "Start Press 2P", sans-serif;
+  font-size: 10px;
+  cursor: pointer;
+`;
 
 const TopBarPaneContainer = styled.div`
   display: flex;

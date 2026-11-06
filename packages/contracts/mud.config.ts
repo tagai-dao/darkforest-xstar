@@ -724,6 +724,23 @@ export default defineWorld({
       },
       key: [],
     },
+    DFXStarConfig: {
+      schema: {
+        scoreStakingPool: "address",
+        paymentToken: "address",
+        stakingFactory: "address",
+        community: "address",
+        buySilverSystem: "address",
+      },
+      key: [],
+    },
+    SilverPurchaseConfig: {
+      schema: {
+        tierPrices: "uint256[3]",
+        tierSilverAmounts: "uint256[3]",
+      },
+      key: [],
+    },
     PlayerStats: {
       schema: {
         player: "address",

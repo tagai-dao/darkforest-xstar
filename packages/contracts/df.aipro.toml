@@ -1,0 +1,12 @@
+# AIPRO 主网 Nutbox 接线。PostDeploy 不读这个文件。
+# 新池由社区 owner 稍后执行 AddAIPRODFXStarPool，在 ready = true 且 ratios 正确之后。
+[aipro]
+token = "0xfa81c13f979f0dff4a40b68c4aba147fa0723333"
+community = "0x67DdB10B8F15a1D87a2237d9b51b97fc00e1FC7F"
+factory = "0x77Fb65140B746e639bB512c2C25604d1924aE774"
+# 前三项必须等于链上现有三个池的比例，最后一项是新建的 DFXStar 池。
+# 总和必须是 10000。新池建议为 0，不分流 AIPRO 现有的每小时释放。
+# 池子已在分叉上创建：0x62370EF15176ffdB0187b37F18eb31Da76Df29ff
+# 比例 3150 / 1350 / 5500 / 0，新池不占社区释放。
+ready = false
+ratios = [3150, 1350, 5500, 0]

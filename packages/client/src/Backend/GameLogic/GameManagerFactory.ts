@@ -75,25 +75,28 @@ import {
   Setting,
   SpaceType,
 } from "@df/types";
-import type { ClientComponents } from "@mud/createClientComponents";
-import delay from "delay";
 import { getComponentValue } from "@latticexyz/recs";
 import {
   decodeEntity,
   encodeEntity,
   singletonEntity,
 } from "@latticexyz/store-sync/recs";
+import type { ClientComponents } from "@mud/createClientComponents";
+import delay from "delay";
 
 import { ContractsAPIEvent } from "../../_types/darkforest/api/ContractsAPITypes";
 import type { HashConfig } from "../../_types/global/GlobalTypes";
 import NotificationManager from "../../Frontend/Game/NotificationManager";
 import { pollSetting } from "../../Frontend/Utils/SettingsHooks";
 import type { TerminalHandle } from "../../Frontend/Views/Terminal";
+import { memoryChunkStoreFromSave } from "../Save/FileChunkSource";
+import type { GameSaveFiles } from "../Save/GameSave";
 import PersistentChunkStore from "../Storage/PersistentChunkStore";
 import SnarkArgsHelper from "../Utils/SnarkArgsHelper";
 import { makeContractsAPI } from "./ContractsAPI";
 import { GameManager } from "./GameManager";
 import { InitialGameStateDownloader } from "./InitialGameStateDownloader";
+import { shouldStartMiner } from "./shouldStartMiner";
 
 export enum GameManagerEvent {
   PlanetUpdate = "PlanetUpdate",
@@ -112,6 +115,7 @@ export class GameManagerFactory {
     contractAddress,
     components,
     spectate = false,
+    fileSave,
   }: {
     mainAccount: EthAddress | undefined;
     connection: EthConnection;
@@ -119,14 +123,19 @@ export class GameManagerFactory {
     contractAddress: EthAddress;
     components: ClientComponents;
     spectate: boolean;
+    fileSave?: GameSaveFiles;
   }): Promise<GameManager> {
     if (!terminal.current) {
       throw new Error("you must pass in a handle to a terminal");
     }
 
-    const account = spectate
-      ? <EthAddress>"0x0000000000000000000000000000000000000001"
-      : mainAccount; // connection.getAddress();
+    // 观看目录里的 agent 用它自己的地址。纯旁观没有钱包时用占位地址。
+    let account = mainAccount;
+    if (fileSave) {
+      account = fileSave.agent.address as EthAddress;
+    } else if (spectate) {
+      account = <EthAddress>"0x0000000000000000000000000000000000000001";
+    }
 
     if (!account) {
       throw new Error("no account on eth connection");
@@ -143,10 +152,12 @@ export class GameManagerFactory {
 
     terminal.current?.println("Loading game data from disk...");
 
-    const persistentChunkStore = await PersistentChunkStore.create({
-      account,
-      contractAddress,
-    });
+    const persistentChunkStore = fileSave
+      ? memoryChunkStoreFromSave(fileSave)
+      : await PersistentChunkStore.create({
+          account,
+          contractAddress,
+        });
 
     terminal.current?.println("Downloading data from Ethereum blockchain...");
     terminal.current?.println(
@@ -202,14 +213,20 @@ export class GameManagerFactory {
     //   knownArtifacts.set(artifact.id, artifact);
     // }
 
-    // figure out what's my home planet
+    // 家坐标以目录里的 homeLocations.json 为准。链上已触及的 hash 优先；
+    // 观看页打开目录时，即使这颗星还没出现在触及列表里，也要定位到这个坐标。
     let homeLocation: WorldLocation | undefined = undefined;
     for (const loc of possibleHomes) {
       if (initialState.allTouchedPlanetIds.includes(loc.hash)) {
         homeLocation = loc;
-        await persistentChunkStore.confirmHomeLocation(loc);
         break;
       }
+    }
+    if (!homeLocation && fileSave && possibleHomes.length > 0) {
+      homeLocation = possibleHomes[0];
+    }
+    if (homeLocation) {
+      await persistentChunkStore.confirmHomeLocation(homeLocation);
     }
 
     const hashConfig: HashConfig = {
@@ -635,7 +652,13 @@ export class GameManagerFactory {
 
     // we only want to initialize the mining manager if the player has already joined the game
     // if they haven't, we'll do this once the player has joined the game
-    if (!!homeLocation && initialState.players.has(account as string)) {
+    if (
+      shouldStartMiner({
+        watchOnly: spectate || !!fileSave,
+        hasHome: !!homeLocation,
+        playerOnChain: initialState.players.has(account as string),
+      })
+    ) {
       gameManager.initMiningManager(homeLocation.coords);
     }
 

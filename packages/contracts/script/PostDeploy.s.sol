@@ -26,6 +26,8 @@ import { GamePassNFT as GamePassNFTTable } from "../src/codegen/index.sol";
 import { AtfInstallModule } from "../src/codegen/index.sol";
 import { RevealedPlanet, PlanetBiomeConfig, PlanetBiomeConfigData, ArtifactConfig } from "../src/codegen/index.sol";
 import { JunkConfig, JunkConfigData } from "../src/codegen/index.sol";
+import { DFXStarConfig } from "../src/codegen/index.sol";
+import { SilverPurchaseConfig } from "../src/codegen/index.sol";
 import { ArtifactInstallModule } from "../src/modules/atfs/ArtifactInstallModule.sol";
 import { installCannon } from "../src/modules/atfs/PhotoidCannon/CannonInstallLibrary.sol";
 import { installWormhole } from "../src/modules/atfs/Wormhole/WormholeInstallLibrary.sol";
@@ -36,6 +38,14 @@ import { ArtifactNFT } from "../src/tokens/ArtifactNFT.sol";
 import { GamePassNFT } from "../src/tokens/GamePassNFT.sol";
 import { MockGameToken } from "../src/tokens/MockGameToken.sol";
 import { EntryFee } from "codegen/tables/EntryFee.sol";
+import { IDFXStarScoreStakingFactory } from "../src/interfaces/nutbox/IDFXStarScoreStakingFactory.sol";
+import { Committee } from "nutbox/Committee.sol";
+import { CommunityFactory } from "nutbox/CommunityFactory.sol";
+import { HourlyTickCalculator } from "nutbox/calculators/HourlyTickCalculator.sol";
+import { DFXStarScoreStakingFactory } from "nutbox/dapps/dfxstar-score-staking/DFXStarScoreStakingFactory.sol";
+import { MintableERC20Factory } from "nutbox/community-token/MintableERC20Factory.sol";
+import { MintableERC20 } from "nutbox/community-token/MintableERC20.sol";
+import { Community } from "nutbox/Community.sol";
 
 contract PostDeploy is Script {
   using stdToml for string;
@@ -92,6 +102,8 @@ contract PostDeploy is Script {
       IArtifactNFT(artifactNftAddress).setDF(roundNum, worldAddress);
     }
     _setGamePassConfig(toml, worldAddress);
+    _setSilverPurchaseConfig(toml);
+    _setDFXStarConfig(toml, worldAddress);
 
     // set entry fee
     uint256 entryFee = toml.readUint(".entry_fee.value");
@@ -210,6 +222,151 @@ contract PostDeploy is Script {
     console.log("Installed bloom filter with index", index);
     index = installPinkBomb(worldAddress);
     console.log("Installed pinkbomb with index", index);
+  }
+
+  function _setDFXStarConfig(string memory toml, address worldAddress) internal {
+    address scoreStakingPool = toml.readAddress(".dfxstar.score_staking_pool");
+    address paymentToken = toml.readAddress(".dfxstar.payment_token");
+    address stakingFactory = toml.readAddress(".dfxstar.staking_factory");
+    address community = toml.readAddress(".dfxstar.community");
+    address buySilverSystem = toml.readAddress(".dfxstar.buy_silver_system");
+
+    // 本地 anvil 没有现成社区时，才部署一套与 AIPRO 相同计算器的 Nutbox。
+    // df.config.toml 里一旦写了 AIPRO 的 community / token / factory，就只记录地址，不新建社区，也不在这里建池。
+    bool attachExisting = paymentToken != address(0) || stakingFactory != address(0) || community != address(0);
+    if (!attachExisting && scoreStakingPool == address(0)) {
+      console.log("DFXStar: bootstrapping local Nutbox stack...");
+      uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+      address deployer = vm.addr(deployerPrivateKey);
+      NutboxAddresses memory addrs = _bootstrapNutbox(deployer);
+      scoreStakingPool = addrs.pool;
+      paymentToken = addrs.dfsToken;
+      stakingFactory = addrs.dfxFactory;
+      community = addrs.community;
+      Committee(payable(addrs.committee)).adminAddFeeFreeAddress(worldAddress);
+      // 本地工厂的 owner 就是本次部署者，才能把 World 加为记分管理员。
+      IDFXStarScoreStakingFactory(stakingFactory).addAdmin(worldAddress);
+      console.log("DFXStar: local Nutbox bootstrap complete");
+    } else if (attachExisting && scoreStakingPool == address(0)) {
+      console.log("DFXStar: existing community set, pool is created later by AddAIPRODFXStarPool");
+    }
+
+    if (scoreStakingPool != address(0) || paymentToken != address(0)) {
+      DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem);
+      console.log("DFXStar: config set");
+    }
+  }
+
+  struct NutboxAddresses {
+    address committee;
+    address communityFactory;
+    address calculator;
+    address dfxFactory;
+    address community;
+    address dfsToken;
+    address pool;
+  }
+
+  function _bootstrapNutbox(address owner) internal returns (NutboxAddresses memory addrs) {
+    // 1. Deploy Committee (all fees = 0 for local testing)
+    Committee committee = new Committee(payable(owner));
+    committee.adminSetCreateCommunityFee(0);
+    committee.adminSetCommunitySettingsFee(0);
+    committee.adminSetPoolOperationFee(0);
+    addrs.committee = address(committee);
+    console.log("  Committee:", addrs.committee);
+
+    // 2. Deploy MintableERC20Factory
+    MintableERC20Factory mintableFactory = new MintableERC20Factory();
+    committee.adminAddContract(address(mintableFactory));
+    console.log("  MintableERC20Factory:", address(mintableFactory));
+
+    // 3. Deploy CommunityFactory
+    CommunityFactory communityFactory = new CommunityFactory(address(committee));
+    addrs.communityFactory = address(communityFactory);
+    console.log("  CommunityFactory:", addrs.communityFactory);
+
+    // 4. 与 AIPRO 社区相同：HourlyTickCalculator，空的 distribution policy。
+    HourlyTickCalculator calculator = new HourlyTickCalculator(address(communityFactory));
+    committee.adminAddContract(address(calculator));
+    addrs.calculator = address(calculator);
+    console.log("  HourlyTickCalculator:", addrs.calculator);
+
+    // 5. Deploy DFXStarScoreStakingFactory
+    DFXStarScoreStakingFactory dfxFactory = new DFXStarScoreStakingFactory(address(communityFactory));
+    committee.adminAddContract(address(dfxFactory));
+    addrs.dfxFactory = address(dfxFactory);
+    console.log("  DFXStarScoreStakingFactory:", addrs.dfxFactory);
+
+    // 6. Create DFS community with Mintable ERC20
+    // Token meta: name="DFS", symbol="DFS", supply=1B, owner=deployer
+    bytes memory tokenMeta = _encodeTokenMeta("DFS", "DFS", 1_000_000_000 ether, owner);
+
+    address communityAddr = communityFactory.createCommunity(
+      true, // isMintable
+      address(0), // communityToken = 0 → auto-create via factory
+      address(mintableFactory),
+      tokenMeta,
+      address(calculator),
+      bytes("")
+    );
+    addrs.community = communityAddr;
+    console.log("  DFS Community:", addrs.community);
+
+    // 7. Get DFS token address
+    addrs.dfsToken = Community(payable(communityAddr)).getCommunityToken();
+    console.log("  DFS Token:", addrs.dfsToken);
+
+    // 8. Create DFXStar pool (100% ratio)
+    uint16[] memory ratios = new uint16[](1);
+    ratios[0] = 10000;
+    Community(payable(communityAddr)).adminAddPool("DFXStar Score Staking", ratios, address(dfxFactory), "");
+
+    // 9. Get pool address
+    addrs.pool = Community(payable(communityAddr)).activedPools(0);
+    console.log("  DFXStar Pool:", addrs.pool);
+  }
+
+  function _encodeTokenMeta(
+    string memory name,
+    string memory symbol,
+    uint256 supply,
+    address owner
+  ) internal pure returns (bytes memory) {
+    bytes memory nameBytes = bytes(name);
+    bytes memory symbolBytes = bytes(symbol);
+    bytes memory meta = new bytes(1 + nameBytes.length + 1 + symbolBytes.length + 32 + 20);
+    uint256 offset = 0;
+    meta[offset++] = bytes1(uint8(nameBytes.length));
+    for (uint256 i = 0; i < nameBytes.length; i++) {
+      meta[offset++] = nameBytes[i];
+    }
+    meta[offset++] = bytes1(uint8(symbolBytes.length));
+    for (uint256 i = 0; i < symbolBytes.length; i++) {
+      meta[offset++] = symbolBytes[i];
+    }
+    bytes32 supplyBytes = bytes32(supply);
+    for (uint256 i = 0; i < 32; i++) {
+      meta[offset++] = supplyBytes[i];
+    }
+    // owner address (20 bytes, left-padded to 32 in the contract but we write last 20)
+    for (uint256 i = 0; i < 20; i++) {
+      meta[offset++] = bytes1(uint8(uint160(owner) >> (8 * (19 - i))));
+    }
+    return meta;
+  }
+
+  function _setSilverPurchaseConfig(string memory toml) internal {
+    uint256[3] memory tierPrices;
+    uint256[3] memory tierSilverAmounts;
+    tierPrices[0] = toml.readUint(".silver_purchase.tier_0_price") * 1 ether;
+    tierPrices[1] = toml.readUint(".silver_purchase.tier_1_price") * 1 ether;
+    tierPrices[2] = toml.readUint(".silver_purchase.tier_2_price") * 1 ether;
+    tierSilverAmounts[0] = toml.readUint(".silver_purchase.tier_0_silver") * 1000;
+    tierSilverAmounts[1] = toml.readUint(".silver_purchase.tier_1_silver") * 1000;
+    tierSilverAmounts[2] = toml.readUint(".silver_purchase.tier_2_silver") * 1000;
+    SilverPurchaseConfig.setTierPrices(tierPrices);
+    SilverPurchaseConfig.setTierSilverAmounts(tierSilverAmounts);
   }
 
   function _setGamePassConfig(string memory toml, address worldAddress) internal {

@@ -9,3 +9,4 @@ libraries=src/lib/
 tokens=src/tokens/
 interfaces=src/interfaces/
 modules=src/modules/
+nutbox/=src/nutbox/

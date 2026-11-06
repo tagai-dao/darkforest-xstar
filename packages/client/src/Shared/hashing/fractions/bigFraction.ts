@@ -39,7 +39,7 @@
  *
  */
 
-import { BigInteger } from "big-integer";
+import type { BigInteger } from "big-integer";
 
 export interface NumeratorDenominator {
   n: number;

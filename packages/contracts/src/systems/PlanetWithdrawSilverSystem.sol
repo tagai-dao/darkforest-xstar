@@ -11,6 +11,7 @@ import { GuildUtils } from "libraries/GuildUtils.sol";
 import { Guild } from "codegen/tables/Guild.sol";
 import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
+import { DFXStarStakingLib } from "libraries/DFXStarStakingLib.sol";
 
 contract PlanetWithdrawSilverSystem is BaseSystem {
   /**
@@ -43,6 +44,7 @@ contract PlanetWithdrawSilverSystem is BaseSystem {
 
     uint playerScore = PlayerScore.get(executor);
     PlayerScore.set(executor, playerScore + silverToWithdraw);
+    DFXStarStakingLib.stakeScoreDelta(executor, silverToWithdraw);
 
     uint8 guildId = GuildUtils.getCurrentGuildId(executor);
     if (guildId != 0) {

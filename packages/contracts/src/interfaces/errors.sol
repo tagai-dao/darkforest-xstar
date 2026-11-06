@@ -94,6 +94,14 @@ interface Errors {
   error NeedBuyMore(); // 0x01f7d1e9
   error NeedBuyLess(); // 0x2c27494e
 
+  // buy silver / dfxstar
+  error BuySilverOnSpacetimeRip();
+  error InvalidSilverPurchaseTier();
+  error InsufficientPlanetSilverCapacity();
+  error NoStakersForBuySilver();
+  error DFXStarPoolNotConfigured();
+  error PaymentTokenNotConfigured();
+
   // GPTToken system
   error NotEnoughETH(); // 0x932b84b0
   error NotEnoughGPTTokens(); // 0x134712e2

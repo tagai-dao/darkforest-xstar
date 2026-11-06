@@ -76,7 +76,12 @@ export class ViewportEntities {
 
     const chunks = new Set<Chunk>();
 
-    for (const exploredChunk of this.uiManager.getExploredChunks()) {
+    for (const exploredChunk of this.gameManager.chunksNear(
+      viewport.getLeftBound(),
+      viewport.getBottomBound(),
+      viewport.getRightBound(),
+      viewport.getTopBound(),
+    )) {
       if (
         viewport.intersectsViewport(exploredChunk) &&
         viewport.worldToCanvasDist(exploredChunk.chunkFootprint.sideLength) >= 3

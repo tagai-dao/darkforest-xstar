@@ -1,9 +1,9 @@
-import { getNetworkConfig } from "@mud/getNetworkConfig";
 import { useMUD } from "@mud/MUDContext";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import React, { useState } from "react";
-import { useAccount, useDisconnect, useWalletClient } from "wagmi";
+import { useAccount, useDisconnect } from "wagmi";
 
+import { connectMetaMask, walletErrorMessage } from "./addLocalChain";
 import { formatAddress } from "./utils";
 import { WalletPane } from "./WalletPane";
 
@@ -12,38 +12,43 @@ export const WalletButton: React.FC = () => {
   const { disconnect } = useDisconnect();
   const [showSessionWalletManager, setShowSessionWalletManager] =
     useState(false);
-
-  const { data: externalWalletClient } = useWalletClient();
+  const [addChainError, setAddChainError] = useState("");
+  const [metamaskAccount, setMetamaskAccount] = useState("");
 
   const {
     network: { walletClient: burnerWalletClient },
   } = useMUD();
 
-  const addNetwork = () => {
-    const networkConfig = getNetworkConfig();
-    const chain = networkConfig.chain;
-    (chain.blockExplorers = {
-      default: {
-        name: "Redstone Explorer",
-        url: "https://explorer.redstone.xyz",
-      },
-    }),
-      externalWalletClient?.addChain({ chain: chain });
+  const connectWallet = async () => {
+    setAddChainError("");
+    try {
+      const { account } = await connectMetaMask();
+      setMetamaskAccount(account);
+      setAddChainError(`已连接 MetaMask：${account}`);
+    } catch (error) {
+      console.error(error);
+      const message = walletErrorMessage(error);
+      setAddChainError(message);
+      window.alert(message);
+    }
   };
 
   return (
     <div>
-      {!isConnected && <ConnectButton />}
-      {/* {!isConnected && <CustomConnectButton />} */}
+      <button
+        type="button"
+        className="rounded-lg bg-amber-500 px-3 py-2 text-white shadow-md"
+        onClick={connectWallet}
+      >
+        连接 MetaMask
+      </button>
+      {metamaskAccount && (
+        <p className="mt-2 text-sm text-white">{metamaskAccount}</p>
+      )}
 
-      {/* TODO: Need to investigate why externalWalletClient is incorrect. */}
-      {isConnected && burnerWalletClient.chain.id !== chain?.id && (
-        <button
-          className="rounded-lg bg-gray-800 p-2 text-white shadow-md"
-          onClick={addNetwork}
-        >
-          add network
-        </button>
+      {!isConnected && <ConnectButton />}
+      {addChainError && (
+        <p className="mt-2 max-w-xl text-sm text-red-300">{addChainError}</p>
       )}
       {isConnected && burnerWalletClient.chain.id === chain?.id && (
         <div className="flex items-center space-x-2">
