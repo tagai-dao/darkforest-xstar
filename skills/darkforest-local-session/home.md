@@ -2,6 +2,8 @@
 
 A joined wallet still cannot play until it has a home. Buying a pass and `joinSeason` do not create one. A home exists when `SpawnPlanet` for this wallet is not zero and `homeLocations.json` contains that planet hash.
 
+For the selected wallet `0x8153C8C8EF6d9e7e7ee11333f33048835325AdD0`, pass #2 is joined and player `pilot25add0` is registered, but no home was spawned. The owner stopped the search. Do not resume searching, proving, spawning, or mining until the owner explicitly asks to continue.
+
 Do this before [mining.md](mining.md). Do not mine from `0, 0`. The center of the map is inside the inner circle, and a home there is rejected.
 
 ## Read the chain
@@ -54,23 +56,25 @@ The contract, not the map center, decides. A coordinate is a legal home only whe
 - Level is the lowest 24 bits of the planet hash. The level thresholds are `[100, 500, 4000, 8000, 30000, 65520, 262128, 1048561, 4194292]`. When the 24-bit value is below one of them, the level is not zero. A home needs that value to be at least `4194292`, so the level stays `0`. Zone `4` and zone `5` add no level bonus.
 - A level-0 nebula planet is type planet. The type byte does not need a separate test.
 
-The search center is `(80000, 0)`. That point sits in zone `4`. Spiral outward from there with `SpiralPattern` from `MiningPatterns.ts`. Do not start at `(0, 0)`.
+When the owner resumes, start the spiral near `(78900, 5500)`, their chosen search center. Do not return to `(80000, 0)` or draw random centers unless they change that choice. Generate a bounded set of legal candidates, then read their `PlanetOwner` records through verified Multicall3 `aggregate3` at one fixed block. Keep the result in candidate order and reject the whole batch if a required subcall fails. Select the first unowned candidate; the first two candidates previously found near `(80000, 0)` were owned by the old wallet, so do not prove either again. If the current batch has no unowned candidate, continue the spiral with another bounded batch and a new fixed-block snapshot.
 
-Skip a chunk when its nearest corner is inside the inner radius or outside the world, using the same nearest-corner test as [mining.md](mining.md). Inside a chunk that is kept, test each coordinate. Take the first coordinate that passes. One home is enough.
+Do not send a loop of individual `eth_call`, a JSON-RPC batch, or `Promise.all` of contract reads for ownership. If the node limits the batch, split it into smaller Multicall3 calls pinned to the same block. Prove only after ownership has been checked. Stop active workers immediately when the owner says stop; clean up temporary scripts and do not submit a spawn transaction.
 
 ## Create the home, then ask about mining
 
-Finding the coordinate does not spend tokens. As soon as one legal coordinate is known, stop the search and create the home. Do not ask whether to use that coordinate. Use the last 6 hex characters of the wallet in the name `pilot<those 6 characters>`. The burner is the same wallet. Do not create or store a second key.
+Finding the coordinate does not spend tokens. Once search is explicitly resumed and one unowned legal coordinate is known, generate its proof and create the home. A wallet that already has a player record keeps that name. Do not register it again. The burner is the same wallet. Do not create or store a second key.
+
+If the player index is zero, ask the owner what name to register. Wait for that name. Do not invent one, and do not use `pilot` plus part of the address. The question is only the name. An example: "What name should this new player use?" If registration reverts because that name is taken, say so and ask for a different name. Do not append a number unless the owner gives that new name.
 
 If the ETH balance cannot pay for the register and spawn transactions, stop and tell the owner. Do not search further and do not write the home files.
 
 Sign with the current wallet. A legacy transaction is fine. Wait for each receipt. Call the world, not the pass contract.
 
-1. If the player index is zero, call `df__registerPlayer(string,address)` with the name and the player address. If it reverts because the name is taken, append a number and send again. Do not stop to ask. If it reverts because the wallet is already registered, continue.
+1. If the player index is zero, call `df__registerPlayer(string,address)` with the name the owner just gave and the player address. If it reverts because the wallet is already registered, continue.
 2. Prove the candidate with the example below. This proof is required. `b_skip_proof_check` is false on this session.
 3. Call `df__initializePlayer(uint256[2],uint256[2][2],uint256[2],uint256[9])` with the `a`, `b`, `c`, and nine public signals printed by the example.
 
-If spawn reverts because that planet is already owned, or because it is not a legal home, discard that coordinate and search again from the next chunk. Do not retry the same coordinate. If it reverts because this wallet already spawned, stop. If it reverts because the game pass is missing, return to the join step in `SKILL.md`.
+If spawn reverts because that planet is already owned, or because it is not a legal home, discard that center, draw a new point, and search again. Do not continue the old spiral and do not retry the same coordinate. If it reverts because this wallet already spawned, stop. If it reverts because the game pass is missing, return to the join step in `SKILL.md`.
 
 After the spawn receipt succeeds, write the wallet folder's `homeLocations.json`. The hash is 64 lowercase hex characters and has no `0x` prefix. `perlin` is the space Perlin. `biomebase` uses key `1731` and `floor` true.
 
@@ -85,210 +89,29 @@ After the spawn receipt succeeds, write the wallet folder's `homeLocations.json`
 ]
 ```
 
-Also append the chunk that contains this planet as one line of `knownBoard.ndjson`, and write `homeLocations.json` after the receipt. Read `SpawnPlanet` again. The home is ready only when that value is not zero, `homeLocations.json` exists, and that chunk line is in the log. Then follow the first-ring steps in [mining.md](mining.md). Do not ask about mining, and do not ask whether the home itself is acceptable, until that ring is written.
+Keep every side-16 square whose 256 coordinates were hashed. The square that contains the chosen home is one of them: finish that square, and list every planet in it, not only the home. A square left unfinished, or skipped because its nearest corner is outside the search band, is not a mined chunk.
 
-## Example
+After a successful spawn receipt, append each fully mined square once to `knownBoard.ndjson`, in the line shape from [mining.md](mining.md), and write `homeLocations.json`. Read `SpawnPlanet` again. The home is ready only when that value is not zero, `homeLocations.json` exists, and the home chunk is in the log.
 
-The repository does not contain a home-search script. Write this to a temporary file, set `WALLET` and `INNER_RADIUS`, and run it from `packages/client`. Do not commit the temporary file. It only searches and proves. It does not send a transaction.
+The reply that reports those coordinates also asks what to do next. Include the page address, the wallet folder, and the `打开钱包目录` button. Ask whether to start mining from that home, with the choices in [mining.md](mining.md), and which strategy file starts play: `aggressive.md`, `conservative.md`, `offensive.md`, or `profit.md`. One question, then wait. Do not start the first ring or write `strategy.txt` before they answer. A yes to mining uses the mining defaults for any choice they left out. The strategy name they give is the one line in `strategy.txt`. After both answers are in that reply, mine, then play from [play.md](play.md). Do not end the turn with only "the home is created."
 
-```bash
-cd packages/client
-./node_modules/.bin/tsx /tmp/darkforest-home.ts
-```
+## Implementation notes
+
+Use a temporary TypeScript script from `packages/client` to iterate `SpiralPattern` around the selected center. Use `mimcHash(1729)` and `perlin` from `src/Shared/hashing`, and apply the legal-home checks above. Bound each search pass to a small number of candidates or chunks and print progress; avoid an unbounded worker pool. Delete the temporary script after the search stops. Keep private keys out of the script.
+
+For ownership, encode `getRecord(bytes32,bytes32[])` for the `PlanetOwner` table (`0x74626466000000000000000000000000506c616e65744f776e65720000000000`) with each candidate hash as its sole key. Call verified Multicall3 `aggregate3((address target,bool allowFailure,bytes callData)[])` at `0xcA11bde05977b3631167028862bE2a173976CA11`, with every target set to the World, `allowFailure=false`, and the same `blockNumber` for all shards. Decode each `getRecord` result as `(bytes staticData,bytes32 encodedLengths,bytes dynamicData)`. The owner is the first 20 bytes of `staticData`; an empty record is the zero address. Check the Multicall3 code and chain ID before using it.
+
+Once an unowned candidate is selected, generate the `init` Groth16 proof with `src/Shared/snarks/init.wasm`, `init.zkey`, and `public/snarkjs.min.js`. Supply `x`, `y`, `r=floor(hypot(x,y))+1`, `PLANETHASH_KEY=1729`, `SPACETYPE_KEY=1730`, `SCALE=8192`, `xMirror=0`, `yMirror=0`, and `targetDistFromOriginSquare=x*x+y*y` as decimal strings. Normalize negative coordinates with `modPBigInt`. When loading the bundled browser prover in Node's `vm` context, expose the host `Uint8Array` and apply the compatibility replacement below; otherwise `fullProve` can fail with `Invalid FastFile type: undefined`.
 
 ```ts
-import { readFileSync } from "node:fs";
-import { appendFile } from "node:fs/promises";
-import path from "node:path";
-import vm from "node:vm";
-import { Worker } from "node:worker_threads";
-import bigInt from "big-integer";
-import { SpiralPattern } from "./src/Backend/Miner/MiningPatterns.ts";
-import { mimcHash, modPBigInt, perlin } from "./src/Shared/hashing/index.ts";
-
-const WALLET = "0x2ee03331a6e02c9f90e6d558fd0e48e016746acc";
-const INNER_RADIUS = 75000; // Live InnerCircle radius. The spawn ring is still outside 75000.
-const SEARCH_X = 80000;
-const SEARCH_Y = 0;
-
-const CHUNK_SIZE = 16;
-const WORLD_RADIUS = 100000;
-const SPAWN_RING = 75000;
-const BORDERS = [37500, 50000, 62500, 75000, 87500];
-const LEVEL_FLOOR = 4194292;
-const LOCATION_ID_UB = bigInt(
-  "21888242871839275222246405745257275088548364400416034343698204186575808495617",
-);
-const spaceFloor = {
-  key: 1730,
-  scale: 8192,
-  mirrorX: false,
-  mirrorY: false,
-  floor: true,
-};
-const biomeFloor = { ...spaceFloor, key: 1731 };
-
-function nearestSquare(x: number, y: number, side: number): number {
-  const xMin = Math.abs(x + side / 2) - side / 2;
-  const yMin = Math.abs(y + side / 2) - side / 2;
-  return xMin ** 2 + yMin ** 2;
-}
-
-function zoneOf(distanceSquare: number): number {
-  for (let i = 0; i < BORDERS.length; i += 1) {
-    if (distanceSquare < BORDERS[i] * BORDERS[i]) return i;
-  }
-  return BORDERS.length;
-}
-
-// Load the browser prover that already ships with the client.
-const context: Record<string, unknown> = {
-  console,
-  setTimeout,
-  clearTimeout,
-  setImmediate,
-  clearImmediate,
-  Buffer,
-  process,
-  URL,
-  TextEncoder,
-  TextDecoder,
-  Worker,
-  btoa,
-  atob,
-  performance,
-  queueMicrotask,
-};
-context.global = context;
-context.self = context;
-context.globalThis = context;
-vm.createContext(context);
-vm.runInContext(readFileSync("public/snarkjs.min.js", "utf8"), context, {
-  filename: "snarkjs.min.js",
-});
-const snarkjs = context.snarkjs as {
-  groth16: {
-    fullProve: (
-      input: Record<string, string>,
-      wasm: Uint8Array,
-      zkey: Uint8Array,
-    ) => Promise<{
-      proof: { pi_a: string[]; pi_b: string[][]; pi_c: string[] };
-      publicSignals: string[];
-    }>;
-  };
-};
-
-const planetHash = mimcHash(1729);
-const pattern = new SpiralPattern({ x: SEARCH_X, y: SEARCH_Y }, CHUNK_SIZE);
-let footprint = pattern.fromChunk;
-let home: {
-  x: number;
-  y: number;
-  h: string;
-  p: number;
-  b: number;
-} | null = null;
-
-while (!home) {
-  const corner = nearestSquare(
-    footprint.bottomLeft.x,
-    footprint.bottomLeft.y,
-    footprint.sideLength,
-  );
-  const outside = corner < INNER_RADIUS ** 2 || corner >= WORLD_RADIUS ** 2;
-  if (!outside) {
-    for (
-      let x = footprint.bottomLeft.x;
-      x < footprint.bottomLeft.x + CHUNK_SIZE;
-      x += 1
-    ) {
-      for (
-        let y = footprint.bottomLeft.y;
-        y < footprint.bottomLeft.y + CHUNK_SIZE;
-        y += 1
-      ) {
-        const distanceSquare = x * x + y * y;
-        if (
-          distanceSquare < SPAWN_RING * SPAWN_RING ||
-          distanceSquare < INNER_RADIUS * INNER_RADIUS ||
-          distanceSquare >= WORLD_RADIUS * WORLD_RADIUS
-        ) {
-          continue;
-        }
-        const hash = planetHash(x, y);
-        if (!hash.lesser(LOCATION_ID_UB.divide(16384))) continue;
-        if (Number(BigInt(hash.toString()) & 0xffffffn) < LEVEL_FLOOR) continue;
-        const p = perlin({ x, y }, spaceFloor);
-        if (p < 1 || p >= 31) continue;
-        const zone = zoneOf(distanceSquare);
-        const nebula = zone === 4 || (zone === 5 && p < 14);
-        if (!nebula) continue;
-        home = {
-          x,
-          y,
-          h: hash.toString(16).padStart(64, "0"),
-          p,
-          b: perlin({ x, y }, biomeFloor),
-        };
-        break;
-      }
-      if (home) break;
-    }
-  }
-  if (!home) footprint = pattern.nextChunk(footprint);
-}
-
-const boardLog = path.join(
-  "/Volumes/Extreme Pro/wangxi/study/mud-study",
-  "31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-1",
-  WALLET.toLowerCase(),
-  "knownBoard.ndjson",
-);
-const chunkX = Math.floor(home.x / CHUNK_SIZE) * CHUNK_SIZE;
-const chunkY = Math.floor(home.y / CHUNK_SIZE) * CHUNK_SIZE;
-const chunkBody = {
-  x: chunkX,
-  y: chunkY,
-  s: CHUNK_SIZE,
-  l: [home],
-  p: perlin(
-    { x: chunkX + CHUNK_SIZE / 2, y: chunkY + CHUNK_SIZE / 2 },
-    { ...spaceFloor, floor: false },
+context.Uint8Array = Uint8Array;
+vm.runInContext(
+  readFileSync("public/snarkjs.min.js", "utf8").replace(
+    "async function De(t, e) {",
+    "async function De(t, e) { t = true;",
   ),
-};
-await appendFile(boardLog, `${JSON.stringify(chunkBody)}\n`);
-
-const distance = Math.hypot(home.x, home.y);
-const input = {
-  x: modPBigInt(home.x).toString(),
-  y: modPBigInt(home.y).toString(),
-  r: String(Math.floor(distance) + 1),
-  PLANETHASH_KEY: "1729",
-  SPACETYPE_KEY: "1730",
-  SCALE: "8192",
-  xMirror: "0",
-  yMirror: "0",
-  targetDistFromOriginSquare: String(home.x * home.x + home.y * home.y),
-};
-const proved = await snarkjs.groth16.fullProve(
-  input,
-  readFileSync("src/Shared/snarks/init.wasm"),
-  readFileSync("src/Shared/snarks/init.zkey"),
+  context,
 );
-
-// The contract expects the two inner pairs of pi_b reversed.
-const call = {
-  a: proved.proof.pi_a.slice(0, 2),
-  b: [
-    proved.proof.pi_b[0].slice(0).reverse(),
-    proved.proof.pi_b[1].slice(0).reverse(),
-  ],
-  c: proved.proof.pi_c.slice(0, 2),
-  input: proved.publicSignals,
-  home,
-};
-console.log(JSON.stringify(call));
 ```
 
-Do not write `homeLocations.json` from this example. Write it only after the spawn receipt succeeds. Then tell the owner the coordinates, the name that was registered, and the wallet folder.
+Reverse the two inner `pi_b` pairs for the contract. Simulate `df__initializePlayer(uint256[2],uint256[2][2],uint256[2],uint256[9])` from the selected wallet before signing; submit only when simulation succeeds. Wait for a successful receipt, then record its chain block timestamp as `time` and transaction hash as `tx`. Never log an unsubmitted proof or a failed transaction as an action. Save the home and finished map chunks only after that receipt.

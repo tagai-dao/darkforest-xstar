@@ -195,8 +195,8 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 ## Advance the clock
 
-**Send.** `df__tick()` only when `paused` is false, this round has no other call, and the stored `tickNumber` is still below an arrival tick that the next read needs. One call writes every elapsed second since the last write. Do not send it again in later rounds to keep a wave, a silver shipment, or energy growth moving. Do not call it while `paused` is true.
+**Send.** `df__tick()` only when `paused` is false, this round has no other call, and the stored `tickNumber` is still below an arrival tick that the next read needs. One call writes every elapsed tick since the last write. Elapsed ticks are the elapsed seconds times the `tickRate` read this round. Do not send it again in later rounds to keep a wave, a silver shipment, or energy growth moving. Do not call it while `paused` is true.
 
-**Effect.** The stored `tickNumber` becomes the last written tick plus the elapsed seconds. The call reverts while paused. Move, upgrade, junk, silver, material, reveal, and artifact calls already do this write.
+**Effect.** The stored `tickNumber` becomes the last written tick plus those elapsed ticks. The call reverts while paused. Move, upgrade, junk, silver, material, reveal, and artifact calls already do this write.
 
 **Impact.** The call writes the clock and shrinks the inner circle. It does not write planets, so the next table read still shows the old owner and the old energy. A move, junk, upgrade, withdraw, reveal, or artifact call writes the planet after it settles. Record `tick` with the `time` field from [play.md](play.md). Do not put the time under `at`.

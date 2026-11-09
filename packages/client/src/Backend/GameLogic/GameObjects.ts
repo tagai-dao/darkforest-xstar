@@ -645,7 +645,8 @@ export class GameObjects {
     // if (kardashevOperator) {
     //   planet.kardashevOperator = kardashevOperator;
     // }
-    this.setPlanet(planet);
+    // 先放进表里，到达结算改的是这份链上记录。先不通知界面，避免界面读到还没推算的能量。
+    this.planets.set(planet.locationId, planet);
 
     if (updatedArrivals) {
       // apply arrivals
@@ -664,6 +665,9 @@ export class GameObjects {
         }
       }
     }
+    // 通知界面之前推到当前 tick。否则右上角会先画出链上旧能量，下一帧再跳回去。
+    this.updatePlanetIfStale(planet);
+    this.setPlanet(planet);
     this.updateScore(planet.locationId);
   }
 
@@ -793,6 +797,8 @@ export class GameObjects {
     const ownedPlanet = [];
     for (const planet of this.planets.values()) {
       if (hasOwner(planet)) {
+        // 合计不依赖这颗星球正在画面上。没画到的也按当前 tick 补能量。
+        this.updatePlanetIfStale(planet);
         ownedPlanet.push(planet);
       }
     }
@@ -1750,7 +1756,8 @@ export class GameObjects {
 
   private updatePlanetIfStale(planet: Planet): void {
     const curTick = this.tickerUtils.getCurrentTick();
-    if (curTick - planet.lastUpdated > 1) {
+    // 过了 1 tick 就更新。要差超过 1 才更新的话，数字会一次跳两拍。
+    if (curTick > planet.lastUpdated) {
       updatePlanetToTick(
         planet,
         this.getPlanetArtifacts(planet.locationId),

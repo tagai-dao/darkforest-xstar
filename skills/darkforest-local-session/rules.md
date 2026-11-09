@@ -18,9 +18,11 @@ A higher-level planet has more range, a higher energy cap, and faster energy gro
 
 ## 2. Time
 
-One tick is one second of chain time. The Ticker record holds four fields, packed from the left: `uint64 tickNumber`, `uint64 tickRate`, `uint64 timestamp`, and `bool paused`. The rate on this world is 1. `paused` is the only pause flag. False means the clock is running.
+`tickRate` is how many ticks the clock advances for each second of chain time. Read it from the Ticker record every round, together with `tickNumber`, `timestamp`, and `paused`. It is an integer, and it is not fixed at 1. This game can run at one rate, and the next game can run at another. Do not reuse a rate remembered from an earlier round or from this file. The four fields are packed from the left: `uint64 tickNumber`, `uint64 tickRate`, `uint64 timestamp`, and `bool paused`. `paused` is the only pause flag. False means the clock is running.
 
-`tickNumber` is the last number written into the table. It changes when a call runs tick and writes the record. Until the next write it stays at that number, including while `paused` is false. An unchanged `tickNumber` does not mean the game is paused. Read `paused` for that. The snapshot field `tick` is this stored number. Keep the elapsed sum out of that field.
+While `paused` is false, the ticks a call would add are `(block.timestamp - timestamp) * tickRate`, using the `tickRate` and `timestamp` from that same read. Voyage length, energy growth, silver growth, material growth, fleet arrival, and the recall window are counted in ticks. Convert a tick gap to seconds by dividing by this round's `tickRate`. A trip of 100 ticks takes 100 seconds when `tickRate` is 1, and 50 seconds when `tickRate` is 2. A `tickRate` of 0 adds no ticks, so those clocks do not move. While `paused` is true, no ticks are added, whatever the rate is.
+
+`tickNumber` is the last number written into the table. It changes when a call runs tick and writes the record. Until the next write it stays at that number, including while `paused` is false. An unchanged `tickNumber` does not mean the game is paused. Read `paused` for that. The snapshot field `tick` is this stored number. The snapshot also keeps the `tickRate` and `timestamp` from the same read. Keep the elapsed sum out of `tick`.
 
 While `paused` is true, a tick write does not happen. Fleets do not arrive, energy and silver and materials do not grow, and the inner circle does not shrink. A move can still be sent. It waits at the departure tick, which also stays still. Upgrades, junk, and reveals can still be sent. `df__tick` itself reverts while paused. Other planet calls try to tick internally, and that write does nothing while paused.
 
@@ -30,7 +32,7 @@ The planet tables store the last write. Seconds passing do not update them. A du
 
 While `paused` is false, a player call settles in this order:
 
-1. It writes the elapsed seconds onto `tickNumber`. The tick it settles to is `stored tickNumber + (block.timestamp - timestamp) * tickRate`.
+1. It writes the elapsed ticks onto `tickNumber`. Those ticks are `(block.timestamp - timestamp) * tickRate` from the Ticker read. The tick it settles to is the stored `tickNumber` plus that product.
 2. It loads the planet and applies every fleet whose arrival tick is at or before that new tick, then growth up to that tick. Owner, energy, and silver at this step are that result. They are not the row the table read returned.
 3. It checks the condition against that result. `df__addJunk` requires the caller to own the planet only after this settlement. Move, upgrade, withdraw, reveal, buy silver, and artifact calls tick and settle before their own checks.
 4. It writes the planet back. The next table read shows the new owner only after this write.
@@ -58,7 +60,7 @@ The map is a disk of radius 100000 around the origin. Zone is the straight-line 
 
 Space type comes from perlin, except that every planet in zone 4 is nebula. Perlin below 14 is nebula, below 15 is space, below 19 is deep space, and 19 or more is dead space.
 
-A move or a spawn whose destination is closer to the origin than the inner circle reverts. The radius in that check is the one after this call's tick. While `paused` is false, start from the stored radius and subtract 0.087 for each elapsed second, stopping at 0. At the start, radius 75000 closes zones 0 through 3. Zone 4 and zone 5 are open. Reveal does not check the circle.
+A move or a spawn whose destination is closer to the origin than the inner circle reverts. The radius in that check is the one after this call's tick. While `paused` is false, start from the stored radius and subtract 0.087 for each elapsed tick, stopping at 0. Elapsed ticks are `(block.timestamp - timestamp) * tickRate`. A higher `tickRate` shrinks the circle faster in real time. At the start, radius 75000 closes zones 0 through 3. Zone 4 and zone 5 are open. Reveal does not check the circle.
 
 A home can be initialized only in zone 4, and only on a level-0 planet. That planet is nebula. A new wallet therefore starts on the ring outside the closed center.
 

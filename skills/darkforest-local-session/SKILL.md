@@ -20,8 +20,9 @@ This is a local Anvil simulation, not BNB Chain and not mainnet. State lives in 
 | Season          | Read `activeSeason()`. It was `1` at deploy.                                                             |
 | Admin           | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`. This account only mints DFPT. It is not the player wallet. |
 | Multicall3      | `0xcA11bde05977b3631167028862bE2a173976CA11`. Local test only. If this address has no code, stop.        |
+| Selected player | `0x8153C8C8EF6d9e7e7ee11333f33048835325AdD0` (owner's new temporary wallet)                              |
 
-Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost` before calling the local RPC. If the connection is refused, tell the owner the local chain is not running, then stop.
+Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost` before calling the local RPC. A sandbox may deny access to loopback even while Anvil is running; verify reachability through an approved local network path before reporting that the chain is down. If that check also fails, stop. Do not restart the chain.
 
 ## Ask first
 
@@ -83,7 +84,9 @@ cast call $MULTI \
 
 ## Read the connected wallet
 
-Use the wallet the agent is already connected to. Do not ask the owner for the address. Do not switch to the admin account.
+Use the selected player address above for this session. Before any signed call, derive the address from the temporary key held in the active runtime and require an exact match. The owner has a copy of that key; never put it in this skill, a game save, a script, a tool argument, or the macOS Keychain. If the runtime signer is gone, stop signed actions and ask the owner to restore the wallet through a private channel supported by the environment. Do not silently switch to an Anvil default account, the admin, or the previous player address `0x2Ee03331a6e02c9F90E6D558Fd0e48e016746acc`.
+
+The new address has its own pass, registration, balances, home, and save folder. Read those on chain before acting. Do not copy the previous wallet's files, spending authorization, or transaction log into the new wallet. A one-off request to start this wallet does not restart a stopped mining process or paused strategy automation.
 
 Read all of these from the decision batch before deciding:
 
@@ -96,7 +99,7 @@ Read all of these from the decision batch before deciding:
 
 If the season is closed, or `activeWorld()` is not the world above, stop. Tell the owner this session is not open.
 
-If the connected address is the admin, stop. Tell the owner to switch to the agent wallet. Do not buy a pass with the admin account.
+If the signer resolves to the admin or any address other than the selected player, stop. Do not buy a pass with another account.
 
 ## Decide
 
@@ -104,12 +107,12 @@ Follow this order. Take the first match. Do not buy a second pass.
 
 1. The wallet has **joined**, `SpawnPlanet` for that wallet is not zero, and `homeLocations.json` contains the same planet hash: the wallet has a **home**. Read [mining.md](mining.md). The mining center is that planet. Do not spawn a second home and do not move fleets.
 2. The wallet has joined, `SpawnPlanet` is not zero, and `homeLocations.json` does not contain that hash: **stop**. The home is already on chain and its coordinates were not saved. Coordinates are not recoverable from the chain. Do not search for another planet.
-3. The wallet has joined and `SpawnPlanet` is zero: there is **no home**. Read [home.md](home.md). Find one legal planet, register, and spawn without asking again. Do not start mining before the home files exist.
+3. The wallet has joined and `SpawnPlanet` is zero: there is **no home**. Read [home.md](home.md). If the player index is zero, ask for a name and wait before registering. Do not invent a name. After the home files exist, ask in that same reply whether to mine and which strategy starts play, as [home.md](home.md) and [mining.md](mining.md) describe. Do not stop after only reporting the coordinates.
 4. The wallet holds a pass and has not joined: **join**.
 5. The wallet has no pass and its DFPT balance is at least the price: **buy a pass**.
 6. The wallet has no pass and its DFPT balance is below the price: **not enough DFPT**. The player cannot buy this token, and must not look for an exchange. The admin has to mint it.
 
-Before joining, buying, registering, or spawning, if the ETH balance cannot pay for one ordinary transaction, decide **not enough gas** and do not send a transaction. Registering and spawning do not need their own yes. After the home files exist, mine the first ring around that home, tell the owner the address and wallet folder in [mining.md](mining.md), and then ask the mining choice.
+Before joining, buying, registering, or spawning, if the ETH balance cannot pay for one ordinary transaction, decide **not enough gas** and do not send a transaction. Registering uses the name the owner just gave. Spawning does not need its own yes once a legal home coordinate is known. A search the owner already stopped stays stopped. A home that just got saved is followed by the mining and strategy question, and mining starts only after they answer.
 
 ## How to talk
 
@@ -121,7 +124,7 @@ Do not ask again for the same wallet and the same action. Ask again when the wal
 
 ## When to ask the owner
 
-Do the work and report it when it does not spend tokens and does not bind the pass. Before spending or binding the pass to this season, ask and wait for a yes. If the owner says no, stop. Finding a home, registering the name, and spawning do not wait for another yes. When the home files are written, mine the first ring and tell the owner the address and wallet folder in [mining.md](mining.md). Ask the mining choice only after that ring is written.
+Do the work and report it when it does not spend tokens and does not bind the pass. Before spending or binding the pass to this season, ask and wait for a yes. If the owner says no, stop. A home search the owner already stopped stays stopped. Once a home has just been saved, the next message asks them to start mining and pick a strategy. Do not treat that question as optional.
 
 Buying a pass already includes joining. Do not ask a second time after the owner agrees. The question names the wallet, the DFPT cost, the small ETH cost, that the pass joins this season immediately, and that it cannot be transferred during the season.
 
@@ -137,9 +140,9 @@ Not enough DFPT. Do not send a transaction. Tell the owner this wallet has less 
 
 Not enough gas. Do not send a transaction. Tell the owner this wallet needs a little ETH on the local chain.
 
-Joined, and a home is saved. Read [mining.md](mining.md). If the first ring around the home is not on disk yet, mine it and tell the owner the address and wallet folder before asking. If that ring is already written, ask the mining question. That question offers the default and the other mining choices together. After the owner chooses, continue mining. Do not ask them to confirm the home again.
+Joined, and a home is saved. If `strategy.txt` is missing or mining has not been started, ask the mining and strategy question from [mining.md](mining.md) and wait. Do not end the turn with only the home coordinates. Do not ask them to confirm the home again.
 
-Joined, but no home yet. Do not offer mining. Follow [home.md](home.md) and create the home before asking anything else.
+Joined, but no home yet. If this player is not registered, ask for a name before searching. Follow [home.md](home.md). A search the owner already stopped stays stopped until they say to continue.
 
 ## Transactions after confirmation
 
