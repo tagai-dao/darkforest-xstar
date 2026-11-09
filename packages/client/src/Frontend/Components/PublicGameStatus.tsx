@@ -13,7 +13,7 @@ import {
 
 const Panel = styled.div`
   position: fixed;
-  top: 16px;
+  top: 52px;
   right: 16px;
   z-index: 6;
   min-width: 240px;

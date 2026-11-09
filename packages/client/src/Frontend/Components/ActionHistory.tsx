@@ -5,6 +5,7 @@ import type {
   ActionRecord,
   AiproPrice,
 } from "../../Backend/Save/FileChunkSource";
+import Viewport from "../Game/Viewport";
 
 const COLLAPSED_ROWS = 3;
 const EXPANDED_ROWS = 20;
@@ -47,6 +48,17 @@ const ActionText = styled.span`
   text-overflow: ellipsis;
 `;
 
+const CoordButton = styled.button`
+  display: inline;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+`;
+
 const Toggle = styled.button`
   width: 100%;
   margin-top: 6px;
@@ -62,6 +74,43 @@ function actionLabel(action: ActionRecord): string {
   return `${action.strategy ? `${action.strategy} ` : ""}${action.action}${
     action.detail ? ` ${action.detail}` : ""
   }`;
+}
+
+export type ActionTextPart =
+  | { kind: "text"; value: string }
+  | { kind: "coord"; x: number; y: number; label: string };
+
+/** 把一行动作说明拆成普通文字和可点击的坐标。坐标形如 (79942, 62)。 */
+export function actionTextParts(text: string): ActionTextPart[] {
+  const coordinate = /\((-?\d+),\s*(-?\d+)\)/g;
+  const parts: ActionTextPart[] = [];
+  let last = 0;
+  for (const match of text.matchAll(coordinate)) {
+    const index = match.index ?? 0;
+    if (index > last) {
+      parts.push({ kind: "text", value: text.slice(last, index) });
+    }
+    parts.push({
+      kind: "coord",
+      x: Number(match[1]),
+      y: Number(match[2]),
+      label: match[0],
+    });
+    last = index + match[0].length;
+  }
+  if (last < text.length) {
+    parts.push({ kind: "text", value: text.slice(last) });
+  }
+  return parts;
+}
+
+function focusCoordinate(x: number, y: number): void {
+  try {
+    // 只移动中心，不改当前缩放。
+    Viewport.getInstance().focus({ x, y });
+  } catch {
+    // 画面还没建好。
+  }
 }
 
 /** 面板宽到当前最长的一行。超过屏幕 80% 的部分才省略。 */
@@ -160,9 +209,19 @@ export function ActionHistory({ actions }: { actions: ActionRecord[] }) {
             <Row key={`${action.time ?? ""}-${action.tx ?? ""}-${index}`}>
               <span>{formatActionTime(action.time)}</span>
               <ActionText>
-                {action.strategy ? `${action.strategy} ` : ""}
-                {action.action}
-                {action.detail ? ` ${action.detail}` : ""}
+                {actionTextParts(actionLabel(action)).map((part, partIndex) =>
+                  part.kind === "text" ? (
+                    <span key={partIndex}>{part.value}</span>
+                  ) : (
+                    <CoordButton
+                      key={partIndex}
+                      type="button"
+                      onClick={() => focusCoordinate(part.x, part.y)}
+                    >
+                      {part.label}
+                    </CoordButton>
+                  ),
+                )}
               </ActionText>
             </Row>
           ))}

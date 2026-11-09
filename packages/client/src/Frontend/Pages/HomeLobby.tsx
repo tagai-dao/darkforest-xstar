@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 
 import dfstyles from "../Styles/dfstyles";
+import { DocsCorner } from "./docs/DocsCorner";
 import { skillPack } from "./skillPack";
 import type { HomeAssets } from "./useHomeAssets";
 
@@ -32,6 +33,11 @@ const Sheet = styled.div`
   display: flex;
   flex-direction: column;
   gap: 18px;
+`;
+
+const Header = styled.header`
+  /* 右上角文档按钮盖在页面上，标题让出这一侧 */
+  padding-right: 88px;
 `;
 
 const Title = styled.h1`
@@ -299,14 +305,33 @@ function AgentSkill() {
   );
 }
 
+const Notice = styled.p`
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  left: 16px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid ${dfstyles.colors.dfgreen};
+  background: rgba(0, 0, 0, 0.92);
+  color: ${dfstyles.colors.dfgreen};
+  font-size: 15px;
+  line-height: 1.6;
+  text-align: center;
+`;
+
 export function HomeLobby({
   card,
   assets,
+  notice,
+  importing,
   onImport,
   onChangeFolder,
 }: {
   card?: FolderCard;
   assets: HomeAssets;
+  notice?: string;
+  importing: boolean;
   onImport: () => void;
   onChangeFolder: () => void;
 }) {
@@ -314,13 +339,14 @@ export function HomeLobby({
 
   return (
     <Page>
+      <DocsCorner />
       <Sheet>
-        <header>
+        <Header>
           <Title>Dark Forest Punk</Title>
           <Lead>
             不完全信息的链上星际策略。整张星图不公开，坐标留在钱包目录里，行动用证明在链上结算。
           </Lead>
-        </header>
+        </Header>
 
         <Split>
           <Card>
@@ -344,9 +370,10 @@ export function HomeLobby({
           ))}
           <Hud />
           <Center>
-            <ImportButton type="button" onClick={onImport}>
-              导入游戏数据
+            <ImportButton type="button" disabled={importing} onClick={onImport}>
+              {importing ? "正在读取" : "导入游戏数据"}
             </ImportButton>
+            {notice && <Notice role="status">{notice}</Notice>}
             {card && (
               <>
                 <FolderName>当前目录 {card.folderName}</FolderName>

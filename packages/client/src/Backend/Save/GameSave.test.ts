@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   appendChunk,
   decideGameStatus,
+  endedGameNotice,
+  playedSaveBelongsToChain,
   gameFolderName,
   parseGameFile,
   parseGameFolderName,
@@ -103,5 +105,19 @@ describe("which game is current", () => {
     expect(decideGameStatus(current, { ...live, open: false, season: 0 })).toBe(
       "not-started",
     );
+    expect(
+      decideGameStatus(
+        { ...current, world: "0x0000000000000000000000000000000000000001" },
+        live,
+      ),
+    ).toBe("ended");
+  });
+
+  it("treats a saved home without a spawn planet as a previous game", () => {
+    expect(playedSaveBelongsToChain(false, 0n)).toBe(true);
+    expect(playedSaveBelongsToChain(true, 0n)).toBe(false);
+    expect(playedSaveBelongsToChain(true, 42n)).toBe(true);
+    expect(endedGameNotice.title).toBe("游戏已经结束");
+    expect(endedGameNotice.detail).toBe("请让 agent 加入新一季的游戏。");
   });
 });

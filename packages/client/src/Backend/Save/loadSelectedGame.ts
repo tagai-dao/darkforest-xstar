@@ -4,15 +4,19 @@ import { createPublicClient, type Hex, http } from "viem";
 import { BOARD_LOG_NAME, parseBoardLog } from "./BoardLog";
 import {
   decideGameStatus,
+  endedGameNotice,
   type GameId,
   type GameSaveFiles,
   parseGameFile,
   parseGameFolderName,
   parseGameSave,
+  playedSaveBelongsToChain,
 } from "./GameSave";
 
 const GAME_PASS_TABLE =
   "0x7462646600000000000000000000000047616d65506173734e46540000000000";
+const SPAWN_PLANET_TABLE =
+  "0x74626466000000000000000000000000537061776e506c616e65740000000000";
 
 const worldAbi = [
   {
@@ -75,6 +79,7 @@ export type RejectedGame = {
   ok: false;
   title: string;
   detail: string;
+  reason: "ended" | "other";
 };
 
 type DirectoryHandle = FileSystemDirectoryHandle;
@@ -125,6 +130,17 @@ function addressFromStatic(data: Hex): string {
   return `0x${hex.slice(-40)}`;
 }
 
+function addressKey(player: string): Hex {
+  return `0x${player.toLowerCase().replace(/^0x/, "").padStart(64, "0")}`;
+}
+
+function uint256FromStatic(data: Hex): bigint {
+  if (!data || data === "0x") {
+    return 0n;
+  }
+  return BigInt(data);
+}
+
 async function readLiveSeason(world: string): Promise<{
   open: boolean;
   world: string;
@@ -161,6 +177,20 @@ async function readLiveSeason(world: string): Promise<{
   return { open, world: activeWorld, season: Number(activeSeason) };
 }
 
+async function readSpawnPlanet(world: string, player: string): Promise<bigint> {
+  const client = createPublicClient({
+    chain: mudFoundry,
+    transport: http("http://localhost:8545"),
+  });
+  const record = await client.readContract({
+    address: world as Hex,
+    abi: worldAbi,
+    functionName: "getRecord",
+    args: [SPAWN_PLANET_TABLE as Hex, [addressKey(player)]],
+  });
+  return uint256FromStatic(record[0]);
+}
+
 async function walletDirectories(
   root: DirectoryHandle,
 ): Promise<DirectoryHandle[]> {
@@ -182,7 +212,7 @@ async function walletDirectories(
 
 export async function loadSelectedGame(
   root: DirectoryHandle,
-  chainId: number,
+  liveGame: { chainId: number; world: string },
   onProgress: (progress: LoadProgress) => void,
 ): Promise<LoadedGame | RejectedGame> {
   onProgress({ done: 0, total: 0, label: "正在查看目录" });
@@ -195,6 +225,7 @@ export async function loadSelectedGame(
     if (wallets.length === 0) {
       return {
         ok: false,
+        reason: "other",
         title: "游戏还未开始",
         detail: "这个赛季目录里还没有钱包存档。",
       };
@@ -202,6 +233,7 @@ export async function loadSelectedGame(
     if (wallets.length > 1) {
       return {
         ok: false,
+        reason: "other",
         title: "请改选钱包目录",
         detail: "这个赛季目录里有多个钱包。请选择其中一个钱包目录。",
       };
@@ -222,7 +254,8 @@ export async function loadSelectedGame(
     } catch (error) {
       return {
         ok: false,
-        title: "游戏已经结束",
+        reason: "other",
+        title: "存档无法读取",
         detail: error instanceof Error ? error.message : "game.json 无法读取",
       };
     }
@@ -230,6 +263,7 @@ export async function loadSelectedGame(
   if (!game) {
     return {
       ok: false,
+      reason: "other",
       title: "游戏还未开始",
       detail: "这份存档没有 game.json，看不出是哪一局。",
     };
@@ -247,6 +281,7 @@ export async function loadSelectedGame(
   if (!files.has("agent.json")) {
     return {
       ok: false,
+      reason: "other",
       title: "游戏还未开始",
       detail: "目录里没有 agent.json。",
     };
@@ -255,32 +290,47 @@ export async function loadSelectedGame(
   onProgress({ done: 1, total: 1, label: "正在读取链上的赛季" });
   let live;
   try {
-    live = await readLiveSeason(game.world);
+    live = await readLiveSeason(liveGame.world);
   } catch {
     return {
       ok: false,
-      title: "游戏已经结束",
-      detail: "链上读不到这份存档对应的世界。",
+      reason: "other",
+      title: "读不到当前游戏",
+      detail: "链上读不到这一局的通行证。",
     };
   }
 
-  const status = decideGameStatus(game, { chainId, ...live });
+  const status = decideGameStatus(game, { chainId: liveGame.chainId, ...live });
   if (status === "not-started") {
     return {
       ok: false,
+      reason: "other",
       title: "游戏还未开始",
       detail: `存档是第 ${game.season} 季，链上当前季号是 ${live.season}。`,
     };
   }
   if (status === "ended") {
-    return {
-      ok: false,
-      title: "游戏已经结束",
-      detail: `存档是第 ${game.season} 季，链上正在进行的是第 ${live.season} 季。`,
-    };
+    return { ok: false, reason: "ended", ...endedGameNotice };
   }
 
   const save = parseGameSave(files);
+  if (save.homeLocations.length > 0) {
+    let spawnPlanet: bigint;
+    try {
+      spawnPlanet = await readSpawnPlanet(liveGame.world, save.agent.address);
+    } catch {
+      return {
+        ok: false,
+        reason: "other",
+        title: "读不到当前游戏",
+        detail: "链上读不到这只钱包的出生星。",
+      };
+    }
+    if (!playedSaveBelongsToChain(true, spawnPlanet)) {
+      return { ok: false, reason: "ended", ...endedGameNotice };
+    }
+  }
+
   let boardOffset = 0;
   const log = files.get(BOARD_LOG_NAME);
   if (log !== undefined) {

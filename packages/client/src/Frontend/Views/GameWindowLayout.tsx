@@ -16,6 +16,7 @@ import {
   WindowWrapper,
 } from "../Components/GameWindowComponents";
 import { PublicGameStatus } from "../Components/PublicGameStatus";
+import { DocsCorner } from "../Pages/docs/DocsCorner";
 import { SelectedVoyageDisplay } from "../Components/SelectedVoyageDisplay";
 import ControllableCanvas from "../Game/ControllableCanvas";
 import { AIChatPane } from "../Panes/AIChatPane";
@@ -360,6 +361,7 @@ export function GameWindowLayout({
 
   return (
     <WindowWrapper>
+      <DocsCorner fixed />
       {showPublicStatus && (
         <PublicGameStatus homeReady={homeReady} priceText={priceText} />
       )}

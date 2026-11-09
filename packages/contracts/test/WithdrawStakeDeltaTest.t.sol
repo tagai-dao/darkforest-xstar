@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
+import { IBaseWorld } from "@latticexyz/world/src/codegen/interfaces/IBaseWorld.sol";
+
 import { BaseTest } from "./BaseTest.t.sol";
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { PlanetType, SpaceType } from "../src/codegen/common.sol";
 import { DFXStarConfig } from "../src/codegen/tables/DFXStarConfig.sol";
 import { Ticker } from "../src/codegen/tables/Ticker.sol";
+import { Errors } from "../src/interfaces/errors.sol";
+import { StakeScoreSystem } from "../src/systems/StakeScoreSystem.sol";
+import { DFXStarStakingLib } from "../src/lib/DFXStarStakingLib.sol";
 import { MockDFXStarScoreStaking } from "./mocks/MockDFXStarScoreStaking.sol";
 
 /// @notice Ensures withdraw passes score delta (not cumulative) to depositFromGame.
@@ -41,8 +46,18 @@ contract WithdrawStakeDeltaTest is BaseTest {
     vm.prank(user1);
     IWorld(worldAddress).df__withdrawSilver(planetHash, withdrawAmount);
 
+    assertEq(pool.lastDepositSender(), worldAddress);
     assertEq(pool.lastDepositUser(), user1);
     assertEq(pool.lastDepositAmount(), withdrawAmount);
     assertEq(pool.totalStaked(), withdrawAmount);
+  }
+
+  function testStake_rejectsPlayer() public {
+    vm.prank(user1);
+    vm.expectRevert(Errors.NotScoreStakeCaller.selector);
+    IBaseWorld(worldAddress).call(
+      DFXStarStakingLib.stakeScoreSystemId(),
+      abi.encodeCall(StakeScoreSystem.stake, (user1, 1))
+    );
   }
 }

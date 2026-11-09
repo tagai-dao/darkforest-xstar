@@ -27,6 +27,7 @@ bytes16 constant PLANET_UPGRADE_SYSTEM_NAME = "PlanetUpgradeSys";
 bytes16 constant ARTIFACT_CREATE_SYSTEM_NAME = "ArtifactCreateSy";
 bytes16 constant ARTIFACT_SYSTEM_NAME = "ArtifactSystem";
 bytes16 constant PLANET_WITHDRAW_SILVER_SYSTEM_NAME = "PlanetWithdrawSi";
+bytes16 constant WITHDRAW_MATERIAL_SYSTEM_NAME = "WithdrawMaterial";
 bytes16 constant PLANET_EMOJI_SYSTEM_NAME = "PlanetEmojiSyste";
 
 library DFUtils {

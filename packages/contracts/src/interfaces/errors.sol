@@ -101,6 +101,8 @@ interface Errors {
   error NoStakersForBuySilver();
   error DFXStarPoolNotConfigured();
   error PaymentTokenNotConfigured();
+  // 只有两个提取系统可以让 World 去积分池记账。
+  error NotScoreStakeCaller();
 
   // GPTToken system
   error NotEnoughETH(); // 0x932b84b0

@@ -67,7 +67,7 @@ contract AttachLocalNutbox is Script {
     deployed.paymentToken = Community(payable(deployed.community)).getCommunityToken();
     deployed.pool = _addPool(deployed.community, deployed.stakingFactory);
 
-    // World 以 delegatecall 调用质押，msg.sender 是 World，必须是工厂管理员。
+    // 记分由根系统在 World 里发出，积分池看到的调用方是 World。不要把各个 df 系统加进管理员。
     DFXStarScoreStakingFactory(deployed.stakingFactory).addAdmin(worldAddress);
     Committee(payable(deployed.committee)).adminAddFeeFreeAddress(worldAddress);
   }

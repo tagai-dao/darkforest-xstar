@@ -234,6 +234,11 @@ export function RedPillLandingPage() {
   // 离开游戏时递增，停掉还在等终端输入的那一轮。
   const sessionRef = useRef(0);
   const [folderCard, setFolderCard] = useState<FolderCard | undefined>();
+  const [importNotice, setImportNotice] = useState<string | undefined>();
+  const [importing, setImporting] = useState(false);
+  const grantedFolderRef = useRef<FileSystemDirectoryHandle | undefined>(
+    undefined,
+  );
   const homeAssets = useHomeAssets(folderCard?.address);
   const boardCursorRef = useRef<BoardCursor>({
     offset: 0,
@@ -1697,6 +1702,7 @@ export function RedPillLandingPage() {
           setFolderCard({ folderName: handle.name });
           return;
         }
+        grantedFolderRef.current = handle;
         setFolderCard(await readFolderCard(handle));
       })
       .catch((error) => console.error(error));
@@ -1847,45 +1853,33 @@ export function RedPillLandingPage() {
       }
     ).showDirectoryPicker;
     try {
-      let handle: FileSystemDirectoryHandle | undefined;
-      if (!forcePick) {
-        handle = await loadWalletDirectory();
-        if (handle && (await directoryPermission(handle, true)) !== "granted") {
-          handle = undefined;
-        }
-      }
+      // 选目录必须发生在第一次 await 之前，否则浏览器会丢掉这次点击。
+      let handle = !forcePick ? grantedFolderRef.current : undefined;
       if (!handle) {
         if (!picker) {
-          setFolderLoad({
-            kind: "blocked",
-            title: "无法选择目录",
-            detail: "这个浏览器没有目录选择窗口。",
-          });
+          setImportNotice("这个浏览器没有目录选择窗口。");
           return;
         }
         handle = await picker({ mode: "read" });
       }
-      setFolderLoad({
-        kind: "busy",
-        done: 0,
-        total: 0,
-        label: "正在读取文件",
-      });
+      setImporting(true);
+      setImportNotice(undefined);
+      const network = getNetworkConfig();
       const result = await loadSelectedGame(
         handle,
-        getNetworkConfig().chain.id,
-        (progress) => {
-          setFolderLoad({ kind: "busy", ...progress });
-        },
+        { chainId: network.chain.id, world: network.worldAddress },
+        () => undefined,
       );
       if (!result.ok) {
-        setFolderLoad({
-          kind: "blocked",
-          title: result.title,
-          detail: result.detail,
-        });
+        const sentence =
+          result.reason === "ended"
+            ? `${result.title}，${result.detail}`
+            : `${result.title}。${result.detail}`;
+        setImportNotice(sentence);
         return;
       }
+      setImportNotice(undefined);
+      grantedFolderRef.current = result.directory;
       await saveWalletDirectory(result.directory);
       setFolderCard(await readFolderCard(result.directory));
       gateSeededRef.current = true;
@@ -1911,15 +1905,16 @@ export function RedPillLandingPage() {
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        setFolderLoad({ kind: "idle" });
         return;
       }
       console.error(error);
-      setFolderLoad({
-        kind: "blocked",
-        title: "无法打开目录",
-        detail: error instanceof Error ? error.message : "请再选一次钱包目录。",
-      });
+      setImportNotice(
+        error instanceof Error
+          ? `无法打开目录。${error.message}`
+          : "无法打开目录。请再选一次钱包目录。",
+      );
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -1970,6 +1965,8 @@ export function RedPillLandingPage() {
           <HomeLobby
             card={folderCard}
             assets={homeAssets}
+            notice={importNotice}
+            importing={importing}
             onImport={() => {
               void openWalletFolder(false);
             }}

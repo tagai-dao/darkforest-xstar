@@ -97,6 +97,8 @@ export default defineWorld({
     "WormholeSystem",
     "BloomFilterSystem",
     "PinkBombSystem",
+    // 根命名空间系统，由 PostDeploy 注册。不能进 df，否则池子看到的调用方不是 World。
+    "StakeScoreSystem",
   ],
   tables: {
     Round: {

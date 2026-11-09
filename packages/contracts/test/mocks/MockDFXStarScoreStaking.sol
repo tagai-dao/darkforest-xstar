@@ -7,10 +7,12 @@ import { IDFXStarScoreStaking } from "interfaces/nutbox/IDFXStarScoreStaking.sol
 contract MockDFXStarScoreStaking is IDFXStarScoreStaking {
   uint256 public totalStaked;
   address public lastDepositUser;
+  address public lastDepositSender;
   uint256 public lastDepositAmount;
   uint256 public lastInjectAmount;
 
   function depositFromGame(address user, uint256 amount) external payable {
+    lastDepositSender = msg.sender;
     lastDepositUser = user;
     lastDepositAmount = amount;
     totalStaked += amount;

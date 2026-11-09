@@ -7,6 +7,8 @@ import { StoreSwitch } from "@latticexyz/store/src/StoreSwitch.sol";
 import { stdToml } from "forge-std/StdToml.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { WorldResourceIdLib } from "@latticexyz/world/src/WorldResourceId.sol";
+import { StakeScoreSystem } from "../src/systems/StakeScoreSystem.sol";
+import { DFXStarStakingLib } from "../src/lib/DFXStarStakingLib.sol";
 
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { SpaceType, PlanetType, ArtifactRarity, PlanetStatus } from "../src/codegen/common.sol";
@@ -124,6 +126,9 @@ contract PostDeploy is Script {
         _setTestPlanets(abi.decode(toml.parseRaw(".test_planets"), (TestPlanet[])));
       }
     }
+
+    // 记分根系统跑在 World 里，积分池只需要认 World 这一个管理员。
+    IWorld(worldAddress).registerSystem(DFXStarStakingLib.stakeScoreSystemId(), new StakeScoreSystem(), true);
 
     // register fallback delegation of df namespace
     IWorld(worldAddress).registerNamespaceDelegation(

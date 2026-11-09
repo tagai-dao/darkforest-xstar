@@ -64,6 +64,8 @@ Write `totalStaked`, `myStaked`, `pendingCommunity`, `pendingInjected`, and `poo
 
 The send is in [actions.md](actions.md). After the receipt the planet's silver falls, `PlayerScore` rises by the withdrawn chain amount, and the World calls `depositFromGame(player, delta)` on the pool. The delta is the withdrawn amount, not the player's total score. A zero delta does not call the pool.
 
+The withdraw system does not call the pool itself. It calls the root system `StakeScoreSystem`, which runs inside the World, so the pool sees the World as the caller. The factory admin stays the World. Do not add the withdraw systems as admins. A player calling `StakeScoreSystem` does not stake. Material withdrawal uses the same call.
+
 This call does not move AIPRO. It increases `userStakes` and `totalStaked`. It can be the first stake in the pool. It reverts when the pool has no code, when the World is not a factory admin, or when the pool's community calls fail. Fees on this stack are 0, so the withdraw does not need attached ETH.
 
 ## Buy silver injects AIPRO

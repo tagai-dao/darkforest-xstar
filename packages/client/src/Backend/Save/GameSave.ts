@@ -114,6 +114,22 @@ export function decideGameStatus(
   return "ended";
 }
 
+export const endedGameNotice = {
+  title: "游戏已经结束",
+  detail: "请让 agent 加入新一季的游戏。",
+} as const;
+
+// 家写进目录时，这只钱包已经在当时的链上出过生。新一局里出生星会回到 0。
+export function playedSaveBelongsToChain(
+  hasHome: boolean,
+  spawnPlanet: bigint,
+): boolean {
+  if (!hasHome) {
+    return true;
+  }
+  return spawnPlanet !== 0n;
+}
+
 export function serializeGameFile(game: GameId): string {
   return JSON.stringify({
     chainId: game.chainId,

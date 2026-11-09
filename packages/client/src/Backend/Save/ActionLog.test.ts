@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   actionHistoryWidth,
+  actionTextParts,
   aiproPriceLabel,
   formatActionTime,
 } from "../../Frontend/Components/ActionHistory";
@@ -30,6 +31,19 @@ describe("action log", () => {
     const minute = String(date.getMinutes()).padStart(2, "0");
     expect(formatActionTime(source)).toContain(`${hour}:${minute}`);
     expect(formatActionTime(undefined)).toBe("时间未知");
+  });
+
+  it("splits planet coordinates out of an action line", () => {
+    const parts = actionTextParts(
+      "aggressive.md move capture (79954, -137) from (79908, 14)",
+    );
+    expect(parts.filter((part) => part.kind === "coord")).toEqual([
+      { kind: "coord", x: 79954, y: -137, label: "(79954, -137)" },
+      { kind: "coord", x: 79908, y: 14, label: "(79908, 14)" },
+    ]);
+    expect(actionTextParts("buy-silver tier 0")).toEqual([
+      { kind: "text", value: "buy-silver tier 0" },
+    ]);
   });
 
   it("widens the log to the longest row and stops at 80 percent", () => {

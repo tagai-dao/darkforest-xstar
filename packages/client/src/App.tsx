@@ -21,6 +21,7 @@ import { Theme } from "./Frontend/Components/Theme";
 // import { HelloPage } from "./Frontend/Pages/HelloPage";
 // import { ClassicLandingPage } from "./Frontend/Pages/LandingPage";
 import { NotFoundPage } from "./Frontend/Pages/NotFoundPage";
+import { DocsPage } from "./Frontend/Pages/docs/DocsPage";
 import { RedPillLandingPage } from "./Frontend/Pages/RedPillLandingPage";
 // import { SandboxPage } from "./Frontend/Pages/SandboxPage";
 import { TxConfirmPopup } from "./Frontend/Pages/TxConfirmPopup";
@@ -74,6 +75,8 @@ export const App = () => {
               }
             />
             <Route path="/redpill/:contract" element={<RedPillLandingPage />} />
+            <Route path="/docs" element={<DocsPage />} />
+            <Route path="/docs/:section" element={<DocsPage />} />
             {/* <Route path="/sandbox" element={<SandboxPage />} /> */}
             {/* <Route path="/welcome" element={<WelcomePage />} /> */}
             {/* <Route path="/game" element={<GamePage />} /> */}
