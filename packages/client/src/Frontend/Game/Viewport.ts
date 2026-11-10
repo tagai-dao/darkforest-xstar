@@ -22,6 +22,35 @@ type ViewportData = {
   centerWorldCoords: WorldCoords;
 };
 
+function isViewportData(value: unknown): value is ViewportData {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const data = value as ViewportData;
+  return (
+    typeof data.widthInWorldUnits === "number" &&
+    Number.isFinite(data.widthInWorldUnits) &&
+    typeof data.centerWorldCoords?.x === "number" &&
+    typeof data.centerWorldCoords?.y === "number" &&
+    Number.isFinite(data.centerWorldCoords.x) &&
+    Number.isFinite(data.centerWorldCoords.y)
+  );
+}
+
+// 有上次的镜头就接着用。没有记录时，家不在原点就回到家。
+export function chooseInitialView(
+  stored: ViewportData | undefined,
+  home: WorldCoords | undefined,
+): "stored" | "home" | "planet" {
+  if (stored) {
+    return "stored";
+  }
+  if (home && (home.x !== 0 || home.y !== 0)) {
+    return "home";
+  }
+  return "planet";
+}
+
 // multiplied by init velocity, since mousemove won't always happen at the same rate as rAF
 const BASE_VEL = 1;
 // if vel gets below this, kill it
@@ -174,6 +203,8 @@ class Viewport {
     const viewport = Viewport.instance;
 
     if (viewport) {
+      // 回到主页时立刻记下，不等 5 秒那次。
+      viewport.setStorage();
       uiEmitter
         .removeListener(UIEmitterEvent.CanvasMouseDown, viewport.onMouseDown)
         .removeListener(UIEmitterEvent.CanvasMouseMove, viewport.onMouseMove)
@@ -205,7 +236,7 @@ class Viewport {
   ): Viewport {
     const uiEmitter = UIEmitter.getInstance();
 
-    const homeCoords = gameUIManager.getHomeCoords();
+    const homeCoords = gameUIManager.getHomeCoords() ?? { x: 0, y: 0 };
 
     const viewport = new Viewport(
       gameUIManager,
@@ -218,15 +249,14 @@ class Viewport {
 
     viewport.setDiagnosticUpdater(gameUIManager);
 
-    // 目录里已经有家时，打开页面就站在家的坐标上，不用上次离开时的镜头。
-    const hasHome = homeCoords.x !== 0 || homeCoords.y !== 0;
     const stored = viewport.getStorage();
-    if (hasHome) {
-      viewport.focus(homeCoords, 96);
-    } else if (!stored) {
-      viewport.zoomPlanet(gameUIManager.getHomePlanet());
-    } else {
+    const initialView = chooseInitialView(stored, homeCoords);
+    if (initialView === "stored" && stored) {
       viewport.setData(stored);
+    } else if (initialView === "home") {
+      viewport.focus(homeCoords, 96);
+    } else {
+      viewport.zoomPlanet(gameUIManager.getHomePlanet());
     }
 
     uiEmitter
@@ -268,10 +298,15 @@ class Viewport {
   getStorage(): ViewportData | undefined {
     const key = this.getStorageKey();
     const stored = localStorage.getItem(key);
-    if (stored) {
-      return (JSON.parse(stored) as ViewportData) || undefined;
+    if (!stored) {
+      return undefined;
     }
-    return undefined;
+    try {
+      const parsed: unknown = JSON.parse(stored);
+      return isViewportData(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   // stores this viewport's ViewportData into storage
@@ -286,11 +321,15 @@ class Viewport {
 
   // set this viewport's zoom and pos to the given ViewportData
   setData(data: ViewportData) {
-    // lets us prevent the program from crashing if this was called poorly
-    typeof data.widthInWorldUnits === "number" &&
+    if (typeof data.widthInWorldUnits === "number") {
       this.setWorldWidth(data.widthInWorldUnits);
-    typeof data.widthInWorldUnits === "number" &&
+    }
+    if (
+      typeof data.centerWorldCoords?.x === "number" &&
+      typeof data.centerWorldCoords?.y === "number"
+    ) {
       this.centerCoords(data.centerWorldCoords);
+    }
   }
 
   centerPlanet(planet: Planet | undefined): void {

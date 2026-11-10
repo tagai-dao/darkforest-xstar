@@ -1755,10 +1755,13 @@ export function RedPillLandingPage() {
             if (home) {
               setHomeReady(true);
             }
-            // 家的文件可能比画面晚到。镜头还没建好就先记着，下一轮再移到家。
+            // 家的文件可能比画面晚到。没有上次镜头时，下一轮再移到家。
             if (home && !centeredOnHome) {
               try {
-                Viewport.getInstance().focus(home.coords, 96);
+                const viewport = Viewport.getInstance();
+                if (!viewport.getStorage()) {
+                  viewport.focus(home.coords, 96);
+                }
                 centeredOnHome = true;
               } catch {
                 // Viewport 尚未初始化。
