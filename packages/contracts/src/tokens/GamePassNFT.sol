@@ -8,6 +8,7 @@ import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { ERC721Enumerable } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import { IGamePassNFT } from "./IGamePassNFT.sol";
 
+/// @notice 旧的自铸通行证。新局不再部署它，入场改为 AiproNftStake 保管 AIPRO NFT。
 contract GamePassNFT is Ownable, ERC721Enumerable, IGamePassNFT {
   using SafeERC20 for IERC20;
 

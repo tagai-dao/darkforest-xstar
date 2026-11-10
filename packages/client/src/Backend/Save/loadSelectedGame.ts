@@ -296,7 +296,7 @@ export async function loadSelectedGame(
       ok: false,
       reason: "other",
       title: "读不到当前游戏",
-      detail: "链上读不到这一局的通行证。",
+      detail: "链上读不到这一局的入场质押。",
     };
   }
 

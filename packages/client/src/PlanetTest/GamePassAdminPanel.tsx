@@ -16,11 +16,9 @@ import {
   isAddress,
   parseAbi,
   parseEther,
-  parseUnits,
   zeroAddress,
 } from "viem";
 
-// 管理操作必须由浏览器里的 MetaMask 签名。Rainbow 没连上时按钮不会有任何弹窗。
 const openMetaMaskWallet = async () => {
   const { account, ethereum } = await connectMetaMask();
   const client = createWalletClient({
@@ -31,28 +29,16 @@ const openMetaMaskWallet = async () => {
   return { account, client };
 };
 
-const GAME_PASS_ABI = parseAbi([
+const LOCKER_ABI = parseAbi([
   "function owner() view returns (address)",
-  "function paymentToken() view returns (address)",
-  "function price() view returns (uint256)",
+  "function nft() view returns (address)",
+  "function handleRegistry() view returns (address)",
   "function activeWorld() view returns (address)",
   "function activeSeason() view returns (uint8)",
   "function isSeasonOpen() view returns (bool)",
-  "function ownerMint(address to) returns (uint256)",
-  "function ownerMintBatch(address[] recipients)",
   "function setActiveSeason(address world, uint8 season)",
   "function clearActiveSeason()",
 ]);
-
-const MOCK_TOKEN_ABI = parseAbi([
-  "function owner() view returns (address)",
-  "function mint(address to, uint256 amount)",
-]);
-
-type TokenMintRow = {
-  recipient: Address;
-  amount: bigint;
-};
 
 const normalizeAddress = (value: string): Address => {
   const trimmed = value.trim();
@@ -62,31 +48,6 @@ const normalizeAddress = (value: string): Address => {
   return trimmed as Address;
 };
 
-const parseTokenAmount = (value: string) => parseUnits(value.trim(), 18);
-
-const parseTokenRows = (rows: string): TokenMintRow[] =>
-  rows
-    .split("\n")
-    .map((row) => row.trim())
-    .filter(Boolean)
-    .map((row) => {
-      const [recipient, amount] = row.split(/[,\s]+/);
-      if (!recipient || !amount) {
-        throw new Error(`Invalid token mint row: ${row}`);
-      }
-      return {
-        recipient: normalizeAddress(recipient),
-        amount: parseTokenAmount(amount),
-      };
-    });
-
-const parseAddressRows = (rows: string): Address[] =>
-  rows
-    .split("\n")
-    .map((row) => row.trim())
-    .filter(Boolean)
-    .map(normalizeAddress);
-
 export const GamePassAdminPanel = () => {
   const {
     network: { publicClient, waitForTransaction, worldContract },
@@ -94,15 +55,14 @@ export const GamePassAdminPanel = () => {
   } = useMUD();
   const gamePassConfig = useComponentValue(GamePassNFT, singletonEntity);
 
-  const gamePassAddress = useMemo(() => {
+  const lockerAddress = useMemo(() => {
     const addr = gamePassConfig?.addr as Address | undefined;
     return addr && addr !== zeroAddress ? addr : undefined;
   }, [gamePassConfig?.addr]);
 
-  const [paymentToken, setPaymentToken] = useState<Address>();
-  const [gamePassOwner, setGamePassOwner] = useState<Address>();
-  const [tokenOwner, setTokenOwner] = useState<Address>();
-  const [passPrice, setPassPrice] = useState<bigint>();
+  const [lockerOwner, setLockerOwner] = useState<Address>();
+  const [nftAddress, setNftAddress] = useState<Address>();
+  const [handleRegistry, setHandleRegistry] = useState<Address>();
   const [activeWorld, setActiveWorld] = useState<Address>();
   const [activeSeason, setActiveSeason] = useState<number>();
   const [isSeasonOpen, setIsSeasonOpen] = useState(false);
@@ -110,20 +70,16 @@ export const GamePassAdminPanel = () => {
   const [seasonNumberInput, setSeasonNumberInput] = useState("1");
   const [nativeRecipient, setNativeRecipient] = useState("");
   const [nativeAmount, setNativeAmount] = useState("1");
-  const [tokenRecipient, setTokenRecipient] = useState("");
-  const [tokenAmount, setTokenAmount] = useState("100000");
-  const [batchTokenRows, setBatchTokenRows] = useState("");
-  const [nftRecipient, setNftRecipient] = useState("");
-  const [batchNftRows, setBatchNftRows] = useState("");
   const [status, setStatus] = useState("");
 
   const configuredWorldAddress = useMemo(() => {
-    const world = worldContract as { address?: Address } | undefined;
-    return world?.address;
+    const address = (worldContract as { address?: Address } | undefined)
+      ?.address;
+    return address && isAddress(address) ? address : undefined;
   }, [worldContract]);
 
   useEffect(() => {
-    if (!seasonWorldInput && configuredWorldAddress) {
+    if (configuredWorldAddress && !seasonWorldInput) {
       setSeasonWorldInput(configuredWorldAddress);
     }
   }, [configuredWorldAddress, seasonWorldInput]);
@@ -132,17 +88,17 @@ export const GamePassAdminPanel = () => {
     const [world, season, open] = await Promise.all([
       publicClient.readContract({
         address: passAddress,
-        abi: GAME_PASS_ABI,
+        abi: LOCKER_ABI,
         functionName: "activeWorld",
       }),
       publicClient.readContract({
         address: passAddress,
-        abi: GAME_PASS_ABI,
+        abi: LOCKER_ABI,
         functionName: "activeSeason",
       }),
       publicClient.readContract({
         address: passAddress,
-        abi: GAME_PASS_ABI,
+        abi: LOCKER_ABI,
         functionName: "isSeasonOpen",
       }),
     ]);
@@ -153,51 +109,42 @@ export const GamePassAdminPanel = () => {
   };
 
   useEffect(() => {
-    const loadGamePassInfo = async () => {
-      if (!gamePassAddress) return;
-
-      const [owner, token, price] = await Promise.all([
+    const loadLocker = async () => {
+      if (!lockerAddress) return;
+      const [owner, nft, registry] = await Promise.all([
         publicClient.readContract({
-          address: gamePassAddress,
-          abi: GAME_PASS_ABI,
+          address: lockerAddress,
+          abi: LOCKER_ABI,
           functionName: "owner",
         }),
         publicClient.readContract({
-          address: gamePassAddress,
-          abi: GAME_PASS_ABI,
-          functionName: "paymentToken",
+          address: lockerAddress,
+          abi: LOCKER_ABI,
+          functionName: "nft",
         }),
         publicClient.readContract({
-          address: gamePassAddress,
-          abi: GAME_PASS_ABI,
-          functionName: "price",
+          address: lockerAddress,
+          abi: LOCKER_ABI,
+          functionName: "handleRegistry",
         }),
       ]);
-
-      setGamePassOwner(owner);
-      setPaymentToken(token);
-      setPassPrice(price);
-      await loadSeasonState(gamePassAddress);
-
-      const ownerOfToken = await publicClient.readContract({
-        address: token,
-        abi: MOCK_TOKEN_ABI,
-        functionName: "owner",
-      });
-      setTokenOwner(ownerOfToken);
+      setLockerOwner(owner);
+      setNftAddress(nft);
+      setHandleRegistry(registry);
+      await loadSeasonState(lockerAddress);
     };
 
-    loadGamePassInfo().catch((error) => {
-      console.error("Failed to load Game Pass admin info:", error);
-      setStatus("Failed to load Game Pass info. Check console for details.");
+    loadLocker().catch((error) => {
+      console.error("Failed to load NFT locker:", error);
+      setStatus("读不到质押保管合约。");
     });
-  }, [gamePassAddress, publicClient]);
+  }, [lockerAddress, publicClient]);
 
   const writeAndWait = async (request: Record<string, unknown>) => {
     const { account, client } = await openMetaMaskWallet();
-    if (tokenOwner && account.toLowerCase() !== tokenOwner.toLowerCase()) {
+    if (lockerOwner && account.toLowerCase() !== lockerOwner.toLowerCase()) {
       throw new Error(
-        `MetaMask 当前账户是 ${account}，铸币管理员是 ${tokenOwner}。请在 MetaMask 里切换到管理员后再点一次。`,
+        `MetaMask 当前账户是 ${account}，保管合约管理员是 ${lockerOwner}。请切换后再点一次。`,
       );
     }
 
@@ -223,26 +170,6 @@ export const GamePassAdminPanel = () => {
     return tx;
   };
 
-  const mintToken = (recipient: Address, amount: bigint) => {
-    if (!paymentToken) throw new Error("Mock token is not configured.");
-    return writeAndWait({
-      address: paymentToken,
-      abi: MOCK_TOKEN_ABI,
-      functionName: "mint",
-      args: [recipient, amount],
-    });
-  };
-
-  const mintNft = (recipient: Address) => {
-    if (!gamePassAddress) throw new Error("GamePassNFT is not configured.");
-    return writeAndWait({
-      address: gamePassAddress,
-      abi: GAME_PASS_ABI,
-      functionName: "ownerMint",
-      args: [recipient],
-    });
-  };
-
   const handleAddLocalChain = async () => {
     try {
       setStatus("请在 MetaMask 里连接账户。");
@@ -256,54 +183,45 @@ export const GamePassAdminPanel = () => {
 
   const handleSetActiveSeason = async () => {
     try {
-      if (!gamePassAddress) throw new Error("GamePassNFT is not configured.");
+      if (!lockerAddress) throw new Error("保管合约还没配置。");
       const world = normalizeAddress(seasonWorldInput);
       const season = Number(seasonNumberInput);
       if (!Number.isInteger(season) || season <= 0 || season > 255) {
-        throw new Error("Season must be an integer between 1 and 255.");
+        throw new Error("轮次要是 1 到 255 的整数。");
       }
 
-      setStatus("Setting active season...");
+      setStatus("正在设置当前轮...");
       await writeAndWait({
-        address: gamePassAddress,
-        abi: GAME_PASS_ABI,
+        address: lockerAddress,
+        abi: LOCKER_ABI,
         functionName: "setActiveSeason",
         args: [world, season],
       });
-      await loadSeasonState(gamePassAddress);
-      setStatus(`Active season set to world ${world}, season ${season}.`);
+      await loadSeasonState(lockerAddress);
+      setStatus(`当前轮已设为世界 ${world}，轮次 ${season}。`);
     } catch (error) {
       console.error(error);
-      setStatus(
-        error instanceof Error ? error.message : "Failed to set active season.",
-      );
+      setStatus(error instanceof Error ? error.message : "设置轮次失败。");
     }
   };
 
   const handleClearActiveSeason = async () => {
     try {
-      if (!gamePassAddress) throw new Error("GamePassNFT is not configured.");
-      setStatus("Clearing active season...");
+      if (!lockerAddress) throw new Error("保管合约还没配置。");
+      setStatus("正在结束当前轮...");
       await writeAndWait({
-        address: gamePassAddress,
-        abi: GAME_PASS_ABI,
+        address: lockerAddress,
+        abi: LOCKER_ABI,
         functionName: "clearActiveSeason",
       });
-      await loadSeasonState(gamePassAddress);
-      setStatus(
-        "Active season cleared. Players can unbind and transfer passes.",
-      );
+      await loadSeasonState(lockerAddress);
+      setStatus("当前轮已结束。玩家可以取出质押的 NFT。");
     } catch (error) {
       console.error(error);
-      setStatus(
-        error instanceof Error
-          ? error.message
-          : "Failed to clear active season.",
-      );
+      setStatus(error instanceof Error ? error.message : "结束轮次失败。");
     }
   };
 
-  // 原生币只付手续费。通行证要的 DFPT 仍由下面的铸造完成。
   const handleSendNative = async () => {
     try {
       const recipient = normalizeAddress(nativeRecipient);
@@ -316,7 +234,7 @@ export const GamePassAdminPanel = () => {
       const balance = await publicClient.getBalance({ address: account });
       if (balance < value) {
         throw new Error(
-          `当前账户 ${account} 只有 ${formatUnits(balance, 18)} ETH，不够发送 ${nativeAmount}。请换到有余额的管理员账户。`,
+          `当前账户 ${account} 只有 ${formatUnits(balance, 18)} BNB，不够发送 ${nativeAmount}。`,
         );
       }
 
@@ -336,81 +254,16 @@ export const GamePassAdminPanel = () => {
         ...(nonce !== undefined ? { nonce } : {}),
       });
       await waitForTransaction(tx);
-      setStatus(`已向 ${recipient} 发送 ${nativeAmount} ETH。`);
+      setStatus(`已向 ${recipient} 发送 ${nativeAmount} BNB。`);
     } catch (error) {
       console.error(error);
       setStatus(walletErrorMessage(error));
     }
   };
 
-  const handleSingleTokenMint = async () => {
-    try {
-      setStatus("Minting test tokens...");
-      await mintToken(
-        normalizeAddress(tokenRecipient),
-        parseTokenAmount(tokenAmount),
-      );
-      setStatus("Test tokens minted.");
-    } catch (error) {
-      console.error(error);
-      setStatus(error instanceof Error ? error.message : "Token mint failed.");
-    }
-  };
-
-  const handleBatchTokenMint = async () => {
-    try {
-      const rows = parseTokenRows(batchTokenRows);
-      setStatus(`Minting test tokens for ${rows.length} recipients...`);
-
-      for (const row of rows) {
-        await mintToken(row.recipient, row.amount);
-      }
-
-      setStatus(`Batch token mint complete: ${rows.length} recipients.`);
-    } catch (error) {
-      console.error(error);
-      setStatus(
-        error instanceof Error ? error.message : "Batch token mint failed.",
-      );
-    }
-  };
-
-  const handleSingleNftMint = async () => {
-    try {
-      setStatus("Minting Game Pass NFT...");
-      await mintNft(normalizeAddress(nftRecipient));
-      setStatus("Game Pass NFT minted.");
-    } catch (error) {
-      console.error(error);
-      setStatus(error instanceof Error ? error.message : "NFT mint failed.");
-    }
-  };
-
-  const handleBatchNftMint = async () => {
-    try {
-      if (!gamePassAddress) throw new Error("GamePassNFT is not configured.");
-      const recipients = parseAddressRows(batchNftRows);
-      setStatus(
-        `Minting Game Pass NFTs for ${recipients.length} recipients...`,
-      );
-      await writeAndWait({
-        address: gamePassAddress,
-        abi: GAME_PASS_ABI,
-        functionName: "ownerMintBatch",
-        args: [recipients],
-      });
-      setStatus(`Batch NFT mint complete: ${recipients.length} recipients.`);
-    } catch (error) {
-      console.error(error);
-      setStatus(
-        error instanceof Error ? error.message : "Batch NFT mint failed.",
-      );
-    }
-  };
-
   return (
     <div className="w-full max-w-xl rounded-lg bg-white p-6 text-gray-900 shadow-lg">
-      <h2 className="mb-4 text-2xl font-semibold">Game Pass Admin</h2>
+      <h2 className="mb-4 text-2xl font-semibold">NFT 质押</h2>
 
       {status && (
         <div className="mb-4 rounded bg-gray-100 p-3 text-sm text-gray-900">
@@ -427,56 +280,52 @@ export const GamePassAdminPanel = () => {
       </button>
 
       <div className="mb-6 space-y-1 break-all text-sm">
-        <div>GamePassNFT: {gamePassAddress ?? "Not configured"}</div>
-        <div>GamePass owner: {gamePassOwner ?? "-"}</div>
-        <div>Mock token: {paymentToken ?? "-"}</div>
-        <div>Mock token owner: {tokenOwner ?? "-"}</div>
-        <div>
-          NFT price:{" "}
-          {passPrice === undefined
-            ? "-"
-            : `${formatUnits(passPrice, 18)} tokens`}
-        </div>
-        <div>Active world: {activeWorld ?? "-"}</div>
-        <div>Active season: {activeSeason ?? "-"}</div>
-        <div>Season open: {isSeasonOpen ? "yes" : "no"}</div>
+        <div>保管合约：{lockerAddress ?? "还没配置"}</div>
+        <div>管理员：{lockerOwner ?? "-"}</div>
+        <div>AIPRO NFT：{nftAddress ?? "-"}</div>
+        <div>Handle 注册表：{handleRegistry ?? "-"}</div>
+        <div>当前世界：{activeWorld ?? "-"}</div>
+        <div>当前轮：{activeSeason ?? "-"}</div>
+        <div>轮次开放：{isSeasonOpen ? "是" : "否"}</div>
       </div>
 
       <div className="mb-8 rounded border border-gray-200 p-4">
-        <h3 className="mb-3 text-lg font-medium">Official Season</h3>
+        <h3 className="mb-3 text-lg font-medium">当前轮</h3>
+        <p className="mb-3 text-sm text-gray-600">
+          轮次开着时，已质押的 NFT 不能取出。清空之后，玩家才能取回。
+        </p>
         <input
           value={seasonWorldInput}
           onChange={(event) => setSeasonWorldInput(event.target.value)}
           className="mb-2 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
-          placeholder="World address"
+          placeholder="World 地址"
         />
         <input
           value={seasonNumberInput}
           onChange={(event) => setSeasonNumberInput(event.target.value)}
           className="mb-3 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
-          placeholder="Season number, e.g. 1"
+          placeholder="轮次，例如 1"
         />
         <button
           type="button"
           onClick={handleSetActiveSeason}
           className="mb-3 w-full rounded bg-emerald-500 px-4 py-2 text-white hover:bg-emerald-600"
         >
-          Set Active Season
+          设为当前轮
         </button>
         <button
           type="button"
           onClick={handleClearActiveSeason}
           className="w-full rounded bg-gray-700 px-4 py-2 text-white hover:bg-gray-800"
         >
-          Clear Active Season
+          结束当前轮
         </button>
       </div>
 
-      <div className="mb-8 rounded border border-gray-200 p-4">
+      <div className="rounded border border-gray-200 p-4">
         <h3 className="mb-3 text-lg font-medium">发送原生币</h3>
         <p className="mb-3 text-sm text-gray-600">
-          从 MetaMask 当前账户转出本机链的 ETH，给指定地址付手续费。默认 1
-          ETH。买通行证用的 DFPT 请用下面的铸造。
+          从 MetaMask 当前账户转出原生币，给指定地址付手续费。
         </p>
         <input
           value={nativeRecipient}
@@ -488,90 +337,14 @@ export const GamePassAdminPanel = () => {
           value={nativeAmount}
           onChange={(event) => setNativeAmount(event.target.value)}
           className="mb-3 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
-          placeholder="ETH 数量，例如 1"
+          placeholder="数量，例如 1"
         />
         <button
           type="button"
           onClick={handleSendNative}
           className="w-full rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
         >
-          发送 ETH
-        </button>
-      </div>
-
-      <div className="mb-8 rounded border border-gray-200 p-4">
-        <h3 className="mb-3 text-lg font-medium">Mint Test Tokens</h3>
-        <p className="mb-3 text-sm text-gray-600">
-          点击后由浏览器里的 MetaMask 签名。当前账户必须是上面的 Mock token
-          owner。
-        </p>
-        <input
-          value={tokenRecipient}
-          onChange={(event) => setTokenRecipient(event.target.value)}
-          className="mb-2 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
-          placeholder="Recipient address"
-        />
-        <input
-          value={tokenAmount}
-          onChange={(event) => setTokenAmount(event.target.value)}
-          className="mb-3 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
-          placeholder="Token amount, e.g. 100000"
-        />
-        <button
-          type="button"
-          onClick={handleSingleTokenMint}
-          className="w-full rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-        >
-          Mint Tokens
-        </button>
-
-        <textarea
-          value={batchTokenRows}
-          onChange={(event) => setBatchTokenRows(event.target.value)}
-          className="mt-4 block h-28 w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
-          placeholder={
-            "Batch format, one per line:\n0xabc...,100000\n0xdef...,50000"
-          }
-        />
-        <button
-          type="button"
-          onClick={handleBatchTokenMint}
-          className="mt-3 w-full rounded bg-indigo-500 px-4 py-2 text-white hover:bg-indigo-600"
-        >
-          Batch Mint Tokens
-        </button>
-      </div>
-
-      <div className="rounded border border-gray-200 p-4">
-        <h3 className="mb-3 text-lg font-medium">Mint Game Pass NFTs</h3>
-        <input
-          value={nftRecipient}
-          onChange={(event) => setNftRecipient(event.target.value)}
-          className="mb-3 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
-          placeholder="Recipient address"
-        />
-        <button
-          type="button"
-          onClick={handleSingleNftMint}
-          className="w-full rounded bg-pink-500 px-4 py-2 text-white hover:bg-pink-600"
-        >
-          Mint NFT
-        </button>
-
-        <textarea
-          value={batchNftRows}
-          onChange={(event) => setBatchNftRows(event.target.value)}
-          className="mt-4 block h-28 w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500"
-          placeholder={
-            "Batch NFT recipients, one address per line:\n0xabc...\n0xdef..."
-          }
-        />
-        <button
-          type="button"
-          onClick={handleBatchNftMint}
-          className="mt-3 w-full rounded bg-purple-500 px-4 py-2 text-white hover:bg-purple-600"
-        >
-          Batch Mint NFTs
+          发送
         </button>
       </div>
     </div>

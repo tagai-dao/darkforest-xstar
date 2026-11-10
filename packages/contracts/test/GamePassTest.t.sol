@@ -1,154 +1,147 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
+import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { IWorld } from "../src/codegen/world/IWorld.sol";
-import { GamePassNFT } from "../src/tokens/GamePassNFT.sol";
-import { MockGameToken } from "../src/tokens/MockGameToken.sol";
+import { AiproNftStake } from "../src/tokens/AiproNftStake.sol";
+import { IBinanceHandle } from "../src/tokens/IBinanceHandle.sol";
 import { GamePassNFT as GamePassNFTTable } from "../src/codegen/index.sol";
 import { Errors } from "../src/interfaces/errors.sol";
 import { BaseTest } from "./BaseTest.t.sol";
 
+contract TestAiproNft is ERC721 {
+  uint256 public nextId = 1;
+
+  constructor() ERC721("AIPRO", "AIPRO") {}
+
+  function mint(address to) external returns (uint256 tokenId) {
+    tokenId = nextId++;
+    _mint(to, tokenId);
+  }
+}
+
+contract TestHandleRegistry is IBinanceHandle {
+  mapping(address => string) public handleOf;
+
+  function setHandle(address who, string calldata handle) external {
+    handleOf[who] = handle;
+  }
+}
+
 contract GamePassTest is BaseTest {
-  MockGameToken token;
-  GamePassNFT pass;
+  TestAiproNft nft;
+  TestHandleRegistry handles;
+  AiproNftStake locker;
 
   function setUp() public override {
     super.setUp();
 
-    token = new MockGameToken();
-    pass = new GamePassNFT(address(token), 100_000 ether);
+    nft = new TestAiproNft();
+    handles = new TestHandleRegistry();
+    locker = new AiproNftStake(address(nft), address(handles));
 
     vm.startPrank(admin);
-    GamePassNFTTable.set(address(pass));
-    pass.setActiveSeason(worldAddress, 1);
+    GamePassNFTTable.set(address(locker));
+    locker.setActiveSeason(worldAddress, 1);
     vm.stopPrank();
   }
 
-  function testRegisterRequiresJoinedPass() public {
+  function testRegisterRequiresStakedNft() public {
     vm.expectRevert(Errors.GamePassRequired.selector);
     IWorld(worldAddress).df__registerPlayer("no-pass", address(1));
   }
 
-  function testJoinSeasonAllowsRegister() public {
-    pass.ownerMint(user1);
+  function testStakeWithoutHandleReverts() public {
+    uint256 tokenId = nft.mint(user1);
 
     vm.startPrank(user1);
-    pass.joinSeason(1);
+    nft.approve(address(locker), tokenId);
+    vm.expectRevert(AiproNftStake.NoBinanceHandle.selector);
+    locker.stake(tokenId);
+    vm.stopPrank();
+  }
+
+  function testStakeAllowsRegisterAndBlocksWithdraw() public {
+    uint256 tokenId = _stake(user1);
+
+    vm.prank(user1);
     IWorld(worldAddress).df__registerPlayer("early", address(1));
-    vm.stopPrank();
 
-    assertTrue(pass.isPlayerInActiveSeason(user1));
-  }
-
-  function testInGamePassCannotTransferOrUnbind() public {
-    pass.ownerMint(user1);
-
-    vm.startPrank(user1);
-    pass.joinSeason(1);
-
-    vm.expectRevert(GamePassNFT.BoundPassNotTransferable.selector);
-    pass.transferFrom(user1, user2, 1);
-
-    vm.expectRevert(GamePassNFT.PassInActiveSeason.selector);
-    pass.unbind(1);
-    vm.stopPrank();
-  }
-
-  function testClearActiveSeasonAllowsUnbindAndTransfer() public {
-    pass.ownerMint(user1);
-
-    vm.startPrank(user1);
-    pass.joinSeason(1);
-    vm.stopPrank();
-
-    vm.prank(admin);
-    pass.clearActiveSeason();
-
-    vm.startPrank(user1);
-    pass.unbind(1);
-    pass.transferFrom(user1, user2, 1);
-    vm.stopPrank();
-
-    assertEq(pass.ownerOf(1), user2);
-    assertEq(pass.tokenBoundWorld(1), address(0));
-    assertEq(pass.tokenBoundSeason(1), 0);
-  }
-
-  function testNewActiveSeasonRequiresRejoin() public {
-    pass.ownerMint(user1);
-
-    vm.startPrank(user1);
-    pass.joinSeason(1);
-    vm.stopPrank();
-
-    vm.prank(admin);
-    pass.setActiveSeason(worldAddress, 2);
-
-    assertFalse(pass.isPlayerInActiveSeason(user1));
-
-    vm.startPrank(user1);
-    pass.joinSeason(1);
-    vm.stopPrank();
-
-    assertTrue(pass.isPlayerInActiveSeason(user1));
-    assertEq(pass.tokenBoundSeason(1), 2);
-  }
-
-  function testJoinSeasonIsIdempotentWhenAlreadyInGame() public {
-    pass.ownerMint(user1);
-
-    vm.startPrank(user1);
-    pass.joinSeason(1);
-    pass.joinSeason(1);
-    vm.stopPrank();
-
-    assertTrue(pass.isTokenInGame(1));
-    assertEq(pass.seasonPlayerToken(worldAddress, 1, user1), 1);
-  }
-
-  function testSecondTokenCannotJoinSameSeasonForSamePlayer() public {
-    pass.ownerMint(user1);
-    pass.ownerMint(user1);
-
-    vm.startPrank(user1);
-    pass.joinSeason(1);
-
-    vm.expectRevert(GamePassNFT.PlayerAlreadyJoined.selector);
-    pass.joinSeason(2);
-    vm.stopPrank();
-  }
-
-  function testPaidMintCollectsTokenAndAllowsJoin() public {
-    token.mint(user1, 100_000 ether);
-
-    vm.startPrank(user1);
-    token.approve(address(pass), 100_000 ether);
-    uint256 tokenId = pass.buyPass();
-    pass.joinSeason(tokenId);
-    IWorld(worldAddress).df__registerPlayer("paid", address(2));
-    vm.stopPrank();
-
-    assertEq(token.balanceOf(address(pass)), 100_000 ether);
-    assertTrue(pass.isPlayerInActiveSeason(user1));
-  }
-
-  function testUnboundPassCanTransferWhenSeasonClosed() public {
-    pass.ownerMint(user1);
+    assertTrue(locker.isPlayerInActiveSeason(user1));
+    assertEq(nft.ownerOf(tokenId), address(locker));
 
     vm.prank(user1);
-    pass.transferFrom(user1, user2, 1);
-
-    assertEq(pass.ownerOf(1), user2);
+    vm.expectRevert(AiproNftStake.StillInRound.selector);
+    locker.withdraw(tokenId);
   }
 
-  function testJoinSeasonRevertsWhenSeasonNotOpen() public {
-    vm.prank(admin);
-    pass.clearActiveSeason();
+  function testClearSeasonAllowsWithdraw() public {
+    uint256 tokenId = _stake(user1);
 
-    pass.ownerMint(user1);
+    vm.prank(admin);
+    locker.clearActiveSeason();
 
     vm.prank(user1);
-    vm.expectRevert(GamePassNFT.SeasonNotOpen.selector);
-    pass.joinSeason(1);
+    locker.withdraw(tokenId);
+
+    assertEq(nft.ownerOf(tokenId), user1);
+    assertEq(locker.stakerOf(tokenId), address(0));
+    assertFalse(locker.isPlayerInActiveSeason(user1));
+  }
+
+  function testNewSeasonRequiresStakeAgain() public {
+    uint256 tokenId = _stake(user1);
+
+    vm.prank(admin);
+    locker.setActiveSeason(worldAddress, 2);
+
+    assertFalse(locker.isPlayerInActiveSeason(user1));
+
+    // 轮次已经换成 2，上一轮的 NFT 可以取回。
+    vm.prank(user1);
+    locker.withdraw(tokenId);
+    assertEq(nft.ownerOf(tokenId), user1);
+
+    vm.startPrank(user1);
+    nft.approve(address(locker), tokenId);
+    locker.stake(tokenId);
+    vm.stopPrank();
+
+    assertTrue(locker.isPlayerInActiveSeason(user1));
+    assertEq(locker.tokenBoundSeason(tokenId), 2);
+  }
+
+  function testSecondTokenCannotStakeInSameRound() public {
+    _stake(user1);
+    uint256 second = nft.mint(user1);
+
+    vm.startPrank(user1);
+    nft.approve(address(locker), second);
+    vm.expectRevert(AiproNftStake.PlayerAlreadyStaked.selector);
+    locker.stake(second);
+    vm.stopPrank();
+  }
+
+  function testStakeRevertsWhenSeasonClosed() public {
+    vm.prank(admin);
+    locker.clearActiveSeason();
+
+    uint256 tokenId = nft.mint(user1);
+    handles.setHandle(user1, "early");
+
+    vm.startPrank(user1);
+    nft.approve(address(locker), tokenId);
+    vm.expectRevert(AiproNftStake.SeasonNotOpen.selector);
+    locker.stake(tokenId);
+    vm.stopPrank();
+  }
+
+  function _stake(address player) internal returns (uint256 tokenId) {
+    tokenId = nft.mint(player);
+    handles.setHandle(player, "early");
+    vm.startPrank(player);
+    nft.approve(address(locker), tokenId);
+    locker.stake(tokenId);
+    vm.stopPrank();
   }
 }

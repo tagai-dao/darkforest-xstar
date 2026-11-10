@@ -13,7 +13,6 @@ import {
   type Address,
   createWalletClient,
   encodeFunctionData,
-  formatUnits,
   http,
   parseAbi,
   type WalletClient,
@@ -21,25 +20,28 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-const GAME_PASS_ABI = parseAbi([
-  "function paymentToken() view returns (address)",
-  "function price() view returns (uint256)",
+const LOCKER_ABI = parseAbi([
+  "function nft() view returns (address)",
+  "function handleRegistry() view returns (address)",
   "function activeWorld() view returns (address)",
   "function activeSeason() view returns (uint8)",
   "function isSeasonOpen() view returns (bool)",
   "function isPlayerInActiveSeason(address player) view returns (bool)",
-  "function isTokenInGame(uint256 tokenId) view returns (bool)",
-  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
-  "function balanceOf(address owner) view returns (uint256)",
-  "function buyPass() returns (uint256)",
-  "function joinSeason(uint256 tokenId)",
-  "function unbind(uint256 tokenId)",
+  "function stakedTokenOf(address player) view returns (uint256)",
+  "function stake(uint256 tokenId)",
+  "function withdraw(uint256 tokenId)",
 ]);
 
-const ERC20_ABI = parseAbi([
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
+const NFT_ABI = parseAbi([
   "function balanceOf(address owner) view returns (uint256)",
+  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+  "function getApproved(uint256 tokenId) view returns (address)",
+  "function isApprovedForAll(address owner, address operator) view returns (bool)",
+  "function approve(address to, uint256 tokenId)",
+]);
+
+const HANDLE_ABI = parseAbi([
+  "function handleOf(address owner) view returns (string)",
 ]);
 
 type GamePassRequirement = {
@@ -47,12 +49,11 @@ type GamePassRequirement = {
   isLoading: boolean;
   isSeasonOpen: boolean;
   isJoined: boolean;
-  hasJoinablePass: boolean;
+  hasNft: boolean;
+  hasHandle: boolean;
   activeWorld?: Address;
   activeSeason?: number;
-  tokenBalance?: bigint;
-  passPrice?: bigint;
-  paymentToken?: Address;
+  stakedTokenId?: bigint;
   error?: string;
 };
 
@@ -204,7 +205,8 @@ export const RedPillRegisterPlayer = ({
       isLoading: false,
       isSeasonOpen: false,
       isJoined: false,
-      hasJoinablePass: false,
+      hasNft: false,
+      hasHandle: false,
     });
 
   // Convert EthAddress to 0x hex string
@@ -294,9 +296,6 @@ export const RedPillRegisterPlayer = ({
     return passAddress && passAddress !== zeroAddress ? passAddress : undefined;
   };
 
-  const formatTokenAmount = (amount?: bigint) =>
-    amount === undefined ? "-" : formatUnits(amount, 18);
-
   const writeAndWait = async (
     walletClient: WalletClient,
     request: Record<string, unknown>,
@@ -326,37 +325,20 @@ export const RedPillRegisterPlayer = ({
     return tx;
   };
 
-  const findJoinableOwnedPass = async (
-    passAddress: Address,
-    playerAddress: Address,
-  ) => {
+  const findOwnedNft = async (nftAddress: Address, playerAddress: Address) => {
     const balance = await publicClient.readContract({
-      address: passAddress,
-      abi: GAME_PASS_ABI,
+      address: nftAddress,
+      abi: NFT_ABI,
       functionName: "balanceOf",
       args: [playerAddress],
     });
-
-    for (let i = 0n; i < balance; i++) {
-      const tokenId = await publicClient.readContract({
-        address: passAddress,
-        abi: GAME_PASS_ABI,
-        functionName: "tokenOfOwnerByIndex",
-        args: [playerAddress, i],
-      });
-      const inGame = await publicClient.readContract({
-        address: passAddress,
-        abi: GAME_PASS_ABI,
-        functionName: "isTokenInGame",
-        args: [tokenId],
-      });
-
-      if (!inGame) {
-        return tokenId;
-      }
-    }
-
-    return undefined;
+    if (balance === 0n) return undefined;
+    return publicClient.readContract({
+      address: nftAddress,
+      abi: NFT_ABI,
+      functionName: "tokenOfOwnerByIndex",
+      args: [playerAddress, 0n],
+    });
   };
 
   const refreshGamePassRequirement = useCallback(async () => {
@@ -368,7 +350,8 @@ export const RedPillRegisterPlayer = ({
         isLoading: false,
         isSeasonOpen: false,
         isJoined: false,
-        hasJoinablePass: false,
+        hasNft: false,
+        hasHandle: false,
       });
       return;
     }
@@ -386,50 +369,57 @@ export const RedPillRegisterPlayer = ({
         isJoined,
         activeWorld,
         activeSeason,
-        paymentToken,
-        passPrice,
+        nft,
+        registry,
+        stakedTokenId,
       ] = await Promise.all([
         publicClient.readContract({
           address: passAddress,
-          abi: GAME_PASS_ABI,
+          abi: LOCKER_ABI,
           functionName: "isSeasonOpen",
         }),
         publicClient.readContract({
           address: passAddress,
-          abi: GAME_PASS_ABI,
+          abi: LOCKER_ABI,
           functionName: "isPlayerInActiveSeason",
           args: [playerAddress],
         }),
         publicClient.readContract({
           address: passAddress,
-          abi: GAME_PASS_ABI,
+          abi: LOCKER_ABI,
           functionName: "activeWorld",
         }),
         publicClient.readContract({
           address: passAddress,
-          abi: GAME_PASS_ABI,
+          abi: LOCKER_ABI,
           functionName: "activeSeason",
         }),
         publicClient.readContract({
           address: passAddress,
-          abi: GAME_PASS_ABI,
-          functionName: "paymentToken",
+          abi: LOCKER_ABI,
+          functionName: "nft",
         }),
         publicClient.readContract({
           address: passAddress,
-          abi: GAME_PASS_ABI,
-          functionName: "price",
+          abi: LOCKER_ABI,
+          functionName: "handleRegistry",
+        }),
+        publicClient.readContract({
+          address: passAddress,
+          abi: LOCKER_ABI,
+          functionName: "stakedTokenOf",
+          args: [playerAddress],
         }),
       ]);
 
-      const [tokenBalance, joinableTokenId] = await Promise.all([
+      const [handle, ownedTokenId] = await Promise.all([
         publicClient.readContract({
-          address: paymentToken,
-          abi: ERC20_ABI,
-          functionName: "balanceOf",
+          address: registry,
+          abi: HANDLE_ABI,
+          functionName: "handleOf",
           args: [playerAddress],
         }),
-        findJoinableOwnedPass(passAddress, playerAddress),
+        findOwnedNft(nft, playerAddress),
       ]);
 
       setGamePassRequirement({
@@ -437,12 +427,11 @@ export const RedPillRegisterPlayer = ({
         isLoading: false,
         isSeasonOpen,
         isJoined,
-        hasJoinablePass: joinableTokenId !== undefined,
+        hasNft: ownedTokenId !== undefined,
+        hasHandle: handle.length > 0,
         activeWorld,
         activeSeason: Number(activeSeason),
-        tokenBalance,
-        passPrice,
-        paymentToken,
+        stakedTokenId,
       });
     } catch (error) {
       console.error("Failed to load Game Pass requirement:", error);
@@ -451,8 +440,9 @@ export const RedPillRegisterPlayer = ({
         isLoading: false,
         isSeasonOpen: false,
         isJoined: false,
-        hasJoinablePass: false,
-        error: "Unable to load Game Pass status. Please refresh and try again.",
+        hasNft: false,
+        hasHandle: false,
+        error: "读不到质押状态。请刷新后再试。",
       });
     }
   }, [ethConnection, GamePassNFT, publicClient]);
@@ -468,110 +458,95 @@ export const RedPillRegisterPlayer = ({
     playerAddress: Address,
     walletClient: WalletClient,
   ) => {
-    const [isSeasonOpen, alreadyJoined] = await Promise.all([
+    const [isSeasonOpen, alreadyJoined, nft, registry] = await Promise.all([
       publicClient.readContract({
         address: passAddress,
-        abi: GAME_PASS_ABI,
+        abi: LOCKER_ABI,
         functionName: "isSeasonOpen",
       }),
       publicClient.readContract({
         address: passAddress,
-        abi: GAME_PASS_ABI,
+        abi: LOCKER_ABI,
         functionName: "isPlayerInActiveSeason",
         args: [playerAddress],
+      }),
+      publicClient.readContract({
+        address: passAddress,
+        abi: LOCKER_ABI,
+        functionName: "nft",
+      }),
+      publicClient.readContract({
+        address: passAddress,
+        abi: LOCKER_ABI,
+        functionName: "handleRegistry",
       }),
     ]);
 
     if (!isSeasonOpen) {
-      throw new Error(
-        "The current season is not open yet. Wait for the admin to start a new season, or unbind your Game Pass during the off-season window.",
-      );
+      throw new Error("当前轮还没开放。等管理员开始这一轮后再质押。");
     }
     if (alreadyJoined) return;
 
-    setRegistrationMessage("Preparing Game Pass...");
-    let tokenId = await findJoinableOwnedPass(passAddress, playerAddress);
+    const handle = await publicClient.readContract({
+      address: registry,
+      abi: HANDLE_ABI,
+      functionName: "handleOf",
+      args: [playerAddress],
+    });
+    if (handle.length === 0) {
+      throw new Error("这只钱包没有 Binance handle，不能质押。");
+    }
 
-    if (!tokenId) {
-      const paymentToken = await publicClient.readContract({
-        address: passAddress,
-        abi: GAME_PASS_ABI,
-        functionName: "paymentToken",
-      });
-      const price = await publicClient.readContract({
-        address: passAddress,
-        abi: GAME_PASS_ABI,
-        functionName: "price",
-      });
-      const tokenBalance = await publicClient.readContract({
-        address: paymentToken,
-        abi: ERC20_ABI,
-        functionName: "balanceOf",
-        args: [playerAddress],
-      });
-      if (tokenBalance < price) {
-        throw new Error(
-          `Game Pass requires ${formatTokenAmount(price)} MockToken, but this wallet only has ${formatTokenAmount(
-            tokenBalance,
-          )}. Ask the admin to mint test tokens to this main wallet, or pre-mint a Game Pass NFT.`,
-        );
-      }
-      const allowance = await publicClient.readContract({
-        address: paymentToken,
-        abi: ERC20_ABI,
-        functionName: "allowance",
+    const tokenId = await findOwnedNft(nft, playerAddress);
+    if (tokenId === undefined) {
+      throw new Error(
+        "这只钱包还没有 AIPRO NFT。先取得一枚，再质押进当前这一轮。",
+      );
+    }
+
+    const [approved, approvedForAll] = await Promise.all([
+      publicClient.readContract({
+        address: nft,
+        abi: NFT_ABI,
+        functionName: "getApproved",
+        args: [tokenId],
+      }),
+      publicClient.readContract({
+        address: nft,
+        abi: NFT_ABI,
+        functionName: "isApprovedForAll",
         args: [playerAddress, passAddress],
-      });
-
-      if (allowance < price) {
-        setRegistrationMessage("Approving Game Pass token payment...");
-        await writeAndWait(walletClient, {
-          address: paymentToken,
-          abi: ERC20_ABI,
-          functionName: "approve",
-          args: [passAddress, price],
-        });
-      }
-
-      setRegistrationMessage("Buying Game Pass...");
+      }),
+    ]);
+    if (approved !== passAddress && !approvedForAll) {
+      setRegistrationMessage("授权保管合约接收这枚 NFT...");
       await writeAndWait(walletClient, {
-        address: passAddress,
-        abi: GAME_PASS_ABI,
-        functionName: "buyPass",
-      });
-
-      const balanceAfterPurchase = await publicClient.readContract({
-        address: passAddress,
-        abi: GAME_PASS_ABI,
-        functionName: "balanceOf",
-        args: [playerAddress],
-      });
-      tokenId = await publicClient.readContract({
-        address: passAddress,
-        abi: GAME_PASS_ABI,
-        functionName: "tokenOfOwnerByIndex",
-        args: [playerAddress, balanceAfterPurchase - 1n],
+        address: nft,
+        abi: NFT_ABI,
+        functionName: "approve",
+        args: [passAddress, tokenId],
       });
     }
 
-    setRegistrationMessage("Joining the current season with your Game Pass...");
+    setRegistrationMessage("把 AIPRO NFT 质押进当前这一轮...");
     await writeAndWait(walletClient, {
       address: passAddress,
-      abi: GAME_PASS_ABI,
-      functionName: "joinSeason",
+      abi: LOCKER_ABI,
+      functionName: "stake",
       args: [tokenId],
     });
   };
 
   const getRegistrationErrorMessage = (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("0xe450d38c")) {
-      return "Not enough MockToken to buy a Game Pass NFT. Ask the admin to mint test tokens to your main wallet, or pre-mint a Game Pass NFT.";
-    }
-    if (message.includes("Game Pass requires")) {
+    if (
+      message.includes("没有 Binance handle") ||
+      message.includes("还没有 AIPRO NFT") ||
+      message.includes("当前轮还没开放")
+    ) {
       return message;
     }
-    return "Registration failed. Please check your Game Pass NFT and MockToken status, then try again.";
+    return "注册失败。确认这只钱包有 Binance handle，并且持有一枚 AIPRO NFT。";
   };
 
   const registerPlayerAction = async () => {
@@ -672,67 +647,44 @@ export const RedPillRegisterPlayer = ({
       return null;
     }
 
-    const needsMoreTokens =
-      gamePassRequirement.isSeasonOpen &&
-      !gamePassRequirement.isJoined &&
-      !gamePassRequirement.hasJoinablePass &&
-      gamePassRequirement.tokenBalance !== undefined &&
-      gamePassRequirement.passPrice !== undefined &&
-      gamePassRequirement.tokenBalance < gamePassRequirement.passPrice;
-
     let accessStatus: React.ReactNode;
     if (gamePassRequirement.isLoading) {
-      accessStatus = "Checking...";
+      accessStatus = "正在检查...";
     } else if (!gamePassRequirement.isSeasonOpen) {
       accessStatus = (
-        <Red>
-          Season closed. Wait for a new season, or unbind stale Game Pass
-          bindings before transferring.
-        </Red>
+        <Red>当前轮还没开放。轮次结束后，已质押的 NFT 才能取出。</Red>
       );
     } else if (gamePassRequirement.isJoined) {
-      accessStatus = <Green>Game Pass already joined for this season</Green>;
-    } else if (gamePassRequirement.hasJoinablePass) {
       accessStatus = (
         <Green>
-          Joinable Game Pass found, registration will join this season
+          已质押 #{gamePassRequirement.stakedTokenId?.toString() ?? "-"}
+          ，可以进入这一轮
         </Green>
       );
-    } else {
+    } else if (!gamePassRequirement.hasHandle) {
+      accessStatus = <Red>这只钱包没有 Binance handle，不能质押。</Red>;
+    } else if (gamePassRequirement.hasNft) {
       accessStatus = (
-        <Red>No Game Pass found, registration will try to buy one</Red>
+        <Green>已有 AIPRO NFT，注册时会把它质押进当前这一轮。</Green>
       );
+    } else {
+      accessStatus = <Red>还没有 AIPRO NFT。先取得一枚再来注册。</Red>;
     }
 
     return (
       <div className="max-w-xl rounded-lg border border-pink-400 bg-black/40 p-4 text-sm text-white">
         <div className="mb-2 text-lg font-semibold text-pink-300">
-          Game Pass NFT Required
+          质押 AIPRO NFT 才能进入
         </div>
         <div>
-          To enter this season, your main wallet must own a Game Pass NFT and
-          join the official active world/season. If you do not already have one,
-          registration will try to buy and join with MockToken first.
+          这只钱包需要有 Binance handle，并持有一枚 AIPRO
+          NFT。注册时会把那一枚质押进当前轮。本轮结束前不能取出。
         </div>
         <div className="mt-3 space-y-1">
-          <div>Access status: {accessStatus}</div>
-          <div>Active world: {gamePassRequirement.activeWorld ?? "-"}</div>
-          <div>Active season: {gamePassRequirement.activeSeason ?? "-"}</div>
-          <div>
-            NFT price: {formatTokenAmount(gamePassRequirement.passPrice)}{" "}
-            MockToken
-          </div>
-          <div>
-            Current wallet MockToken balance:{" "}
-            {formatTokenAmount(gamePassRequirement.tokenBalance)}
-          </div>
+          <div>状态：{accessStatus}</div>
+          <div>当前世界：{gamePassRequirement.activeWorld ?? "-"}</div>
+          <div>当前轮：{gamePassRequirement.activeSeason ?? "-"}</div>
         </div>
-        {needsMoreTokens && (
-          <div className="mt-3 rounded border border-red-400 bg-red-900/30 p-3 text-red-200">
-            Not enough MockToken to buy a Game Pass. Ask the admin to mint test
-            tokens to your main wallet on /test, or pre-mint a Game Pass NFT.
-          </div>
-        )}
         {gamePassRequirement.error && (
           <div className="mt-3 rounded border border-yellow-400 bg-yellow-900/30 p-3 text-yellow-200">
             {gamePassRequirement.error}

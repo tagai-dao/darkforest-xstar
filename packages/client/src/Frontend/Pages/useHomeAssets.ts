@@ -27,13 +27,18 @@ const erc20Abi = parseAbi([
   "function balanceOf(address account) view returns (uint256)",
 ]);
 
-const passAbi = parseAbi([
+const nftAbi = parseAbi([
   "function name() view returns (string)",
   "function symbol() view returns (string)",
   "function balanceOf(address owner) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+]);
+
+const lockerAbi = parseAbi([
+  "function nft() view returns (address)",
   "function isSeasonOpen() view returns (bool)",
   "function activeSeason() view returns (uint8)",
+  "function stakedTokenOf(address player) view returns (uint256)",
 ]);
 
 export type PoolRow = {
@@ -171,7 +176,7 @@ async function readPools(
   return { rows, pending: owner ? pending : undefined };
 }
 
-/** 首页上的矿池、代币和通行证。钱包地址来自已记住的游戏目录。 */
+/** 首页上的矿池、代币和入场 NFT。钱包地址来自已记住的游戏目录。 */
 export function useHomeAssets(wallet: string | undefined): HomeAssets {
   const {
     network: { publicClient },
@@ -199,7 +204,7 @@ export function useHomeAssets(wallet: string | undefined): HomeAssets {
           : "Nutbox 社区还没接到这局里",
         tokenSymbol: "AIPRO",
         tokenAddress: paymentToken,
-        seasonLabel: passAddress ? "赛季状态读不到" : "通行证还没配置",
+        seasonLabel: passAddress ? "轮次状态读不到" : "入场质押还没配置",
         nfts: [],
       };
 
@@ -247,8 +252,35 @@ export function useHomeAssets(wallet: string | undefined): HomeAssets {
         }
       }
 
+      let aiproNft: Address | undefined;
+      if (passAddress) {
+        try {
+          aiproNft = await publicClient.readContract({
+            address: passAddress,
+            abi: lockerAbi,
+            functionName: "nft",
+          });
+          const open = await publicClient.readContract({
+            address: passAddress,
+            abi: lockerAbi,
+            functionName: "isSeasonOpen",
+          });
+          const season = await publicClient.readContract({
+            address: passAddress,
+            abi: lockerAbi,
+            functionName: "activeSeason",
+          });
+          next.seasonLabel = open
+            ? `第 ${Number(season)} 轮开放`
+            : "本轮已结束";
+          if (open) next.season = Number(season);
+        } catch {
+          next.seasonLabel = "轮次状态读不到";
+        }
+      }
+
       const nftTargets = [
-        passAddress ? { address: passAddress, label: "赛季通行证" } : undefined,
+        aiproNft ? { address: aiproNft, label: "AIPRO NFT" } : undefined,
         artifactAddress
           ? { address: artifactAddress, label: "神器" }
           : undefined,
@@ -259,41 +291,23 @@ export function useHomeAssets(wallet: string | undefined): HomeAssets {
         try {
           row.label = await publicClient.readContract({
             address: target.address,
-            abi: passAbi,
+            abi: nftAbi,
             functionName: "name",
           });
           row.symbol = await publicClient.readContract({
             address: target.address,
-            abi: passAbi,
+            abi: nftAbi,
             functionName: "symbol",
           });
           let balance = 0n;
           if (owner) {
             balance = await publicClient.readContract({
               address: target.address,
-              abi: passAbi,
+              abi: nftAbi,
               functionName: "balanceOf",
               args: [owner],
             });
             row.balance = grouped(balance);
-          }
-          if (target.address === passAddress) {
-            const open = await publicClient.readContract({
-              address: target.address,
-              abi: passAbi,
-              functionName: "isSeasonOpen",
-            });
-            const season = await publicClient.readContract({
-              address: target.address,
-              abi: passAbi,
-              functionName: "activeSeason",
-            });
-            next.seasonLabel = open
-              ? `第 ${Number(season)} 季开放`
-              : "赛季未开放";
-            if (open) {
-              next.season = Number(season);
-            }
           }
           const idCount = Number(balance > 8n ? 8n : balance);
           if (owner && idCount > 0) {
@@ -301,13 +315,23 @@ export function useHomeAssets(wallet: string | undefined): HomeAssets {
             for (let index = 0; index < idCount; index += 1) {
               const tokenId = await publicClient.readContract({
                 address: target.address,
-                abi: passAbi,
+                abi: nftAbi,
                 functionName: "tokenOfOwnerByIndex",
                 args: [owner, BigInt(index)],
               });
               ids.push(`#${tokenId.toString()}`);
             }
             row.tokenIds = ids;
+          }
+          if (owner && target.address === aiproNft && passAddress) {
+            const staked = await publicClient.readContract({
+              address: passAddress,
+              abi: lockerAbi,
+              functionName: "stakedTokenOf",
+              args: [owner],
+            });
+            if (staked > 0n)
+              row.tokenIds.unshift(`质押中 #${staked.toString()}`);
           }
         } catch {
           // 这一份 NFT 读不到时保留标题。

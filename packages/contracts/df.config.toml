@@ -14,9 +14,10 @@ address = "0x0000000000000000000000000000000000000000"
 set_current_round = true # if true,should be deployed by nft contract owner
 
 [game_pass]
-payment_token_address = "0x0000000000000000000000000000000000000000"
-nft_address = "0x0000000000000000000000000000000000000000"
-price = 100000 # token amount, multiplied by 1 ether in PostDeploy for the test ERC20
+# AIPRO Classic Residents。本地 anvil 上没有代码时，PostDeploy 不开启入场限制。
+nft_address = "0xe86c2E52A5Ebaf4afd18020834D5c771Aff59cDE"
+# Binance Agent ID。质押时 handleOf(钱包) 必须非空。
+handle_registry = "0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F"
 
 [temp]
 b_skip_proof_check = false

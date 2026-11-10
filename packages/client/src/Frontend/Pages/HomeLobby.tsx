@@ -355,7 +355,9 @@ export function HomeLobby({
               <li>从家出发，在本地把周围的星球挖出来。</li>
               <li>派出舰队占领星球，搬运能量和银。</li>
               <li>银进入 Nutbox 矿池，按质押份额领取 AIPRO。</li>
-              <li>通行证 NFT 把这只钱包绑进当前赛季。</li>
+              <li>
+                有 Binance handle 的钱包，把 AIPRO NFT 质押进当前轮才能玩。
+              </li>
             </List>
           </Card>
           <Card>

@@ -37,8 +37,7 @@ import { installBloomFilter } from "../src/modules/atfs/BloomFilter/BloomFilterI
 import { installPinkBomb } from "../src/modules/atfs/PinkBomb/PinkBombInstallLibrary.sol";
 import { IArtifactNFT } from "../src/tokens/IArtifactNFT.sol";
 import { ArtifactNFT } from "../src/tokens/ArtifactNFT.sol";
-import { GamePassNFT } from "../src/tokens/GamePassNFT.sol";
-import { MockGameToken } from "../src/tokens/MockGameToken.sol";
+import { AiproNftStake } from "../src/tokens/AiproNftStake.sol";
 import { EntryFee } from "codegen/tables/EntryFee.sol";
 import { Committee } from "nutbox/Committee.sol";
 import { CommunityFactory } from "nutbox/CommunityFactory.sol";
@@ -378,20 +377,21 @@ contract PostDeploy is Script {
   }
 
   function _setGamePassConfig(string memory toml, address worldAddress) internal {
-    address paymentTokenAddress = toml.readAddress(".game_pass.payment_token_address");
-    if (paymentTokenAddress == address(0)) {
-      paymentTokenAddress = address(new MockGameToken());
+    address nftAddress = toml.readAddress(".game_pass.nft_address");
+    address handleRegistry = toml.readAddress(".game_pass.handle_registry");
+    // 本地链上没有这枚 NFT 时不部署保管合约，入场检查保持关闭。
+    if (nftAddress == address(0) || nftAddress.code.length == 0) {
+      console.log("Game pass: NFT has no code, entry stays open");
+      GamePassNFTTable.set(address(0));
+      return;
     }
+    require(handleRegistry != address(0), "handle registry required");
 
-    address gamePassAddress = toml.readAddress(".game_pass.nft_address");
-    if (gamePassAddress == address(0)) {
-      gamePassAddress = address(new GamePassNFT(paymentTokenAddress, toml.readUint(".game_pass.price") * 1 ether));
-    }
-
-    GamePassNFTTable.set(gamePassAddress);
-
+    AiproNftStake locker = new AiproNftStake(nftAddress, handleRegistry);
+    GamePassNFTTable.set(address(locker));
     uint8 roundNum = abi.decode(toml.parseRaw(".round.number"), (uint8));
-    GamePassNFT(gamePassAddress).setActiveSeason(worldAddress, roundNum);
+    locker.setActiveSeason(worldAddress, roundNum);
+    console.log("Game pass locker:", address(locker));
   }
 
   function _setArtifactNFTConfig(address artifactNftAddress) internal {
