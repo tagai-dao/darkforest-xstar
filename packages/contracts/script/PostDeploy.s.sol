@@ -40,7 +40,6 @@ import { ArtifactNFT } from "../src/tokens/ArtifactNFT.sol";
 import { GamePassNFT } from "../src/tokens/GamePassNFT.sol";
 import { MockGameToken } from "../src/tokens/MockGameToken.sol";
 import { EntryFee } from "codegen/tables/EntryFee.sol";
-import { IDFXStarScoreStakingFactory } from "../src/interfaces/nutbox/IDFXStarScoreStakingFactory.sol";
 import { Committee } from "nutbox/Committee.sol";
 import { CommunityFactory } from "nutbox/CommunityFactory.sol";
 import { HourlyTickCalculator } from "nutbox/calculators/HourlyTickCalculator.sol";
@@ -243,14 +242,12 @@ contract PostDeploy is Script {
       console.log("DFXStar: bootstrapping local Nutbox stack...");
       uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
       address deployer = vm.addr(deployerPrivateKey);
-      NutboxAddresses memory addrs = _bootstrapNutbox(deployer);
+      NutboxAddresses memory addrs = _bootstrapNutbox(deployer, worldAddress);
       scoreStakingPool = addrs.pool;
       paymentToken = addrs.dfsToken;
       stakingFactory = addrs.dfxFactory;
       community = addrs.community;
       Committee(payable(addrs.committee)).adminAddFeeFreeAddress(worldAddress);
-      // 本地工厂的 owner 就是本次部署者，才能把 World 加为记分管理员。
-      IDFXStarScoreStakingFactory(stakingFactory).addAdmin(worldAddress);
       console.log("DFXStar: local Nutbox bootstrap complete");
     } else if (attachExisting && scoreStakingPool == address(0)) {
       console.log("DFXStar: existing community set, pool is created later by AddAIPRODFXStarPool");
@@ -272,7 +269,7 @@ contract PostDeploy is Script {
     address pool;
   }
 
-  function _bootstrapNutbox(address owner) internal returns (NutboxAddresses memory addrs) {
+  function _bootstrapNutbox(address owner, address worldAddress) internal returns (NutboxAddresses memory addrs) {
     // 1. Deploy Committee (all fees = 0 for local testing)
     Committee committee = new Committee(payable(owner));
     committee.adminSetCreateCommunityFee(0);
@@ -325,7 +322,13 @@ contract PostDeploy is Script {
     // 8. Create DFXStar pool (100% ratio)
     uint16[] memory ratios = new uint16[](1);
     ratios[0] = 10000;
-    Community(payable(communityAddr)).adminAddPool("DFXStar Score Staking", ratios, address(dfxFactory), "");
+    // meta 里的 World 会写进池子，之后不能改。记分只认这个地址。
+    Community(payable(communityAddr)).adminAddPool(
+      "DFXStar Score Staking",
+      ratios,
+      address(dfxFactory),
+      abi.encode(worldAddress)
+    );
 
     // 9. Get pool address
     addrs.pool = Community(payable(communityAddr)).activedPools(0);

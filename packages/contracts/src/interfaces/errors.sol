@@ -101,6 +101,10 @@ interface Errors {
   error NoStakersForBuySilver();
   error DFXStarPoolNotConfigured();
   error PaymentTokenNotConfigured();
+  // 积分池地址已经写过，不能改成另一个，也不能清掉。
+  error ScorePoolAlreadyBound();
+  // 这个池子绑的不是当前 World。
+  error ScorePoolWorldMismatch();
   // 只有两个提取系统可以让 World 去积分池记账。
   error NotScoreStakeCaller();
 

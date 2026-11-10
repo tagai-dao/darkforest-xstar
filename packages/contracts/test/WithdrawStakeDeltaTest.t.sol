@@ -20,7 +20,7 @@ contract WithdrawStakeDeltaTest is BaseTest {
 
   function setUp() public override {
     super.setUp();
-    pool = new MockDFXStarScoreStaking();
+    pool = new MockDFXStarScoreStaking(worldAddress);
 
     vm.startPrank(admin);
     if (Ticker.getPaused()) {

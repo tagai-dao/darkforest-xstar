@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 /// @notice Minimal interface for TagAI Nutbox DFXStarScoreStaking pool (deployed from TagAI-contract-V2).
 interface IDFXStarScoreStaking {
+  function world() external view returns (address);
+
   function depositFromGame(address user, uint256 amount) external payable;
 
   function injectRewards(uint256 amount) external payable;

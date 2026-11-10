@@ -16,6 +16,7 @@ import { LinearTimeCalculator } from "nutbox/calculators/LinearTimeCalculator.so
 import { DFXStarScoreStakingFactory } from "nutbox/dapps/dfxstar-score-staking/DFXStarScoreStakingFactory.sol";
 import { DFXStarScoreStaking } from "nutbox/dapps/dfxstar-score-staking/DFXStarScoreStaking.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { Errors } from "../src/interfaces/errors.sol";
 
 /// @dev Simple ERC20 for testing (non-mintable, pre-minted supply).
 contract TestDFS is ERC20 {
@@ -79,13 +80,10 @@ contract E2E_DFStar_Flow is BaseTest {
     // 7. Create DFXStar pool (100% ratio)
     uint16[] memory ratios = new uint16[](1);
     ratios[0] = 10000;
-    community.adminAddPool("DFXStar Score Staking", ratios, address(dfxFactory), "");
+    community.adminAddPool("DFXStar Score Staking", ratios, address(dfxFactory), abi.encode(worldAddress));
 
     // 8. Get pool address
     pool = DFXStarScoreStaking(payable(community.activedPools(0)));
-
-    // 9. Authorize World contract as admin on factory
-    dfxFactory.addAdmin(worldAddress);
 
     // 10. Configure DFXStarConfig in the World
     vm.startPrank(admin);
@@ -156,8 +154,9 @@ contract E2E_DFStar_Flow is BaseTest {
   function test_poolWiring() public view {
     assertEq(pool.community(), communityAddr(), "pool.community mismatch");
     assertEq(pool.factory(), address(dfxFactory), "pool.factory mismatch");
+    assertEq(pool.world(), worldAddress, "pool.world mismatch");
+    assertEq(dfxFactory.poolOfWorld(worldAddress), address(pool), "factory binding mismatch");
     assertEq(pool.getTotalStakedAmount(), 0, "initial totalStaked should be 0");
-    assertTrue(dfxFactory.isAdmin(worldAddress), "world not admin");
   }
 
   // ─── Test: Withdraw silver → depositFromGame on real pool ───
@@ -257,6 +256,66 @@ contract E2E_DFStar_Flow is BaseTest {
     // But cap check limits it. Let's just verify pool got all rewards.
     uint256 totalInjected = 690_000 ether;
     assertEq(dfsToken.balanceOf(address(pool)), totalInjected, "pool should hold all injected DFS");
+  }
+
+  function test_secondPoolSameWorldReverts() public {
+    uint16[] memory ratios = new uint16[](2);
+    ratios[0] = 10000;
+    ratios[1] = 0;
+    vm.expectRevert("World already bound");
+    community.adminAddPool("Again", ratios, address(dfxFactory), abi.encode(worldAddress));
+  }
+
+  function test_depositRejectsNonWorld() public {
+    vm.prank(user1);
+    vm.expectRevert("Not world");
+    pool.depositFromGame(user1, 1);
+  }
+
+  function test_setConfig_rejectsAnotherLivePool() public {
+    vm.prank(admin);
+    vm.expectRevert(Errors.ScorePoolAlreadyBound.selector);
+    IWorld(worldAddress).df__setDFXStarConfig(
+      address(1),
+      address(dfsToken),
+      address(dfxFactory),
+      address(community),
+      worldAddress
+    );
+  }
+
+  function test_setConfig_rejectsForeignWorld() public {
+    uint16[] memory ratios = new uint16[](2);
+    ratios[0] = 10000;
+    ratios[1] = 0;
+    community.adminAddPool("Other", ratios, address(dfxFactory), abi.encode(user2));
+    address other = community.activedPools(1);
+
+    vm.startPrank(admin);
+    DFXStarConfig.set(address(0), address(dfsToken), address(dfxFactory), address(community), worldAddress);
+    vm.expectRevert(Errors.ScorePoolWorldMismatch.selector);
+    IWorld(worldAddress).df__setDFXStarConfig(
+      other,
+      address(dfsToken),
+      address(dfxFactory),
+      address(community),
+      worldAddress
+    );
+    vm.stopPrank();
+  }
+
+  function test_setConfig_acceptsBoundPoolOnce() public {
+    vm.startPrank(admin);
+    DFXStarConfig.set(address(0), address(0), address(0), address(0), address(0));
+    IWorld(worldAddress).df__setDFXStarConfig(
+      address(pool),
+      address(dfsToken),
+      address(dfxFactory),
+      address(community),
+      worldAddress
+    );
+    vm.stopPrank();
+    assertEq(DFXStarConfig.getScoreStakingPool(), address(pool));
   }
 
   // ─── Helpers ───

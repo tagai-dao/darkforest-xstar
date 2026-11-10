@@ -5,11 +5,16 @@ import { IDFXStarScoreStaking } from "interfaces/nutbox/IDFXStarScoreStaking.sol
 
 /// @dev Test double for Nutbox DFXStarScoreStaking pool.
 contract MockDFXStarScoreStaking is IDFXStarScoreStaking {
+  address public override world;
   uint256 public totalStaked;
   address public lastDepositUser;
   address public lastDepositSender;
   uint256 public lastDepositAmount;
   uint256 public lastInjectAmount;
+
+  constructor(address boundWorld) {
+    world = boundWorld;
+  }
 
   function depositFromGame(address user, uint256 amount) external payable {
     lastDepositSender = msg.sender;

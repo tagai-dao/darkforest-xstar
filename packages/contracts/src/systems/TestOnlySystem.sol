@@ -21,6 +21,7 @@ import { PlanetMaterialStorage } from "codegen/tables/PlanetMaterialStorage.sol"
 import { PlanetMaterial } from "codegen/tables/PlanetMaterial.sol";
 import { PlayerJunkLimit } from "codegen/tables/PlayerJunkLimit.sol";
 import { DFXStarConfig } from "codegen/tables/DFXStarConfig.sol";
+import { IDFXStarScoreStaking } from "interfaces/nutbox/IDFXStarScoreStaking.sol";
 
 contract TestOnlySystem is BaseSystem {
   // function createPlanet(
@@ -170,7 +171,7 @@ contract TestOnlySystem is BaseSystem {
     GPTTokens.set(player, GPTTokens.get(player) + amount);
   }
 
-  /// @notice Local /test page: wire Nutbox addresses after TagAI Init + World deploy.
+  /// @notice 把本局的积分池写进配置。已经指向一个有代码的池之后，不能再换成别的池。
   function setDFXStarConfig(
     address scoreStakingPool,
     address paymentToken,
@@ -178,6 +179,12 @@ contract TestOnlySystem is BaseSystem {
     address community,
     address buySilverSystem
   ) public {
+    address current = DFXStarConfig.getScoreStakingPool();
+    // 已经指向一个有代码的池就不能换。地址有值但链上没代码时还可以写成真正的池，本地部署会先记下主网地址。
+    if (current.code.length > 0 && scoreStakingPool != current) revert ScorePoolAlreadyBound();
+    if (scoreStakingPool != address(0) && IDFXStarScoreStaking(scoreStakingPool).world() != _world()) {
+      revert ScorePoolWorldMismatch();
+    }
     DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem);
   }
 

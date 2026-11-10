@@ -18,6 +18,8 @@ contract AddAIPRODFXStarPool is Script {
     address token = toml.readAddress(".aipro.token");
     address community = toml.readAddress(".aipro.community");
     address factory = toml.readAddress(".aipro.factory");
+    address world = toml.readAddress(".aipro.world");
+    require(world != address(0), "world required");
     uint256[] memory rawRatios = toml.readUintArray(".aipro.ratios");
 
     require(Community(payable(community)).getCommunityToken() == token, "community token mismatch");
@@ -37,7 +39,8 @@ contract AddAIPRODFXStarPool is Script {
     uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
     vm.startBroadcast(deployerPrivateKey);
     // 调用者必须是 AIPRO Community owner。工厂必须已在 Committee 白名单中。
-    Community(payable(community)).adminAddPool("DFXStar Score Staking", ratios, factory, bytes(""));
+    // 这个 World 写进池子后不能改。只有它能向这个池记分。
+    Community(payable(community)).adminAddPool("DFXStar Score Staking", ratios, factory, abi.encode(world));
     vm.stopBroadcast();
 
     address pool = Community(payable(community)).activedPools(activeCount);

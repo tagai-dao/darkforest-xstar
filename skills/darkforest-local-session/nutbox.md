@@ -38,23 +38,24 @@ forge script script/AttachLocalNutbox.s.sol \
   --broadcast
 ```
 
-The script deploys a committee with zero fees, a community, a local AIPRO token, a staking factory, and one pool at ratio `10000`. It adds the World as a factory admin and as a fee-free address, then writes `DFXStarConfig`. Copy the logged addresses. Those replace the table above.
+The script deploys a committee with zero fees, a community, a local AIPRO token, a staking factory, and one pool at ratio `10000`. The pool is created with this World in its meta, so that address is stored once and cannot be changed. The script also marks the World fee-free, then writes `DFXStarConfig`. Copy the logged addresses. Those replace the table above.
 
-Do not call `addAdmin`, `removeAdmin`, or the committee fee setters yourself. The World is the only admin the game needs. `depositFromGame` rejects every other caller with `Not admin`.
+Do not call `addAdmin`, `removeAdmin`, or the committee fee setters yourself. The factory admin list does not grant scoring. `depositFromGame` accepts only the World stored on the pool and rejects every other caller with `Not world`.
 
 ## Read before a score or a buy
 
 One Multicall3 `aggregate3`, `allowFailure` false. Use the pool, factory, and payment token from `DFXStarConfig`.
 
-| Call                                | What it decides                                                                            |
-| ----------------------------------- | ------------------------------------------------------------------------------------------ |
-| Pool code size                      | `0` means the attach step above has not been done                                          |
-| Factory `isAdmin(world)`            | Must be true before a withdraw. The World is `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`  |
-| Pool `getTotalStakedAmount()`       | Buy silver reverts while this is 0. The first score deposit may be the stake that opens it |
-| Pool `getUserStakedAmount(player)`  | This wallet's score stake                                                                  |
-| Pool `getPendingAllRewards(player)` | Two `uint256` words: community pending, then injected pending                              |
-| Token `balanceOf(player)`           | Whole-token balance of the local AIPRO. Score staking does not transfer it                 |
-| Token `allowance(player, world)`    | Buy silver pulls tokens into the World, so the allowance target is the World               |
+| Call                                | What it decides                                                                             |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| Pool code size                      | `0` means the attach step above has not been done                                           |
+| Pool `world()`                      | Must equal the World `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`. This is the bound scorer |
+| Factory `poolOfWorld(world)`        | Must equal the pool. A second pool for the same World cannot be created                     |
+| Pool `getTotalStakedAmount()`       | Buy silver reverts while this is 0. The first score deposit may be the stake that opens it  |
+| Pool `getUserStakedAmount(player)`  | This wallet's score stake                                                                   |
+| Pool `getPendingAllRewards(player)` | Two `uint256` words: community pending, then injected pending                               |
+| Token `balanceOf(player)`           | Whole-token balance of the local AIPRO. Score staking does not transfer it                  |
+| Token `allowance(player, world)`    | Buy silver pulls tokens into the World, so the allowance target is the World                |
 
 `getPendingAllRewards` does not pay the wallet. Community pending stays 0 until the hourly calculator has an injection. Do not invent an AIPRO emission rate. The local pool's share of a future injection is its ratio, `10000` out of `10000` while it is the only pool.
 
@@ -64,9 +65,11 @@ Write `totalStaked`, `myStaked`, `pendingCommunity`, `pendingInjected`, and `poo
 
 The send is in [actions.md](actions.md). After the receipt the planet's silver falls, `PlayerScore` rises by the withdrawn chain amount, and the World calls `depositFromGame(player, delta)` on the pool. The delta is the withdrawn amount, not the player's total score. A zero delta does not call the pool.
 
-The withdraw system does not call the pool itself. It calls the root system `StakeScoreSystem`, which runs inside the World, so the pool sees the World as the caller. The factory admin stays the World. Do not add the withdraw systems as admins. A player calling `StakeScoreSystem` does not stake. Material withdrawal uses the same call.
+The withdraw system does not call the pool itself. It calls the root system `StakeScoreSystem`, which runs inside the World, so the pool sees the World as the caller. That caller must equal `pool.world()`. Do not add the withdraw systems as admins. A player calling `StakeScoreSystem` does not stake. Material withdrawal uses the same call.
 
-This call does not move AIPRO. It increases `userStakes` and `totalStaked`. It can be the first stake in the pool. It reverts when the pool has no code, when the World is not a factory admin, or when the pool's community calls fail. Fees on this stack are 0, so the withdraw does not need attached ETH.
+This call does not move AIPRO. It increases `userStakes` and `totalStaked`. It can be the first stake in the pool. It reverts when the pool has no code, when `pool.world()` is not this World, or when the pool's community calls fail. Fees on this stack are 0, so the withdraw does not need attached ETH.
+
+The pool already attached on this anvil was created before the World binding. It has no `world()` function. Leave that pool as it is. `world()` and `poolOfWorld` apply after the contracts are redeployed and a new pool is attached.
 
 ## Buy silver injects AIPRO
 

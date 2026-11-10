@@ -20,6 +20,8 @@ contract StakeScoreSystem is System, Errors {
 
     address pool = DFXStarConfig.getScoreStakingPool();
     if (pool == address(0)) return;
+    // 配置可以指向任意地址。真正能记账的，只有创建时绑上这个 World 的那个池。
+    if (IDFXStarScoreStaking(pool).world() != _world()) revert ScorePoolWorldMismatch();
 
     IDFXStarScoreStaking(pool).depositFromGame(user, delta);
   }

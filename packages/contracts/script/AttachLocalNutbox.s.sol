@@ -65,10 +65,9 @@ contract AttachLocalNutbox is Script {
 
     deployed.community = _createCommunity(communityFactory, mintableFactory, calculator, deployer);
     deployed.paymentToken = Community(payable(deployed.community)).getCommunityToken();
-    deployed.pool = _addPool(deployed.community, deployed.stakingFactory);
+    deployed.pool = _addPool(deployed.community, deployed.stakingFactory, worldAddress);
 
-    // 记分由根系统在 World 里发出，积分池看到的调用方是 World。不要把各个 df 系统加进管理员。
-    DFXStarScoreStakingFactory(deployed.stakingFactory).addAdmin(worldAddress);
+    // 记分由根系统在 World 里发出，积分池看到的调用方是 World。建池时已经把这个地址写进池子。
     Committee(payable(deployed.committee)).adminAddFeeFreeAddress(worldAddress);
   }
 
@@ -104,10 +103,15 @@ contract AttachLocalNutbox is Script {
       );
   }
 
-  function _addPool(address community, address stakingFactory) internal returns (address) {
+  function _addPool(address community, address stakingFactory, address worldAddress) internal returns (address) {
     uint16[] memory ratios = new uint16[](1);
     ratios[0] = 10000;
-    Community(payable(community)).adminAddPool("DFXStar Score Staking", ratios, stakingFactory, bytes(""));
+    Community(payable(community)).adminAddPool(
+      "DFXStar Score Staking",
+      ratios,
+      stakingFactory,
+      abi.encode(worldAddress)
+    );
     return Community(payable(community)).activedPools(0);
   }
 

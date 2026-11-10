@@ -16,6 +16,8 @@ contract DFXStarScoreStaking is IPool, IDFXStarScoreStaking, ERC20Helper, Reentr
 
   address public factory;
   address public community;
+  // 创建时由社区管理员填入。initialize 只能调用一次，所以之后改不了。
+  address public override world;
 
   mapping(address => uint256) private userStakes;
   uint256 private totalStaked;
@@ -33,16 +35,19 @@ contract DFXStarScoreStaking is IPool, IDFXStarScoreStaking, ERC20Helper, Reentr
     _disableInitializers();
   }
 
-  function initialize(address _community) external initializer {
+  function initialize(address _community, address _world) external initializer {
     require(_community != address(0), "Invalid community");
+    require(_world != address(0), "Invalid world");
     factory = msg.sender;
     community = _community;
+    world = _world;
   }
 
   function depositFromGame(address user, uint256 amount) external payable override nonReentrant {
     require(user != address(0), "Invalid user");
     require(amount > 0, "Amount=0");
-    require(DFXStarScoreStakingFactory(factory).isAdmin(msg.sender), "Not admin");
+    // 工厂管理员名单不再开门。只有创建时绑上的那个 World 能记分。
+    require(msg.sender == world, "Not world");
 
     _updateExternalRewards(user);
 
