@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import styled from "styled-components";
 
 import dfstyles from "../../Styles/dfstyles";
+import { EnergyCurveFigure } from "./EnergyCurve";
 import {
   chapterHeadings,
   findChapter,
@@ -167,6 +168,9 @@ function Blocks({ blocks }: { blocks: DocBlock[] }) {
               ))}
             </BulletList>
           );
+        }
+        if (block.kind === "energy-figure") {
+          return <EnergyCurveFigure key={index} />;
         }
         if (block.kind === "table") {
           return (

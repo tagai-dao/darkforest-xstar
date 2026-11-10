@@ -60,7 +60,7 @@ export const WalletPane = ({ onClose }: { onClose: () => void }) => {
     }
     const value = parseEther((transferAmount ?? 0).toString());
     try {
-      const gasLimit = 21000; // Typical gas limit for simple ETH transfers
+      const gasLimit = 21000; // Typical gas limit for simple BNB transfers
       const hash = await walletClient.sendTransaction({
         to: burnerWalletClient.account?.address,
         value,
@@ -165,7 +165,7 @@ export const WalletPane = ({ onClose }: { onClose: () => void }) => {
           {mainWalletBalance
             ? Number(formatEther(mainWalletBalance)).toFixed(4)
             : "0"}{" "}
-          ETH
+          BNB
         </span>
         <br />
         <span>Burner:</span>
@@ -174,7 +174,7 @@ export const WalletPane = ({ onClose }: { onClose: () => void }) => {
         </span>{" "}
         <span>
           {burnerBalance ? Number(formatEther(burnerBalance)).toFixed(4) : "0"}{" "}
-          ETH
+          BNB
         </span>
       </div>
       <div>
@@ -191,7 +191,7 @@ export const WalletPane = ({ onClose }: { onClose: () => void }) => {
             mainWalletBalance < parseEther((transferAmount ?? 0).toString())
           }
         >
-          Deposit {transferAmount} ETH
+          Deposit {transferAmount} BNB
         </Btn>{" "}
         <input
           type="number"
@@ -205,7 +205,7 @@ export const WalletPane = ({ onClose }: { onClose: () => void }) => {
           }}
           min="0"
           max="1"
-          step="0.001" // Allows increments of 0.01 ETH for more precise control
+          step="0.001" // Allows increments of 0.01 BNB for more precise control
           className="w-32 rounded border"
         />{" "}
         <Btn onClick={withdrawAll} disabled={(burnerBalanceValue ?? 0) <= 0}>

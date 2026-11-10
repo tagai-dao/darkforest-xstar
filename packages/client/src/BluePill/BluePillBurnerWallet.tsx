@@ -274,7 +274,7 @@ export const BluePillBurnerWallet = () => {
         <span>Main Account: </span>
         <span>{(walletClient?.account?.address ?? zeroAddress) as Hex}</span>
         <br />
-        <span>Balance: {formatEther(mainWalletBalanceValue)} ETH</span>
+        <span>Balance: {formatEther(mainWalletBalanceValue)} BNB</span>
       </div>
       <div>
         <span>Game Account: </span>
@@ -282,7 +282,7 @@ export const BluePillBurnerWallet = () => {
           {(burnerWalletClient?.account?.address ?? zeroAddress) as Hex}
         </span>
         <br />
-        <span>Balance: {formatEther(burnerBalanceValue)} ETH</span>
+        <span>Balance: {formatEther(burnerBalanceValue)} BNB</span>
       </div>
 
       <div
@@ -310,7 +310,7 @@ export const BluePillBurnerWallet = () => {
         <ul style={{ listStyleType: "none", padding: 0 }}>
           <li>1. Your Game Wallet lives only in your browser.</li>
           <li>2. It's never online — you're the only one who holds the key.</li>
-          <li>3. Just keep enough ETH for gas.</li>
+          <li>3. Just keep enough BNB for gas.</li>
           <li>4. Don't clear your explorer cache during game.</li>
           <li>5. Don't forget to back up your private key.</li>
         </ul>
@@ -328,7 +328,7 @@ export const BluePillBurnerWallet = () => {
             placeholder="0"
           />
           <PinkButton onClick={transferToBurner}>
-            Send {transferAmount} ETH to Game Account
+            Send {transferAmount} BNB to Game Account
           </PinkButton>
         </div>
 

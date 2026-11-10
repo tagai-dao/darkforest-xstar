@@ -3,7 +3,7 @@ import { ArtifactRarity, ArtifactType, Biome, PlanetLevel } from "@df/types";
 import bigInt, { type BigInteger } from "big-integer";
 
 export const WORLD_NAME = "Dark Forest Punk";
-export const TOKEN_NAME = "ETH";
+export const TOKEN_NAME = "BNB";
 export const BLOCKCHAIN_NAME = "Optimism";
 export const HOST_TEAM_NAME = "DF Archon";
 export const VERSION = "v0.1.4";

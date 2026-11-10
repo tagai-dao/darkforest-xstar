@@ -73,7 +73,7 @@ export function CurrencyView() {
         credits
       </span>
       <span>
-        for Price: <Green>{currentCreditPrice.toString()} ETH each</Green>
+        for Price: <Green>{currentCreditPrice.toString()} BNB each</Green>
       </span>
       <Btn onClick={buyMore} disabled={isBuyingCredits}>
         {isBuyingCredits ? (

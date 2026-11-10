@@ -65,23 +65,23 @@ export function DonationPane() {
           </Row> */}
         <EmSpacer height={1} />
         <Btn disabled={disabled_1} onClick={() => uiManager.donate(1)}>
-          donate 0.001 ETH
+          donate 0.001 BNB
         </Btn>{" "}
         <Btn disabled={disabled_2} onClick={() => uiManager.donate(10)}>
-          donate 0.01 ETH
+          donate 0.01 BNB
         </Btn>{" "}
         <Btn disabled={disabled_3} onClick={() => uiManager.donate(100)}>
-          donate 0.1 ETH
+          donate 0.1 BNB
         </Btn>
         <EmSpacer height={1} />
         <Btn disabled={disabled_4} onClick={() => uiManager.donate(1000)}>
-          donate 1 ETH
+          donate 1 BNB
         </Btn>{" "}
         <Btn disabled={disabled_5} onClick={() => uiManager.donate(10000)}>
-          donate 10 ETH
+          donate 10 BNB
         </Btn>{" "}
         <Btn disabled={disabled_6} onClick={() => uiManager.donate(100000)}>
-          donate 100 ETH
+          donate 100 BNB
         </Btn>{" "}
       </Section>
     </DonationContent>

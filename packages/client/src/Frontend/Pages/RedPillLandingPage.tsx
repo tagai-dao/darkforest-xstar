@@ -330,7 +330,7 @@ export function RedPillLandingPage() {
               TerminalTextStyle.Red,
             );
             terminal.current?.println(
-              " => select this account to know how to get enough ETH",
+              " => select this account to know how to get enough BNB",
             );
           } else {
             terminal.current?.println(
@@ -566,12 +566,12 @@ export function RedPillLandingPage() {
             TerminalTextStyle.Red,
           );
 
-          terminal.current?.println(" <= recommend depositing 0.001 ETH");
+          terminal.current?.println(" <= recommend depositing 0.001 BNB");
 
           terminal.current?.print(`           NOTE: `, TerminalTextStyle.Pink);
 
           terminal.current?.println(
-            "You can use bridge to transfer ETH to " +
+            "You can use bridge to transfer BNB to " +
               BLOCKCHAIN_NAME +
               " Mainnet",
             TerminalTextStyle.Pink,
@@ -588,7 +588,7 @@ export function RedPillLandingPage() {
           );
 
           terminal.current?.println(
-            " <= transfer ETH from L2 (e.g. optimism) to " +
+            " <= transfer BNB from L2 (e.g. optimism) to " +
               BLOCKCHAIN_NAME +
               " Mainnet",
           );
@@ -596,7 +596,7 @@ export function RedPillLandingPage() {
           terminal.current?.print("   Player guide: ");
 
           terminal.current?.printLink(
-            "How to get ETH on the " +
+            "How to get BNB on the " +
               BLOCKCHAIN_NAME +
               " mainnet for your account",
             () => {
@@ -612,7 +612,7 @@ export function RedPillLandingPage() {
           terminal.current?.println("");
 
           terminal.current?.println(
-            "After your account get ETH on " +
+            "After your account get BNB on " +
               BLOCKCHAIN_NAME +
               " Mainnet, press [enter] to continue.",
             TerminalTextStyle.Pink,
@@ -1251,13 +1251,13 @@ export function RedPillLandingPage() {
               }
 
               // terminal.current?.println(
-              //   "Don't worry :-) you can get more ETH on Redstone this way 😘",
+              //   "Don't worry :-) you can get more BNB on Redstone this way 😘",
               //   TerminalTextStyle.Pink
               // );
 
               // terminal.current?.newline();
               // terminal.current?.printLink(
-              //   'Deposit ETH to Redstone',
+              //   'Deposit BNB to Redstone',
               //   () => {
               //     window.open(BLOCKCHAIN_BRIDGE);
               //   },
@@ -1408,13 +1408,13 @@ export function RedPillLandingPage() {
               }
 
               // terminal.current?.println(
-              //   "Don't worry :-) you can get more ETH on Redstone this way 😘",
+              //   "Don't worry :-) you can get more BNB on Redstone this way 😘",
               //   TerminalTextStyle.Pink
               // );
 
               // terminal.current?.newline();
               // terminal.current?.printLink(
-              //   'Deposit ETH to Redstone',
+              //   'Deposit BNB to Redstone',
               //   () => {
               //     window.open(BLOCKCHAIN_BRIDGE);
               //   },

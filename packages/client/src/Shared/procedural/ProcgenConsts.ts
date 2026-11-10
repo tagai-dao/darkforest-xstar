@@ -2337,7 +2337,7 @@ export const blurb2grammar = {
     "thrive",
     "develop economies",
     "raise bears",
-    "trade ETH",
+    "trade BNB",
     "buy cryptokitties",
   ],
   sun: [
@@ -2522,7 +2522,7 @@ export const blurb2grammar = {
   will: [
     "will",
     "way",
-    "$50 ETH gas price",
+    "$50 BNB gas price",
     "decentralized hair salon",
     "strong desire to minimize self-actualization",
     "bear",

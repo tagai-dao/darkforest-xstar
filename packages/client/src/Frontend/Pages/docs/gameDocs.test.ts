@@ -13,6 +13,16 @@ describe("game docs", () => {
     }
   });
 
+  it("shows the energy growth formulas in resources", () => {
+    const resources = findChapter("resources");
+    expect(chapterHeadings(resources).map((heading) => heading.id)).toContain(
+      "energy-curve",
+    );
+    expect(
+      resources.blocks.some((block) => block.kind === "energy-figure"),
+    ).toBe(true);
+  });
+
   it("opens on the overview", () => {
     expect(gameDocs[0].id).toBe("overview");
     expect(findChapter(undefined).id).toBe("overview");

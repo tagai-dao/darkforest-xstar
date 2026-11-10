@@ -39,7 +39,7 @@ if (typeof window !== "undefined") {
 export const localChain = {
   chainId: `0x${mudFoundry.id.toString(16)}`,
   chainName: "Local Anvil",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
   // MetaMask 只接受 https，或主机名正好是 localhost 的 http。127.0.0.1 会被拒绝。
   rpcUrls: ["http://localhost:8545"],
 };

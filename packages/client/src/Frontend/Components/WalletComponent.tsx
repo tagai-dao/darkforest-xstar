@@ -239,14 +239,14 @@ export const WalletComponent: React.FC<WalletComponentProps> = ({
         <br />
         <span>Main Wallet: </span>
         <span>{(walletClient?.account?.address ?? zeroAddress) as Hex}</span>
-        <span> Balance: {formatEther(state.mainWalletBalance)} ETH</span>
+        <span> Balance: {formatEther(state.mainWalletBalance)} BNB</span>
       </div>
       <div>
         <span>Game Wallet: </span>
         <span>
           {(burnerWalletClient.account?.address ?? zeroAddress) as Hex}
         </span>
-        <span> Balance: {formatEther(state.burnerBalance)} ETH</span>
+        <span> Balance: {formatEther(state.burnerBalance)} BNB</span>
       </div>
     </div>
   );
@@ -261,7 +261,7 @@ export const WalletComponent: React.FC<WalletComponentProps> = ({
             parseEther((state.transferAmount ?? 0).toString())
         }
       >
-        Deposit {state.transferAmount} ETH
+        Deposit {state.transferAmount} BNB
       </Btn>{" "}
       <input
         type="number"

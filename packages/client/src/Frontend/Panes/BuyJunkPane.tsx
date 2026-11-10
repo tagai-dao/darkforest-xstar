@@ -209,7 +209,7 @@ export function BuyJunkPane(): React.ReactElement {
         </Row>
         <Row>
           <Label>Available Balance:</Label>
-          <Value>{balanceEth.toFixed(4)} ETH</Value>
+          <Value>{balanceEth.toFixed(4)} BNB</Value>
         </Row>
       </InfoBox>
 
@@ -259,7 +259,7 @@ export function BuyJunkPane(): React.ReactElement {
               color: dfstyles.colors.dfgreen,
             }}
           >
-            {buyJunkFeeEth > 0 ? `${buyJunkFeeEth.toFixed(6)} ETH` : "FREE"}
+            {buyJunkFeeEth > 0 ? `${buyJunkFeeEth.toFixed(6)} BNB` : "FREE"}
           </Value>
         </Row>
         {!balanceCheckPassed && buyJunkFeeEth > 0 && (

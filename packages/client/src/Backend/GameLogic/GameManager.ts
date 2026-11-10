@@ -6498,7 +6498,7 @@ export class GameManager extends EventEmitter {
       const balanceEth = this.getMyBalanceEth();
       const donationCostEth = amount * 0.001;
       if (balanceEth < donationCostEth) {
-        throw new Error("you don't have enough ETH");
+        throw new Error("you don't have enough BNB");
       }
 
       // transaction requirements
