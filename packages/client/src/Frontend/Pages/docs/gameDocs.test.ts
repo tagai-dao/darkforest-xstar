@@ -13,6 +13,27 @@ describe("game docs", () => {
     }
   });
 
+  it("shows the space-type map in the map chapter", () => {
+    const map = findChapter("map");
+    expect(chapterHeadings(map).map((heading) => heading.id)).toContain(
+      "space",
+    );
+    expect(map.blocks.some((block) => block.kind === "space-figure")).toBe(
+      true,
+    );
+    const shares = map.blocks.find(
+      (block) => block.kind === "table" && block.headers[0] === "空间",
+    );
+    expect(shares).toMatchObject({
+      rows: [
+        ["星云", "33.2%", "17.6%"],
+        ["太空", "12.0%", "16.2%"],
+        ["深空", "49.2%", "59.8%"],
+        ["死空", "5.7%", "6.3%"],
+      ],
+    });
+  });
+
   it("shows the energy growth formulas in resources", () => {
     const resources = findChapter("resources");
     expect(chapterHeadings(resources).map((heading) => heading.id)).toContain(

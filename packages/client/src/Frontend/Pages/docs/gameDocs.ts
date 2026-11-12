@@ -3,7 +3,8 @@ export type DocBlock =
   | { kind: "h2"; id: string; title: string }
   | { kind: "ul"; items: string[] }
   | { kind: "table"; headers: string[]; rows: string[][] }
-  | { kind: "energy-figure" };
+  | { kind: "energy-figure" }
+  | { kind: "space-figure" };
 
 export type DocChapter = {
   id: string;
@@ -223,6 +224,29 @@ export const gameDocs: DocChapter[] = [
       {
         kind: "p",
         text: "空间类型来自 perlin。区域 4 里的每颗星球都是星云。perlin 低于 14 是星云，低于 15 是太空，低于 19 是深空，19 及以上是死空。",
+      },
+      {
+        kind: "p",
+        text: "噪声用空间密钥 1730、尺度 8192 计算，不沿坐标轴镜像。取整后大约落在 0 到 32，数值往中间堆，同一种空间连成大片。太空只对应整数 14。这一档正好是噪声最密的地方，所以太空在图上也是一片片区域。",
+      },
+      {
+        kind: "p",
+        text: "下图是这一局半径 100000 的圆盘。原点在中心，上方为正。三条细圈从里到外是 37500、75000、87500。75000 到 87500 那一圈全部是星云，家出生在这里。这一圈的里面和外面，四种空间都成片出现。",
+      },
+      { kind: "space-figure" },
+      {
+        kind: "p",
+        text: "下表是沿坐标均匀采样得到的面积。星球按哈希稀疏地落在这张场上，颗数要另外数。75000 以内深空约占六成，星云和太空各约占一两成，死空约占 6%。全图把整圈出生带都算进星云，星云的面积更高。",
+      },
+      {
+        kind: "table",
+        headers: ["空间", "全图", "75000 以内"],
+        rows: [
+          ["星云", "33.2%", "17.6%"],
+          ["太空", "12.0%", "16.2%"],
+          ["深空", "49.2%", "59.8%"],
+          ["死空", "5.7%", "6.3%"],
+        ],
       },
       { kind: "h2", id: "home", title: "家和内圈" },
       {

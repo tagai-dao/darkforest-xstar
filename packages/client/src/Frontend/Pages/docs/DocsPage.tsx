@@ -4,6 +4,7 @@ import styled from "styled-components";
 
 import dfstyles from "../../Styles/dfstyles";
 import { EnergyCurveFigure } from "./EnergyCurve";
+import { SpaceTypeMapFigure } from "./SpaceTypeMap";
 import {
   chapterHeadings,
   findChapter,
@@ -171,6 +172,9 @@ function Blocks({ blocks }: { blocks: DocBlock[] }) {
         }
         if (block.kind === "energy-figure") {
           return <EnergyCurveFigure key={index} />;
+        }
+        if (block.kind === "space-figure") {
+          return <SpaceTypeMapFigure key={index} />;
         }
         if (block.kind === "table") {
           return (
