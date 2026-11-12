@@ -1,14 +1,14 @@
 # Home planet
 
-A joined wallet still cannot play until it has a home. Buying a pass and `joinSeason` do not create one. A home exists when `SpawnPlanet` for this wallet is not zero and `homeLocations.json` contains that planet hash.
+A staked wallet still cannot play until it has a home. Staking the AIPRO NFT does not create one. A home exists when `SpawnPlanet` for this wallet is not zero and `homeLocations.json` contains that planet hash.
 
-For the selected wallet `0x8153C8C8EF6d9e7e7ee11333f33048835325AdD0`, pass #2 is joined and player `pilot25add0` is registered, but no home was spawned. The owner stopped the search. Do not resume searching, proving, spawning, or mining until the owner explicitly asks to continue.
+For the selected wallet `0x8153C8C8EF6d9e7e7ee11333f33048835325AdD0`, no home was spawned. The owner stopped the search. Do not resume searching, proving, spawning, or mining until the owner explicitly asks to continue. Entry is the AIPRO NFT stake in [SKILL.md](SKILL.md). Do not treat an older pass as joined.
 
 Do this before [mining.md](mining.md). Do not mine from `0, 0`. The center of the map is inside the inner circle, and a home there is rejected.
 
 ## Read the chain
 
-Use the world `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f` and the test Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send ETH to Multicall3.
+Use the world `0x3295A33430Bb33696b5F04DC12DD91276213100e` and the test Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send ETH to Multicall3.
 
 | Table       | Id                                                                   |
 | ----------- | -------------------------------------------------------------------- |
@@ -27,7 +27,7 @@ export NO_PROXY=127.0.0.1,localhost
 export no_proxy=127.0.0.1,localhost
 RPC=http://127.0.0.1:8545
 MULTI=0xcA11bde05977b3631167028862bE2a173976CA11
-WORLD=0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f
+WORLD=0x3295A33430Bb33696b5F04DC12DD91276213100e
 KEY=$(cast abi-encode "x(address)" <player>)
 SPAWN=$(cast calldata "getRecord(bytes32,bytes32[])" 0x74626466000000000000000000000000537061776e506c616e65740000000000 "[$KEY]")
 PLAYER_REC=$(cast calldata "getRecord(bytes32,bytes32[])" 0x74626466000000000000000000000000506c6179657200000000000000000000 "[$KEY]")
@@ -68,13 +68,13 @@ If the player index is zero, ask the owner what name to register. Wait for that 
 
 If the ETH balance cannot pay for the register and spawn transactions, stop and tell the owner. Do not search further and do not write the home files.
 
-Sign with the current wallet. A legacy transaction is fine. Wait for each receipt. Call the world, not the pass contract.
+Sign with the current wallet. A legacy transaction is fine. Wait for each receipt. Call the world. Staking is the locker call in [SKILL.md](SKILL.md), not a world call.
 
 1. If the player index is zero, call `df__registerPlayer(string,address)` with the name the owner just gave and the player address. If it reverts because the wallet is already registered, continue.
 2. Prove the candidate with the example below. This proof is required. `b_skip_proof_check` is false on this session.
 3. Call `df__initializePlayer(uint256[2],uint256[2][2],uint256[2],uint256[9])` with the `a`, `b`, `c`, and nine public signals printed by the example.
 
-If spawn reverts because that planet is already owned, or because it is not a legal home, discard that center, draw a new point, and search again. Do not continue the old spiral and do not retry the same coordinate. If it reverts because this wallet already spawned, stop. If it reverts because the game pass is missing, return to the join step in `SKILL.md`.
+If spawn reverts because that planet is already owned, or because it is not a legal home, discard that center, draw a new point, and search again. Do not continue the old spiral and do not retry the same coordinate. If it reverts because this wallet already spawned, stop. If it reverts because this wallet has not staked for this season, return to the stake step in `SKILL.md`.
 
 After the spawn receipt succeeds, write the wallet folder's `homeLocations.json`. The hash is 64 lowercase hex characters and has no `0x` prefix. `perlin` is the space Perlin. `biomebase` uses key `1731` and `floor` true.
 

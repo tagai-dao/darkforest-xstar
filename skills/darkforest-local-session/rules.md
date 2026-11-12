@@ -43,7 +43,7 @@ While `paused` is true, step 1 writes nothing. The call settles only up to the s
 
 The inner circle starts at radius 75000. While the ticker advances, the radius falls by 0.087 each tick. At 0 it stops. Reaching 0 does not end the season, does not zero score, and does not pay anyone. The snapshot field `innerRadius` is the wall for this round.
 
-A season is open while the game pass has a world and a non-zero season number. The pass owner sets that pair, or clears it. Players join the open season with their pass. A later season requires joining again. No score, no radius, and no clock closes the season by itself.
+A season is open while the locker has a world and a non-zero season number. The locker owner sets that pair, or clears it. A player enters by staking one AIPRO NFT, and only a wallet with a non-empty Binance handle can stake. The NFT stays in the locker until that season is no longer the active one. A later season requires staking again. No score, no radius, and no clock closes the season by itself.
 
 ## 3. Map
 
@@ -206,7 +206,7 @@ A zero delta does not call the pool. The pool receives the increment, not the cu
 
 ## 9. The pool
 
-`depositFromGame` adds the increment to this wallet's stake and to the total. There is no decrease, no expiry, and no season argument. Pending injected AIPRO is this wallet's share of what has been injected since its last update. Pending community AIPRO is its share of the community release. On this local community the calculator has no release, so that pending stays 0. `claimExternalRewards` pays the injected pending and leaves the stake in place. Community rewards are claimed from the community contract.
+`depositFromGame` adds the increment to this wallet's stake and to the total. There is no decrease, no expiry, and no season argument. Pending injected AIPRO is this wallet's share of what has been injected since its last update. Pending community AIPRO is its share of the community release. On this local community the calculator starts with an empty policy, so that pending stays 0 until an injection. The local pool is the only pool, so its ratio is `10000`. The live AIPRO DFX pool's ratio is `0`. `claimExternalRewards` pays the injected pending and leaves the stake in place. Community rewards are claimed from the community contract.
 
 Buying silver is an injection. It is split by the stake already in the pool, including this wallet's own stake. A wallet that holds the whole stake is paid its own injection back when it claims, minus nothing in the local fee configuration, because the committee fees are 0.
 

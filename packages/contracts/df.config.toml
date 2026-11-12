@@ -14,9 +14,9 @@ address = "0x0000000000000000000000000000000000000000"
 set_current_round = true # if true,should be deployed by nft contract owner
 
 [game_pass]
-# AIPRO Classic Residents。本地 anvil 上没有代码时，PostDeploy 不开启入场限制。
+# AIPRO Classic Residents。本机没有这段代码时，PostDeploy 会部署一枚本地 NFT，入场检查仍然打开。
 nft_address = "0xe86c2E52A5Ebaf4afd18020834D5c771Aff59cDE"
-# Binance Agent ID。质押时 handleOf(钱包) 必须非空。
+# Binance Agent ID。本机没有这段代码时，PostDeploy 会部署本地登记处。质押时 handleOf(钱包) 必须非空。
 handle_registry = "0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F"
 
 [temp]
@@ -191,8 +191,8 @@ j_SPACE_JUNK_QUADRATIC_BASE_PRICE = 1000000000000000
 # Don't forget to update getJunk function in PlanetLabels.tsx
 k_PLANET_LEVEL_JUNK = [50, 55, 60, 65, 75, 100, 200, 250, 300, 500]
 
-# BSC 分叉本地测试：下面是 AIPRO 主网社区和刚在分叉上建出的 DFX 池。
-# 空 anvil 上这些地址没有代码，不要拿这条配置去部署全新链。
+# 下面是 AIPRO 主网社区和已经建出的 DFX 池。分叉上有代码时直接沿用。
+# 空 anvil 上这些地址没有代码，PostDeploy 会改部署本地的 Committee、工厂、HourlyTickCalculator、AIPRO 社区和积分池。
 [dfxstar]
 score_staking_pool = "0x62370EF15176ffdB0187b37F18eb31Da76Df29ff"
 payment_token = "0xfa81c13f979f0dff4a40b68c4aba147fa0723333"

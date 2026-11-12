@@ -4,6 +4,8 @@ pragma solidity >=0.8.24;
 import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
 import { StoreSwitch } from "@latticexyz/store/src/StoreSwitch.sol";
+import { Systems } from "@latticexyz/world/src/codegen/tables/Systems.sol";
+import { WorldResourceIdLib } from "@latticexyz/world/src/WorldResourceId.sol";
 
 import { DFXStarConfig } from "../src/codegen/index.sol";
 import { ITestOnlySystem } from "../src/codegen/world/ITestOnlySystem.sol";
@@ -36,13 +38,14 @@ contract AttachLocalNutbox is Script {
     uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
     vm.startBroadcast(deployerPrivateKey);
     Deployed memory deployed = _deploy(vm.addr(deployerPrivateKey), worldAddress);
-    // 买银授权对象记成 World。系统是 delegatecall，address(this) 就是 World。
+    // df 系统是普通 call。买银扣款的是 BuySilverSystem，不是 World。
+    address buySilverSystem = Systems.getSystem(WorldResourceIdLib.encode("sy", "df", "BuySilverSystem"));
     ITestOnlySystem(worldAddress).df__setDFXStarConfig(
       deployed.pool,
       deployed.paymentToken,
       deployed.stakingFactory,
       deployed.community,
-      worldAddress
+      buySilverSystem
     );
     vm.stopBroadcast();
 
@@ -104,6 +107,7 @@ contract AttachLocalNutbox is Script {
   }
 
   function _addPool(address community, address stakingFactory, address worldAddress) internal returns (address) {
+    // 只有这一个池，比例拿满 10000。主网 DFX 池是 0，因为另外三个池分走了每小时释放。
     uint16[] memory ratios = new uint16[](1);
     ratios[0] = 10000;
     Community(payable(community)).adminAddPool(

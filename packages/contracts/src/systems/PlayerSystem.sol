@@ -166,7 +166,7 @@ contract PlayerSystem is BaseSystem {
     return _msgSender();
   }
 
-  /// @dev 表里是 NFT 保管合约。地址为 0 时不限制入场，本地链因此可以不接 AIPRO NFT。
+  /// @dev 表里是 NFT 保管合约。地址为 0 时不检查入场，测试会写成 0。本地部署和正式部署都会写入保管合约。
   function _requireGamePass(address player) internal view {
     address pass = GamePassNFT.get();
     if (pass == address(0)) {

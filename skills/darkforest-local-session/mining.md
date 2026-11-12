@@ -12,13 +12,13 @@ Do not start the first ring merely because the home files appear. [home.md](home
 
 When that reply is sent, tell the owner three things in their language, inside the mining and strategy question:
 
-1. Open `http://localhost:3000/redpill/0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`.
-2. The folder to import is the wallet folder. For this session that is `/Volumes/Extreme Pro/wangxi/study/mud-study/31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-<season>/<wallet lowercase>`.
+1. Open `http://localhost:3000/redpill/0x3295A33430Bb33696b5F04DC12DD91276213100e`.
+2. The folder to import is the wallet folder. For this session that is `/Volumes/Extreme Pro/wangxi/study/mud-study/31337-0x3295a33430bb33696b5f04dc12dd91276213100e-<season>/<wallet lowercase>`.
 3. On the page, click `打开钱包目录` and select that wallet folder. It must contain `agent.json` directly. The season folder above it is the wrong folder. The owner does not select the folder a second time.
 
 Example:
 
-> The home is at (79942, 62), registered as the name you chose. Open http://localhost:3000/redpill/0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f and click 打开钱包目录. Select the wallet folder. Start mining from that home? The default is one core, spiraling outward, until you say stop. You can instead pick a pattern (swiss, center, or center2), a core count (2, 4, 8, 16, or 32), another center outside the inner circle, a fixed number of chunks, or a duration such as 60 minutes. Which strategy should play: aggressive, conservative, offensive, or profit?
+> The home is at (79942, 62), registered as the name you chose. Open http://localhost:3000/redpill/0x3295A33430Bb33696b5F04DC12DD91276213100e and click 打开钱包目录. Select the wallet folder. Start mining from that home? The default is one core, spiraling outward, until you say stop. You can instead pick a pattern (swiss, center, or center2), a core count (2, 4, 8, 16, or 32), another center outside the inner circle, a fixed number of chunks, or a duration such as 60 minutes. Which strategy should play: aggressive, conservative, offensive, or profit?
 
 Ask that once, in the owner's language, as soon as the home files exist. Wait. Then mine from the home with their mining choices, write `strategy.txt` with the strategy filename, and continue play. Do not ask the owner to confirm the home. If they have not opened the page yet, the address and the folder path are already in the question. Do not send a second copy unless they ask where to look.
 
@@ -75,7 +75,7 @@ Hold those side-16 lines in a buffer. Append the buffer with one write when it h
 
 The log is one file in the wallet folder:
 
-`/Volumes/Extreme Pro/wangxi/study/mud-study/31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-<season>/<wallet lowercase>/knownBoard.ndjson`
+`/Volumes/Extreme Pro/wangxi/study/mud-study/31337-0x3295a33430bb33696b5f04dc12dd91276213100e-<season>/<wallet lowercase>/knownBoard.ndjson`
 
 Do not write a directory of chunk files, and do not write under `~/Library`. The owner does not select the folder again.
 
@@ -213,7 +213,7 @@ async function main(): Promise<void> {
   const wallet = WALLET.toLowerCase();
   const boardLog = path.join(
     "/Volumes/Extreme Pro/wangxi/study/mud-study",
-    "31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-1",
+    "31337-0x3295a33430bb33696b5f04dc12dd91276213100e-1",
     wallet,
     "knownBoard.ndjson",
   );

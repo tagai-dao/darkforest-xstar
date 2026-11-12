@@ -10,11 +10,11 @@ The `strategy` field is the current filename, such as `aggressive.md`.
 
 ## Catalog
 
-These are the player calls. `legacyMove`, `legacyUpgradePlanet`, `legacyRevealLocation`, `findArtifact`, and `initializePlayer` run the same body as the current function. Send the current name. A call marked "ask" spends ETH or DFPT beyond the entry fee, so ask the owner before the first one.
+These are the player calls. `legacyMove`, `legacyUpgradePlanet`, `legacyRevealLocation`, `findArtifact`, and `initializePlayer` run the same body as the current function. Send the current name. A call marked "ask" locks the AIPRO NFT or spends AIPRO or ETH beyond the entry fee, so ask the owner before the first one.
 
 | Action                              | Call                                                                 | Ask            |
 | ----------------------------------- | -------------------------------------------------------------------- | -------------- |
-| Buy a pass, join                    | Pass `approve`, `buyPass`, `joinSeason` in [SKILL.md](SKILL.md)      | yes            |
+| Stake an AIPRO NFT                  | NFT `approve`, locker `stake` in [SKILL.md](SKILL.md)                | yes            |
 | Register, spawn                     | `df__registerPlayer`, `df__spawnPlayer` in [home.md](home.md)        | no             |
 | Rename                              | `df__changePlayerName`                                               | no             |
 | Change burner                       | `df__changeBurnerWallet`                                             | no             |
