@@ -7,6 +7,7 @@ import { StoreSwitch } from "@latticexyz/store/src/StoreSwitch.sol";
 import { stdToml } from "forge-std/StdToml.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { WorldResourceIdLib } from "@latticexyz/world/src/WorldResourceId.sol";
+import { Systems } from "@latticexyz/world/src/codegen/tables/Systems.sol";
 import { StakeScoreSystem } from "../src/systems/StakeScoreSystem.sol";
 import { DFXStarStakingLib } from "../src/lib/DFXStarStakingLib.sol";
 
@@ -30,6 +31,7 @@ import { RevealedPlanet, PlanetBiomeConfig, PlanetBiomeConfigData, ArtifactConfi
 import { JunkConfig, JunkConfigData } from "../src/codegen/index.sol";
 import { DFXStarConfig } from "../src/codegen/index.sol";
 import { SilverPurchaseConfig } from "../src/codegen/index.sol";
+import { SilverMarket } from "../src/lib/SilverMarket.sol";
 import { ArtifactInstallModule } from "../src/modules/atfs/ArtifactInstallModule.sol";
 import { installCannon } from "../src/modules/atfs/PhotoidCannon/CannonInstallLibrary.sol";
 import { installWormhole } from "../src/modules/atfs/Wormhole/WormholeInstallLibrary.sol";
@@ -211,6 +213,9 @@ contract PostDeploy is Script {
         false
       );
       PlanetOwner.set(planets[i].planetHash, planets[i].owner);
+      if (planets[i].owner != address(0)) {
+        SilverMarket.noteCapture(planets[i].level);
+      }
       RevealedPlanet.set(planets[i].planetHash, planets[i].x, planets[i].y, planets[i].owner);
     }
   }
@@ -232,7 +237,8 @@ contract PostDeploy is Script {
     address paymentToken = toml.readAddress(".dfxstar.payment_token");
     address stakingFactory = toml.readAddress(".dfxstar.staking_factory");
     address community = toml.readAddress(".dfxstar.community");
-    address buySilverSystem = toml.readAddress(".dfxstar.buy_silver_system");
+    // df 命名空间的系统是普通 call，扣款的是系统合约，不是 World。
+    address buySilverSystem = Systems.getSystem(WorldResourceIdLib.encode("sy", "df", "BuySilverSystem"));
 
     // 本地 anvil 没有现成社区时，才部署一套与 AIPRO 相同计算器的 Nutbox。
     // df.config.toml 里一旦写了 AIPRO 的 community / token / factory，就只记录地址，不新建社区，也不在这里建池。
@@ -363,6 +369,7 @@ contract PostDeploy is Script {
     return meta;
   }
 
+  /// @dev 旧的三档全局表。购银已改读 SilverMarket，这里只是继续把配置写入，避免旧部署脚本缺字段。
   function _setSilverPurchaseConfig(string memory toml) internal {
     uint256[3] memory tierPrices;
     uint256[3] memory tierSilverAmounts;

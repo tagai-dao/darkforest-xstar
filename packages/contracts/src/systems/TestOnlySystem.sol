@@ -13,6 +13,7 @@ import { Planet, PlanetLib } from "libraries/Planet.sol";
 import { Proof } from "libraries/SnarkProof.sol";
 import { SpawnInput } from "libraries/VerificationInput.sol";
 import { DFUtils } from "libraries/DFUtils.sol";
+import { SilverMarket } from "libraries/SilverMarket.sol";
 import { GPTTokens } from "codegen/index.sol";
 import { JunkConfig } from "codegen/tables/JunkConfig.sol";
 import { PlayerJunk } from "codegen/tables/PlayerJunk.sol";
@@ -81,6 +82,10 @@ contract TestOnlySystem is BaseSystem {
     // 1. Save core metadata
     PlanetConstants.set(bytes32(planetHash), perlin, level, planetType, spaceType);
     PlanetOwner.set(bytes32(planetHash), owner);
+    // 测试星和部署时预置的星不走 writeToStore，这里单独记进度。
+    if (owner != address(0)) {
+      SilverMarket.noteCapture(level);
+    }
     setPlanetJunkOwner(planetHash, owner, level);
 
     PlanetTable.set(bytes32(planetHash), Ticker.getTickNumber(), population, silver, upgrades, false);

@@ -28,6 +28,7 @@ import { PlanetFlags } from "codegen/tables/PlanetFlags.sol";
 import { ArtifactMetadataData } from "modules/atfs/tables/ArtifactMetadata.sol";
 import { ABDKMath64x64 } from "abdk-libraries-solidity/ABDKMath64x64.sol";
 import { PendingMoveQueue } from "libraries/Move.sol";
+import { SilverMarket } from "libraries/SilverMarket.sol";
 import { Artifact, ArtifactLib, ArtifactStorage, ArtifactStorageLib } from "libraries/Artifact.sol";
 import { MaterialStorage } from "libraries/Material.sol";
 import { Effect, EffectLib } from "libraries/Effect.sol";
@@ -121,6 +122,10 @@ library PlanetLib {
     }
     if (planet.ownerChanged) {
       PlanetOwner.set(bytes32(planet.planetHash), planet.owner);
+      // 只有换到一个玩家时才推进购银进度。清空拥有者不回退。
+      if (planet.owner != address(0)) {
+        SilverMarket.noteCapture(planet.level);
+      }
     }
 
     PlanetJunkOwner.set(bytes32(planet.planetHash), planet.junkOwner);

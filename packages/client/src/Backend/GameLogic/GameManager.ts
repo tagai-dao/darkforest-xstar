@@ -4,6 +4,7 @@ import {
   EMPTY_ADDRESS,
   MIN_PLANET_LEVEL,
 } from "@df/constants";
+import { quoteSilverPurchase } from "@df/silverMarket";
 import type { Monomitter, Subscription } from "@df/events";
 import { monomitter } from "@df/events";
 import {
@@ -5472,7 +5473,7 @@ export class GameManager extends EventEmitter {
       if (!this.account) {
         throw new Error("no account");
       }
-      if (tier < 0 || tier > 2) {
+      if (tier < 0 || tier > 3) {
         throw new Error("invalid silver purchase tier");
       }
 
@@ -5504,29 +5505,19 @@ export class GameManager extends EventEmitter {
         throw new Error("DFXStar payment token is not configured");
       }
 
-      const purchaseConfig = getComponentValue(
-        this.components.SilverPurchaseConfig,
-        singletonEntity,
-      );
-      if (!purchaseConfig?.tierPrices || !purchaseConfig.tierSilverAmounts) {
-        throw new Error("silver purchase tiers are not configured");
-      }
-
-      const packageSilverRaw = Number(
-        purchaseConfig.tierSilverAmounts[tier] ?? 0,
-      );
-      const packageSilver = packageSilverRaw / CONTRACT_PRECISION;
-      if (packageSilver <= 0) {
+      const frontier =
+        getComponentValue(this.components.SilverFrontier, singletonEntity)
+          ?.level ?? 0;
+      const quote = quoteSilverPurchase(planet.planetLevel, tier, frontier);
+      if (!quote || quote.priceWei === 0n) {
         throw new Error("invalid silver purchase tier");
       }
+      const packageSilver = quote.silverDisplay;
       if (planet.silver + packageSilver > planet.silverCap) {
         throw new Error("not enough planet silver capacity for this package");
       }
 
-      const tokenPrice = purchaseConfig.tierPrices[tier]?.toString() ?? "0";
-      if (tokenPrice === "0") {
-        throw new Error("invalid silver purchase price");
-      }
+      const tokenPrice = quote.priceWei.toString();
 
       localStorage.setItem(
         `${this.ethConnection.getAddress()?.toLowerCase()}-buySilver-tier`,

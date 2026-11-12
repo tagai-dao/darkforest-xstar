@@ -8,8 +8,8 @@ import { Planet } from "libraries/Planet.sol";
 import { PlanetType } from "codegen/common.sol";
 import { Player } from "codegen/tables/Player.sol";
 import { DFXStarConfig } from "codegen/tables/DFXStarConfig.sol";
-import { SilverPurchaseConfig } from "codegen/tables/SilverPurchaseConfig.sol";
 import { DFUtils } from "libraries/DFUtils.sol";
+import { SilverMarket } from "libraries/SilverMarket.sol";
 import { IDFXStarScoreStaking } from "interfaces/nutbox/IDFXStarScoreStaking.sol";
 
 /// @notice Purchase silver packages on non–spacetime-rip planets; payment injects Nutbox DFXStar pool rewards.
@@ -17,12 +17,10 @@ contract BuySilverSystem is BaseSystem {
   using SafeERC20 for IERC20;
 
   /**
-   * @param planetHash Target planet
-   * @param tier Package tier 0..2
+   * @param planetHash 目标星球。等级决定档位，种类和空间加成不改价格和数量。
+   * @param tier 0=20%，1=50%，2=80%，3=150% 的星云行星基础银上限
    */
   function buySilver(uint256 planetHash, uint8 tier) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
-    if (tier > 2) revert InvalidSilverPurchaseTier();
-
     address pool = DFXStarConfig.getScoreStakingPool();
     if (pool == address(0)) revert DFXStarPoolNotConfigured();
 
@@ -45,12 +43,7 @@ contract BuySilverSystem is BaseSystem {
     if (planet.planetType == PlanetType.SPACETIME_RIP) revert BuySilverOnSpacetimeRip();
     if (planet.junkOwner != executor || planet.addJunkTick == 0) revert NotJunkOwner();
 
-    uint256[3] memory prices = SilverPurchaseConfig.getTierPrices();
-    uint256[3] memory silverAmounts = SilverPurchaseConfig.getTierSilverAmounts();
-    uint256 price = prices[tier];
-    uint256 packageSilver = silverAmounts[tier];
-
-    if (price == 0 || packageSilver == 0) revert InvalidSilverPurchaseTier();
+    (uint256 price, uint256 packageSilver) = SilverMarket.quote(uint8(planet.level), tier);
 
     if (planet.silverCap < planet.silver + packageSilver) {
       revert InsufficientPlanetSilverCapacity();

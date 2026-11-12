@@ -198,10 +198,10 @@ score_staking_pool = "0x62370EF15176ffdB0187b37F18eb31Da76Df29ff"
 payment_token = "0xfa81c13f979f0dff4a40b68c4aba147fa0723333"
 staking_factory = "0x77Fb65140B746e639bB512c2C25604d1924aE774"
 community = "0x67DdB10B8F15a1D87a2237d9b51b97fc00e1FC7F"
-# 买银授权对象。MUD 系统是 World 的 delegatecall，这里应填 World，不是 BuySilverSystem。
+# 旧字段。PostDeploy 会改写成 BuySilverSystem 合约地址，客户端按那个地址授权。
 buy_silver_system = "0x0000000000000000000000000000000000000000"
 
-# tier prices are whole tokens (× 1e18 in PostDeploy); silver amounts are display units (× 1000 on-chain)
+# 旧的三档全局购银。BuySilverSystem 不再读取。价格在 src/lib/SilverMarket.sol。
 [silver_purchase]
 tier_0_price = 10000
 tier_0_silver = 10000
