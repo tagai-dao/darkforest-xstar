@@ -8,7 +8,7 @@ Score withdrawals stake into this pool. Buy-silver payments are injected here an
 2. `paymentToken`
 3. `stakingFactory`
 4. `community`
-5. `buySilverSystem` (the World, because a system call is a delegatecall)
+5. `buySilverSystem` (the `BuySilverSystem` contract, not the World; approve the payment token to this address)
 
 On this anvil the config is:
 
@@ -46,16 +46,16 @@ Do not call `addAdmin`, `removeAdmin`, or the committee fee setters yourself. Th
 
 One Multicall3 `aggregate3`, `allowFailure` false. Use the pool, factory, and payment token from `DFXStarConfig`.
 
-| Call                                | What it decides                                                                             |
-| ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| Pool code size                      | `0` means the attach step above has not been done                                           |
-| Pool `world()`                      | Must equal the World `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`. This is the bound scorer |
-| Factory `poolOfWorld(world)`        | Must equal the pool. A second pool for the same World cannot be created                     |
-| Pool `getTotalStakedAmount()`       | Buy silver reverts while this is 0. The first score deposit may be the stake that opens it  |
-| Pool `getUserStakedAmount(player)`  | This wallet's score stake                                                                   |
-| Pool `getPendingAllRewards(player)` | Two `uint256` words: community pending, then injected pending                               |
-| Token `balanceOf(player)`           | Whole-token balance of the local AIPRO. Score staking does not transfer it                  |
-| Token `allowance(player, world)`    | Buy silver pulls tokens into the World, so the allowance target is the World                |
+| Call                                       | What it decides                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Pool code size                             | `0` means the attach step above has not been done                                           |
+| Pool `world()`                             | Must equal the World `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`. This is the bound scorer |
+| Factory `poolOfWorld(world)`               | Must equal the pool. A second pool for the same World cannot be created                     |
+| Pool `getTotalStakedAmount()`              | Buy silver reverts while this is 0. The first score deposit may be the stake that opens it  |
+| Pool `getUserStakedAmount(player)`         | This wallet's score stake                                                                   |
+| Pool `getPendingAllRewards(player)`        | Two `uint256` words: community pending, then injected pending                               |
+| Token `balanceOf(player)`                  | Whole-token balance of the local AIPRO. Score staking does not transfer it                  |
+| Token `allowance(player, buySilverSystem)` | Buy silver pulls tokens into `BuySilverSystem`. Approve that address, not the World         |
 
 `getPendingAllRewards` does not pay the wallet. Community pending stays 0 until the hourly calculator has an injection. Do not invent an AIPRO emission rate. The local pool's share of a future injection is its ratio, `10000` out of `10000` while it is the only pool.
 
@@ -73,7 +73,7 @@ The pool already attached on this anvil was created before the World binding. It
 
 ## Buy silver injects AIPRO
 
-The send is in [actions.md](actions.md). Approve the payment token to the World for the tier price, then call the World. The World transfers that amount and calls `injectRewards`. The pool splits it across current stakers by stake. The call reverts when `totalStaked` is 0, so a score deposit has to land first.
+The send is in [actions.md](actions.md). The price is in [rules.md](rules.md). Approve the payment token to `buySilverSystem` for the discounted whole-token price, then call World `df__buySilver`. The `df` system is a normal call, so `BuySilverSystem` pulls the tokens and calls `injectRewards`. The pool splits that amount across current stakers by stake. The call reverts when `totalStaked` is 0, so a score deposit has to land first. A score deposit is different: only the World, through the root `StakeScoreSystem`, may call `depositFromGame`.
 
 The whole-token amount counts against the cap in [play.md](play.md). If `balanceOf` is below the price, or the remaining cap is below the price, do not send it. Tell the owner. The local AIPRO supply was minted to the anvil deployer. Do not use that deployer key to mint or transfer unless the owner asks for tokens.
 

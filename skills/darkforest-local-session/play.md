@@ -87,6 +87,7 @@ Table ids:
 - PlanetAddJunkTick `0x74626466000000000000000000000000506c616e65744164644a756e6b546963`
 - PlayerJunk `0x74626466000000000000000000000000506c617965724a756e6b000000000000`
 - PlayerJunkLimit `0x74626466000000000000000000000000506c617965724a756e6b4c696d697400`
+- SilverFrontier `0x7462646600000000000000000000000053696c76657246726f6e746965720000`
 
 Planet, PlanetOwner, PlanetConstants, PlanetJunkOwner, PlanetAddJunkTick, and PendingMove use the planet hash as the key. PlayerJunk and PlayerJunkLimit use the left-padded wallet, same as PlayerScore. Junk owner is the first 20 bytes of that record. `addJunkTick`, used junk, and the junk limit are one `uint256` each. Move uses that destination hash plus the queue index. PlayerScore uses the left-padded wallet. The singleton tables use an empty key tuple. On the pool from [nutbox.md](nutbox.md), call `getTotalStakedAmount`, `getUserStakedAmount(player)`, and `getPendingAllRewards(player)`. Use the pool address in `DFXStarConfig`. Do not use the mainnet addresses in `df.config.toml`.
 
@@ -448,7 +449,7 @@ Append one JSON line to `actions.ndjson` after each receipt:
   "time": "2026-11-05T06:00:00Z",
   "strategy": "aggressive.md",
   "action": "buy-silver",
-  "detail": "tier 0 on home",
+  "detail": "tier 0 on a level-1 planet",
   "tx": "0x"
 }
 ```
