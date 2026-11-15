@@ -2,13 +2,13 @@
 
 A staked wallet still cannot play until it has a home. Staking the AIPRO NFT does not create one. A home exists when `SpawnPlanet` for this wallet is not zero and `homeLocations.json` contains that planet hash.
 
-For the selected wallet `0x8153C8C8EF6d9e7e7ee11333f33048835325AdD0`, no home was spawned. The owner stopped the search. Do not resume searching, proving, spawning, or mining until the owner explicitly asks to continue. Entry is the AIPRO NFT stake in [SKILL.md](SKILL.md). Do not treat an older pass as joined.
+A wallet in the season whose `SpawnPlanet` is zero has no home yet. Search for one. Do not treat another wallet's stopped search as this wallet's stop. Entry is the AIPRO NFT stake in [SKILL.md](SKILL.md). Do not treat an older pass as joined.
 
 Do this before [mining.md](mining.md). Do not mine from `0, 0`. The center of the map is inside the inner circle, and a home there is rejected.
 
 ## Read the chain
 
-Use the world `0x3295A33430Bb33696b5F04DC12DD91276213100e` and the test Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send ETH to Multicall3.
+Use the world `0x3295A33430Bb33696b5F04DC12DD91276213100e` and Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send ETH to Multicall3.
 
 | Table       | Id                                                                   |
 | ----------- | -------------------------------------------------------------------- |
@@ -47,7 +47,7 @@ The three results are SpawnPlanet, Player, then InnerCircle. Each `returnData` i
 
 ## What counts as a home
 
-The contract, not the map center, decides. A coordinate is a legal home only when every line below is true. These numbers are the values deployed from `packages/contracts/df.config.toml`.
+The contract, not the map center, decides. A coordinate is a legal home only when every line below is true.
 
 - It is a planet: its MiMC hash, key `1729`, is below `LOCATION_ID_UB / 16384`.
 - Let `distanceSquare` be `x * x + y * y`. It is at least `75000 * 75000`, and at least `innerRadius * innerRadius`. It is below `100000 * 100000`.
@@ -56,13 +56,13 @@ The contract, not the map center, decides. A coordinate is a legal home only whe
 - Level is the lowest 24 bits of the planet hash. The level thresholds are `[100, 500, 4000, 8000, 30000, 65520, 262128, 1048561, 4194292]`. When the 24-bit value is below one of them, the level is not zero. A home needs that value to be at least `4194292`, so the level stays `0`. Zone `4` and zone `5` add no level bonus.
 - A level-0 nebula planet is type planet. The type byte does not need a separate test.
 
-When the owner resumes, start the spiral near `(78900, 5500)`, their chosen search center. Do not return to `(80000, 0)` or draw random centers unless they change that choice. Generate a bounded set of legal candidates, then read their `PlanetOwner` records through verified Multicall3 `aggregate3` at one fixed block. Keep the result in candidate order and reject the whole batch if a required subcall fails. Select the first unowned candidate; the first two candidates previously found near `(80000, 0)` were owned by the old wallet, so do not prove either again. If the current batch has no unowned candidate, continue the spiral with another bounded batch and a new fixed-block snapshot.
+Start the spiral inside the legal home band: distance at least the live inner radius, which starts at `75000`, and below `100000`, and only zone `4` or zone `5`. Pick one center in that band and spiral from there. Generate a bounded set of legal candidates, then read their `PlanetOwner` records through verified Multicall3 `aggregate3` at one fixed block. Keep the result in candidate order and reject the whole batch if a required subcall fails. Select the first unowned candidate. Ownership is this read. Do not skip a coordinate because another wallet once owned a neighbor. If the current batch has no unowned candidate, continue the spiral with another bounded batch and a new fixed-block snapshot.
 
 Do not send a loop of individual `eth_call`, a JSON-RPC batch, or `Promise.all` of contract reads for ownership. If the node limits the batch, split it into smaller Multicall3 calls pinned to the same block. Prove only after ownership has been checked. Stop active workers immediately when the owner says stop; clean up temporary scripts and do not submit a spawn transaction.
 
 ## Create the home, then ask about mining
 
-Finding the coordinate does not spend tokens. Once search is explicitly resumed and one unowned legal coordinate is known, generate its proof and create the home. A wallet that already has a player record keeps that name. Do not register it again. The burner is the same wallet. Do not create or store a second key.
+Finding the coordinate does not spend tokens. Once one unowned legal coordinate is known, generate its proof and create the home. A wallet that already has a player record keeps that name. Do not register it again. The burner is the same wallet. Do not create or store a second key.
 
 If the player index is zero, ask the owner what name to register. Wait for that name. Do not invent one, and do not use `pilot` plus part of the address. The question is only the name. An example: "What name should this new player use?" If registration reverts because that name is taken, say so and ask for a different name. Do not append a number unless the owner gives that new name.
 
@@ -71,12 +71,12 @@ If the ETH balance cannot pay for the register and spawn transactions, stop and 
 Sign with the current wallet. A legacy transaction is fine. Wait for each receipt. Call the world. Staking is the locker call in [SKILL.md](SKILL.md), not a world call.
 
 1. If the player index is zero, call `df__registerPlayer(string,address)` with the name the owner just gave and the player address. If it reverts because the wallet is already registered, continue.
-2. Prove the candidate with the example below. This proof is required. `b_skip_proof_check` is false on this session.
+2. Prove the candidate with the example below. The world requires this proof.
 3. Call `df__initializePlayer(uint256[2],uint256[2][2],uint256[2],uint256[9])` with the `a`, `b`, `c`, and nine public signals printed by the example.
 
 If spawn reverts because that planet is already owned, or because it is not a legal home, discard that center, draw a new point, and search again. Do not continue the old spiral and do not retry the same coordinate. If it reverts because this wallet already spawned, stop. If it reverts because this wallet has not staked for this season, return to the stake step in `SKILL.md`.
 
-After the spawn receipt succeeds, write the wallet folder's `homeLocations.json`. The hash is 64 lowercase hex characters and has no `0x` prefix. `perlin` is the space Perlin. `biomebase` uses key `1731` and `floor` true.
+After the spawn receipt succeeds, write the wallet folder's `homeLocations.json`. The hash is 64 lowercase hex characters and has no `0x` prefix. `perlin` is the space Perlin. `biomebase` uses key `1731` and `floor` true. The numbers below only show the file shape. Write the coordinate that just spawned.
 
 ```json
 [
@@ -114,4 +114,4 @@ vm.runInContext(
 );
 ```
 
-Reverse the two inner `pi_b` pairs for the contract. Simulate `df__initializePlayer(uint256[2],uint256[2][2],uint256[2],uint256[9])` from the selected wallet before signing; submit only when simulation succeeds. Wait for a successful receipt, then record its chain block timestamp as `time` and transaction hash as `tx`. Never log an unsubmitted proof or a failed transaction as an action. Save the home and finished map chunks only after that receipt.
+Reverse the two inner `pi_b` pairs for the contract. Simulate `df__initializePlayer(uint256[2],uint256[2][2],uint256[2],uint256[9])` from this wallet before signing; submit only when simulation succeeds. Wait for a successful receipt, then record its chain block timestamp as `time` and transaction hash as `tx`. Never log an unsubmitted proof or a failed transaction as an action. Save the home and finished map chunks only after that receipt.

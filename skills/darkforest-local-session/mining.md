@@ -13,12 +13,12 @@ Do not start the first ring merely because the home files appear. [home.md](home
 When that reply is sent, tell the owner three things in their language, inside the mining and strategy question:
 
 1. Open `http://localhost:3000/redpill/0x3295A33430Bb33696b5F04DC12DD91276213100e`.
-2. The folder to import is the wallet folder. For this session that is `/Volumes/Extreme Pro/wangxi/study/mud-study/31337-0x3295a33430bb33696b5f04dc12dd91276213100e-<season>/<wallet lowercase>`.
+2. The folder to import is this wallet's folder: `<save root>/31337-0x3295a33430bb33696b5f04dc12dd91276213100e-<season>/<wallet lowercase>`.
 3. On the page, click `打开钱包目录` and select that wallet folder. It must contain `agent.json` directly. The season folder above it is the wrong folder. The owner does not select the folder a second time.
 
 Example:
 
-> The home is at (79942, 62), registered as the name you chose. Open http://localhost:3000/redpill/0x3295A33430Bb33696b5F04DC12DD91276213100e and click 打开钱包目录. Select the wallet folder. Start mining from that home? The default is one core, spiraling outward, until you say stop. You can instead pick a pattern (swiss, center, or center2), a core count (2, 4, 8, 16, or 32), another center outside the inner circle, a fixed number of chunks, or a duration such as 60 minutes. Which strategy should play: aggressive, conservative, offensive, or profit?
+> The home is at the coordinates in homeLocations.json, registered as the name you chose. Open http://localhost:3000/redpill/0x3295A33430Bb33696b5F04DC12DD91276213100e and click 打开钱包目录. Select the wallet folder. Start mining from that home? The default is one core, spiraling outward, until you say stop. You can instead pick a pattern (swiss, center, or center2), a core count (2, 4, 8, 16, or 32), another center outside the inner circle, a fixed number of chunks, or a duration such as 60 minutes. Which strategy should play: aggressive, conservative, offensive, or profit?
 
 Ask that once, in the owner's language, as soon as the home files exist. Wait. Then mine from the home with their mining choices, write `strategy.txt` with the strategy filename, and continue play. Do not ask the owner to confirm the home. If they have not opened the page yet, the address and the folder path are already in the question. Do not send a second copy unless they ask where to look.
 
@@ -54,7 +54,7 @@ After the choice is clear, run the example below with those values. Do not ask a
 
 Each core hashes one whole 16 by 16 square with MiMC. A coordinate is a planet when its hash is below `LOCATION_ID_UB / 16384`. The page draws new lines as they are appended to `knownBoard.ndjson`. Hashing does not wait for that write.
 
-The numbers match what `packages/contracts/df.config.toml` deployed on this chain:
+The chain uses these universe constants:
 
 - Planet rarity `16384` (`[universe] a_sparsity`)
 - Planet hash key `1729`
@@ -75,7 +75,7 @@ Hold those side-16 lines in a buffer. Append the buffer with one write when it h
 
 The log is one file in the wallet folder:
 
-`/Volumes/Extreme Pro/wangxi/study/mud-study/31337-0x3295a33430bb33696b5f04dc12dd91276213100e-<season>/<wallet lowercase>/knownBoard.ndjson`
+`<save root>/31337-0x3295a33430bb33696b5f04dc12dd91276213100e-<season>/<wallet lowercase>/knownBoard.ndjson`
 
 Do not write a directory of chunk files, and do not write under `~/Library`. The owner does not select the folder again.
 
@@ -128,7 +128,9 @@ const CHUNKS = 0; // 0 means no chunk limit. Stop earlier when MINUTES is also s
 const MINUTES = 0; // 0 means no time limit. 60 means stop after one hour.
 const CENTER_X = 0; // Replace with the home planet x from homeLocations.json.
 const CENTER_Y = 0; // Replace with the home planet y. Do not leave these at 0.
-const WALLET = "0x8153c8c8ef6d9e7e7ee11333f33048835325add0";
+const SAVE_ROOT = "<folder the owner named>";
+const SEASON = 1; // Replace with activeSeason() from the locker.
+const WALLET = "<connected wallet, lowercase>";
 
 const PLANET_RARITY = 16384;
 const CHUNK_SIZE = 16;
@@ -212,8 +214,8 @@ async function main(): Promise<void> {
 
   const wallet = WALLET.toLowerCase();
   const boardLog = path.join(
-    "/Volumes/Extreme Pro/wangxi/study/mud-study",
-    "31337-0x3295a33430bb33696b5f04dc12dd91276213100e-1",
+    SAVE_ROOT,
+    `31337-0x3295a33430bb33696b5f04dc12dd91276213100e-${SEASON}`,
     wallet,
     "knownBoard.ndjson",
   );

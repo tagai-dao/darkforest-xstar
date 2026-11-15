@@ -206,13 +206,11 @@ A zero delta does not call the pool. The pool receives the increment, not the cu
 
 ## 9. The pool
 
-`depositFromGame` adds the increment to this wallet's stake and to the total. There is no decrease, no expiry, and no season argument. Pending injected AIPRO is this wallet's share of what has been injected since its last update. Pending community AIPRO is its share of the community release. On this local community the calculator starts with an empty policy, so that pending stays 0 until an injection. The local pool is the only pool, so its ratio is `10000`. The live AIPRO DFX pool's ratio is `0`. `claimExternalRewards` pays the injected pending and leaves the stake in place. Community rewards are claimed from the community contract.
+`depositFromGame` adds the increment to this wallet's stake and to the total. There is no decrease, no expiry, and no season argument. Pending injected AIPRO is this wallet's share of what has been injected since its last update. Pending community AIPRO is its share of the community release. Read both from the pool. Do not invent an emission rate. `claimExternalRewards` pays the injected pending and leaves the stake in place. Community rewards are claimed from the community contract.
 
-Buying silver is an injection. It is split by the stake already in the pool, including this wallet's own stake. A wallet that holds the whole stake is paid its own injection back when it claims, minus nothing in the local fee configuration, because the committee fees are 0.
+Buying silver is an injection. It is split by the stake already in the pool, including this wallet's own stake.
 
-Changing the pass to a new season does not read the pool. Stake and unclaimed rewards stay where they are. A new world starts its own `PlayerScore` at 0. If that world still points at this pool, the next withdraw adds a new increment on top of the old stake. One claim pays the whole pending balance. The pool does not keep a separate balance per season.
-
-The agreed later change is not in the live pool. When it is added, a new season will make every effective stake 0 without deleting the AIPRO already owed, and one claim will still pay every season's unpaid balance together. Until that code is deployed, read `getUserStakedAmount` and do not treat a new season number as a wiped stake.
+A new season does not change the pool. Stake and unclaimed rewards stay where they are. A new world starts its own `PlayerScore` at 0. If that world still points at this pool, the next withdraw adds a new increment on top of the old stake. One claim pays the whole pending balance. The pool does not keep a separate balance per season. Read `getUserStakedAmount`. Do not treat a new season number as a wiped stake.
 
 ## 10. Where the other rules are
 

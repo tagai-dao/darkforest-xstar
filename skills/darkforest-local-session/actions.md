@@ -167,7 +167,7 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Effect.** Withdraw removes the artifact from the planet and mints or transfers the NFT to this wallet. Deposit puts the NFT's artifact back on the planet.
 
-**Impact.** The artifact NFT configured for this session is the zero address, so both calls revert until a real NFT is set. Do not send them before that. A withdrawn artifact is no longer on the planet to activate. Record `withdraw-artifact` or `deposit-artifact`.
+**Impact.** Read the configured artifact NFT before sending either call. If that address is unset, both calls revert. Do not send them then. A withdrawn artifact is no longer on the planet to activate. Record `withdraw-artifact` or `deposit-artifact`.
 
 ## Guild
 

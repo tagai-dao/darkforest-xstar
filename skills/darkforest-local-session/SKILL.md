@@ -5,41 +5,34 @@ description: Join the local Dark Forest simulation, initialize a home planet, mi
 
 # Local simulation
 
-The owner does not know the chain, contracts, or price. Do not ask for them. The addresses below are this session. Read them from the chain and stop if they do not match. Do not switch chains.
+The owner does not know the chain, contracts, or price. Do not ask for them. The addresses below are the contracts for this game. Read them from the chain and stop if they do not match. Do not switch chains. Do not deploy contracts. If Multicall3 or the World has no code, stop.
 
-This is a local Anvil simulation, not BNB Chain and not mainnet. State lives in memory and disappears when the process stops. Do not restart the chain. Do not deploy game contracts. Multicall3 is already deployed for this test session. Do not deploy another copy.
+| Item            | Value                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------- |
+| Chain ID        | `31337`                                                                                 |
+| RPC             | `http://127.0.0.1:8545` (`http://localhost:8545` is the same)                           |
+| World           | `0x3295A33430Bb33696b5F04DC12DD91276213100e`                                            |
+| AIPRO NFT       | `0x90c84237fDdf091b1E63f369AF122EB46000bc70`                                            |
+| Handle registry | `0x3D63c50AD04DD5aE394CAB562b7691DD5de7CF6f`                                            |
+| Locker          | `0x103A3b128991781EE2c8db0454cA99d67b257923`                                            |
+| Entry           | Stake one AIPRO NFT in the locker. There is no DFPT and no pass to buy.                 |
+| Season          | Read `activeSeason()` on the locker.                                                    |
+| Multicall3      | `0xcA11bde05977b3631167028862bE2a173976CA11`. If this address has no code, stop.        |
+| Player          | The wallet the owner connected for this run. Do not write that address into this skill. |
 
-| Item            | Value                                                                                                                                   |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Chain ID        | `31337`                                                                                                                                 |
-| RPC             | `http://127.0.0.1:8545` (`http://localhost:8545` is the same)                                                                           |
-| World           | `0x3295A33430Bb33696b5F04DC12DD91276213100e`                                                                                            |
-| AIPRO NFT       | `0x90c84237fDdf091b1E63f369AF122EB46000bc70`                                                                                            |
-| Handle registry | `0x3D63c50AD04DD5aE394CAB562b7691DD5de7CF6f`                                                                                            |
-| Locker          | `0x103A3b128991781EE2c8db0454cA99d67b257923`                                                                                            |
-| Entry           | Stake one AIPRO NFT in the locker. There is no DFPT and no pass to buy.                                                                 |
-| Season          | Read `activeSeason()` on the locker. It was `1` at deploy.                                                                              |
-| Admin           | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`. On this local chain it owns the NFT and the handle registry. It is not the player wallet. |
-| Multicall3      | `0xcA11bde05977b3631167028862bE2a173976CA11`. Local test only. If this address has no code, stop.                                       |
-| Selected player | `0x8153C8C8EF6d9e7e7ee11333f33048835325AdD0` (owner's new temporary wallet)                                                             |
+Use these addresses. If this wallet is not already in the season, approve one NFT to the locker, then call `stake` on the locker. Stake transfers that NFT into the locker, so a wallet already in the season has an NFT balance of 0 and still plays. Do not call `mint` or `setHandle`. If a chain read of the NFT, the handle registry, the locker, or the World does not match this table, stop.
 
-The NFT, handle registry, and locker above are the contracts created by this fresh deploy. Approve the NFT to the locker, then call `stake` on the locker. The handle registry is read-only for this wallet. If a chain read of those three, or of the World, does not match this table, stop.
-
-Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost` before calling the local RPC. A sandbox may deny access to loopback even while Anvil is running; verify reachability through an approved local network path before reporting that the chain is down. If that check also fails, stop. Do not restart the chain.
+Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost` before calling the RPC. If the RPC cannot be reached, stop.
 
 ## Ask first
 
-After reading this skill, ask whether to start. Do not ask where to store the save. Do not ask again in this conversation if the owner already answered.
+After reading this skill, ask whether to start. Do not ask again in this conversation if the owner already answered.
 
 > Start this local simulation? I will read the connected wallet and then decide whether to stake an AIPRO NFT for this season, or initialize a home.
 
 If the owner says no, stop. Do not read the chain and do not create a folder.
 
-The save root is fixed:
-
-`/Volumes/Extreme Pro/wangxi/study/mud-study`
-
-Do not move it into `~/Library`, the Desktop, Documents, iCloud, or the `darkforest-punk` repository. The browser cannot open `~/Library`.
+The save root is the folder the owner names for this run. If they have not named one, ask once before creating files. Reuse that folder for the same wallet. Do not invent a disk path, and do not reuse another person's folder. Do not put the save inside this repository, on the Desktop, in Documents, in iCloud, or under `~/Library`. The browser cannot open `~/Library`.
 
 ## Reads
 
@@ -75,46 +68,47 @@ The second batch uses the locker from that read. `nft()` and `handleRegistry()` 
 2. Locker `activeWorld()`
 3. Locker `activeSeason()`
 4. Locker `isPlayerInActiveSeason(player)`
-5. Locker `nft()`
-6. Locker `handleRegistry()`
-7. Handle registry `handleOf(player)`
-8. NFT `balanceOf(player)`
+5. Locker `stakedTokenOf(player)`
+6. Locker `nft()`
+7. Locker `handleRegistry()`
+8. Handle registry `handleOf(player)`
+9. NFT `balanceOf(player)`
 
 Each result is `(bool success, bytes returnData)`. `returnData` is ABI-encoded: a `uint256` or `bool` is one 32-byte word, an address is the last 20 bytes of that word, and a string is a dynamic ABI string.
 
-If the NFT balance is greater than 0, send another `aggregate3` with `tokenOfOwnerByIndex(player, 0)`. Stake that token. Do not guess token ids, and do not stake a second one. One wallet stakes one NFT for the open season.
+`isPlayerInActiveSeason(player)` is whether this wallet may play. Stake moves the NFT into the locker, so a wallet already in this season has `balanceOf` 0. That 0 is expected. Do not treat it as a missing NFT, and do not call `tokenOfOwnerByIndex` on that wallet. Its token id is `stakedTokenOf(player)`. The locker holds the token.
+
+Only when `isPlayerInActiveSeason(player)` is false and `balanceOf(player)` is greater than 0, send another `aggregate3` with `tokenOfOwnerByIndex(player, 0)`. That token is the one to stake. Do not guess token ids, and do not stake a second one. One wallet stakes one NFT for the open season.
 
 Home, registration, and the inner circle are the batch in [home.md](home.md).
 
 ## Read the connected wallet
 
-Use the selected player address above for this session. Before any signed call, derive the address from the temporary key held in the active runtime and require an exact match. The owner has a copy of that key; never put it in this skill, a game save, a script, a tool argument, or the macOS Keychain. If the runtime signer is gone, stop signed actions and ask the owner to restore the wallet through a private channel supported by the environment. Do not silently switch to an Anvil default account, the admin, or the previous player address `0x2Ee03331a6e02c9F90E6D558Fd0e48e016746acc`.
+The player is the wallet the owner connected for this run. Before any signed call, derive the address from that signer and require an exact match. Never put the key or the address into this skill, a game save, a script, a tool argument, or the macOS Keychain. If the runtime signer is gone, stop signed actions and ask the owner to connect the wallet again. Do not switch to another account.
 
-The new address has its own NFT, handle, registration, balances, home, and save folder. Read those on chain before acting. Do not copy the previous wallet's files, spending authorization, or transaction log into the new wallet. A one-off request to start this wallet does not restart a stopped mining process or paused strategy automation.
+Each wallet has its own NFT, handle, registration, balances, home, and save folder. Read those on chain before acting. Do not copy another wallet's files, spending authorization, or transaction log. A one-off request to start this wallet does not restart a stopped mining process or paused strategy automation.
 
 Read all of these before deciding:
 
 - Local ETH balance, for gas
 - The locker address from `GamePassNFT`
 - `isSeasonOpen()`, `activeWorld()`, `activeSeason()`
-- `isPlayerInActiveSeason(player)`
+- `isPlayerInActiveSeason(player)` and `stakedTokenOf(player)`
 - `handleOf(player)`
-- NFT `balanceOf(player)`. When it is greater than 0, read `tokenOfOwnerByIndex(player, 0)`
+- NFT `balanceOf(player)`. Read `tokenOfOwnerByIndex(player, 0)` only when the wallet is not in the season and the balance is greater than 0
 
-If the season is closed, or `activeWorld()` is not the world above, stop. Tell the owner this session is not open.
-
-If the signer resolves to the admin or any address other than the selected player, stop. Do not stake with another account.
+If the season is closed, or `activeWorld()` is not the world above, stop. Tell the owner this season is not open. Sign only with the wallet the owner connected.
 
 ## Decide
 
-Follow this order. Take the first match. Do not stake a second NFT.
+Follow this order. Take the first match. A wallet already in the season keeps its NFT in the locker, so steps 1–3 still apply when `balanceOf` is 0. Do not stake a second NFT.
 
-1. The wallet has **staked**, `SpawnPlanet` for that wallet is not zero, and `homeLocations.json` contains the same planet hash: the wallet has a **home**. Read [mining.md](mining.md). The mining center is that planet. Do not spawn a second home and do not move fleets.
-2. The wallet has staked, `SpawnPlanet` is not zero, and `homeLocations.json` does not contain that hash: **stop**. The home is already on chain and its coordinates were not saved. Coordinates are not recoverable from the chain. Do not search for another planet.
-3. The wallet has staked and `SpawnPlanet` is zero: there is **no home**. Read [home.md](home.md). If the player index is zero, ask for a name and wait before registering. Do not invent a name. After the home files exist, ask in that same reply whether to mine and which strategy starts play, as [home.md](home.md) and [mining.md](mining.md) describe. Do not stop after only reporting the coordinates.
-4. `handleOf(player)` is empty: **no Binance handle**. Stop. The admin has to bind one. Do not call `setHandle`, and do not invent a handle.
-5. The NFT balance is 0: **no AIPRO NFT**. Stop. The admin has to mint one to this wallet. Do not mint, and do not look for a token to buy.
-6. The wallet has a handle and an NFT, and has not staked: **stake**.
+1. The wallet is **in the season**, `SpawnPlanet` for that wallet is not zero, and `homeLocations.json` contains the same planet hash: the wallet has a **home**. Read [mining.md](mining.md). The mining center is that planet. Do not spawn a second home and do not move fleets.
+2. The wallet is in the season, `SpawnPlanet` is not zero, and `homeLocations.json` does not contain that hash: **stop**. The home is already on chain and its coordinates were not saved. Coordinates are not recoverable from the chain. Do not search for another planet.
+3. The wallet is in the season and `SpawnPlanet` is zero: there is **no home**. Read [home.md](home.md). If the player index is zero, ask for a name and wait before registering. Do not invent a name. After the home files exist, ask in that same reply whether to mine and which strategy starts play, as [home.md](home.md) and [mining.md](mining.md) describe. Do not stop after only reporting the coordinates.
+4. The wallet is not in the season and `handleOf(player)` is empty: **no Binance handle**. Stop. Do not call `setHandle`, and do not invent a handle.
+5. The wallet is not in the season and the NFT balance is 0: **no AIPRO NFT**. Stop. Do not mint, and do not look for a token to buy.
+6. The wallet is not in the season, has a handle, and holds an NFT: **stake**.
 
 Before staking, registering, or spawning, if the ETH balance cannot pay for one ordinary transaction, decide **not enough gas** and do not send a transaction. Registering uses the name the owner just gave. Spawning does not need its own yes once a legal home coordinate is known. A search the owner already stopped stays stopped. A home that just got saved is followed by the mining and strategy question, and mining starts only after they answer.
 
@@ -136,11 +130,11 @@ Example, when this wallet has a handle and an NFT and has not staked:
 
 > Stake AIPRO NFT #1 with this wallet now? It moves into the season locker, costs a little ETH, and cannot be withdrawn while this season is open.
 
-No Binance handle. Do not send a transaction. Tell the owner this wallet has an empty handle, so it cannot stake. The admin has to call `setHandle` on the handle registry. Ask whether this is the wallet they mean.
+No Binance handle. Do not send a transaction. Tell the owner this wallet has an empty handle, so it cannot stake. Ask whether this is the wallet they mean.
 
-No AIPRO NFT. Do not send a transaction. Tell the owner this wallet holds none, so it cannot stake. The admin has to call `mint` on the NFT and send it to this wallet. Ask whether this is the wallet they mean.
+No AIPRO NFT, and not already in the season. Do not send a transaction. Tell the owner this wallet holds none and has not staked, so it cannot join. Ask whether this is the wallet they mean. A wallet already in the season is not this case. Its balance is 0 because the locker holds the NFT, and play continues.
 
-Not enough gas. Do not send a transaction. Tell the owner this wallet needs a little ETH on the local chain.
+Not enough gas. Do not send a transaction. Tell the owner this wallet needs ETH for gas.
 
 Joined, and a home is saved. If `strategy.txt` is missing or mining has not been started, ask the mining and strategy question from [mining.md](mining.md) and wait. Do not end the turn with only the home coordinates. Do not ask them to confirm the home again.
 
@@ -170,7 +164,7 @@ cast send --legacy --rpc-url $RPC $LOCKER "stake(uint256)" <tokenId>
 
 ## Save
 
-The root is `/Volumes/Extreme Pro/wangxi/study/mud-study`. Do not put the save inside the `darkforest-punk` repository, on the Desktop, in Documents, in iCloud, or under `~/Library`. The wallet folder contains `agent.json` directly. Tell the owner that folder path, not the season folder above it.
+The root is the folder the owner named. The wallet folder contains `agent.json` directly. Tell the owner that folder path, not the season folder above it.
 
 Add two levels under the root:
 
@@ -182,7 +176,7 @@ Add two levels under the root:
 { "address": "<wallet lowercase>" }
 ```
 
-`game.json` sits next to it and names this session. Write it when the folder is created, and write it if the folder already exists without it:
+`game.json` sits next to it and names this game. Write it when the folder is created, and write it if the folder already exists without it:
 
 ```json
 {
@@ -200,7 +194,7 @@ When the wallet folder is created, also copy `aggressive.md`, `conservative.md`,
 
 Reuse the file if it already exists. Do not create a second folder. Do not store a private key.
 
-After a successful stake, prepare this folder and tell the owner the full path. Then read [home.md](home.md). Read [mining.md](mining.md) only after the home exists and its coordinates are in `homeLocations.json`. Map mining stays on that path. The next game action after the owner picks a strategy is [play.md](play.md). A preset or a custom strategy file is one prediction per round, then zero or more calls sent in order. A strategy file states a goal and a method. `aggressive.md` expands by taking a higher-level planet. The calls are chosen from [actions.md](actions.md). Score staking, buy silver, and claims use the Nutbox pool in [nutbox.md](nutbox.md). If that pool has no code, attach it from that file before a withdraw. Every player call, including junk, reveal, artifacts, materials, guilds, and fleet recall, is listed in [actions.md](actions.md). The game rules are [rules.md](rules.md). What a planet's fields and type change is [planets.md](planets.md). What each installed artifact changes is [artifacts.md](artifacts.md). A voyage leaves a planet only when that planet's owner and junk owner are the same wallet.
+After a successful stake, prepare this folder and tell the owner the full path. Then read [home.md](home.md). Read [mining.md](mining.md) only after the home exists and its coordinates are in `homeLocations.json`. Map mining stays on that path. The next game action after the owner picks a strategy is [play.md](play.md). A preset or a custom strategy file is one prediction per round, then zero or more calls sent in order. A strategy file states a goal and a method. `aggressive.md` expands by taking a higher-level planet. The calls are chosen from [actions.md](actions.md). Score staking, buy silver, and claims use the Nutbox pool in [nutbox.md](nutbox.md). If that pool has no code, stop. Do not deploy one. Every player call, including junk, reveal, artifacts, materials, guilds, and fleet recall, is listed in [actions.md](actions.md). The game rules are [rules.md](rules.md). What a planet's fields and type change is [planets.md](planets.md). What each installed artifact changes is [artifacts.md](artifacts.md). A voyage leaves a planet only when that planet's owner and junk owner are the same wallet.
 
 `homeLocations.json` is a JSON array in the wallet folder. It is absent until the first home is initialized. Do not put a private key in it.
 
