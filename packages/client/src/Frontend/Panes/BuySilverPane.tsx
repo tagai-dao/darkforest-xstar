@@ -1,4 +1,5 @@
-import { CONTRACT_PRECISION, EMPTY_ADDRESS } from "@df/constants";
+import { EMPTY_ADDRESS } from "@df/constants";
+import { quoteSilverPurchase, SILVER_TIER_PERCENTS } from "@df/silverMarket";
 import type { Planet } from "@df/types";
 import { PlanetType } from "@df/types";
 import { useComponentValue } from "@latticexyz/react";
@@ -6,7 +7,7 @@ import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import { type Address, formatUnits, parseAbi, zeroAddress } from "viem";
+import { type Address, parseAbi, zeroAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 
 import type { Wrapper } from "../../Backend/Utils/Wrapper";
@@ -45,8 +46,6 @@ const TierRow = styled.div`
   font-size: ${dfstyles.fontSizeS};
 `;
 
-const TIER_LABELS = ["档 1", "档 2", "档 3"];
-
 type Props = {
   planetWrapper: Wrapper<Planet | undefined>;
 };
@@ -60,14 +59,12 @@ export function BuySilverPane({
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const {
-    components: { DFXStarConfig, SilverPurchaseConfig },
+    components: { DFXStarConfig, SilverFrontier },
   } = useMUD();
 
   const dfxConfig = useComponentValue(DFXStarConfig, singletonEntity);
-  const purchaseConfig = useComponentValue(
-    SilverPurchaseConfig,
-    singletonEntity,
-  );
+  const frontier =
+    useComponentValue(SilverFrontier, singletonEntity)?.level ?? 0;
 
   const [totalStaked, setTotalStaked] = useState<bigint | null>(null);
   const [tokenSymbol, setTokenSymbol] = useState("TOKEN");
@@ -80,21 +77,22 @@ export function BuySilverPane({
   const buySilverSpender = dfxConfig?.buySilverSystem as Address | undefined;
   const pool = dfxConfig?.scoreStakingPool as Address | undefined;
 
+  const level = planet?.planetLevel ?? 0;
   const tiers = useMemo(() => {
-    if (!purchaseConfig?.tierPrices || !purchaseConfig.tierSilverAmounts) {
-      return [];
-    }
-    return [0, 1, 2].map((tier) => {
-      const price = purchaseConfig.tierPrices[tier] ?? 0n;
-      const silverRaw = purchaseConfig.tierSilverAmounts[tier] ?? 0n;
-      return {
-        tier,
-        price,
-        silver: Number(silverRaw) / CONTRACT_PRECISION,
-        priceLabel: formatUnits(price, 18),
-      };
+    return [0, 1, 2, 3].flatMap((tier) => {
+      const quote = quoteSilverPurchase(level, tier, frontier);
+      if (!quote) return [];
+      return [
+        {
+          tier,
+          price: quote.priceWei,
+          silver: quote.silverDisplay,
+          priceLabel: quote.priceWhole.toLocaleString(),
+          percent: quote.percent,
+        },
+      ];
     });
-  }, [purchaseConfig]);
+  }, [frontier, level]);
 
   const refreshPoolState = useCallback(async () => {
     if (!publicClient || !pool || pool === zeroAddress) {
@@ -162,8 +160,20 @@ export function BuySilverPane({
     return null;
   }
 
+  if (level < 1) {
+    return (
+      <Container>
+        <Text>购银（DFXStar）</Text>
+        <Text>0 级星球没有购银档位。</Text>
+      </Container>
+    );
+  }
+
   const stakingActive = totalStaked !== null && totalStaked > 0n;
-  const configReady = pool && pool !== zeroAddress && tiers.length === 3;
+  const configReady = Boolean(
+    pool && pool !== zeroAddress && tiers.length === 4,
+  );
+  const pricePercent = tiers[0]?.percent ?? 100;
 
   const ensureAllowance = async (spender: Address, amount: bigint) => {
     if (!walletClient || !publicClient || !account) {
@@ -226,21 +236,24 @@ export function BuySilverPane({
   return (
     <Container>
       <Text>购银（DFXStar）</Text>
-      {!configReady ? <Red>链上 DFXStar / 购银配置未完成</Red> : null}
+      <Text>
+        {frontier > level
+          ? `进度 ${frontier} 级，本星 ${level} 级，价格 ${pricePercent}%`
+          : `进度 ${frontier} 级，本星按原价`}
+      </Text>
+      {!configReady ? <Red>链上 DFXStar 配置未完成</Red> : null}
       {!stakingActive ? (
         <Red>暂无全局质押：请先在时空裂隙 withdraw 提银/矿后再购银</Red>
       ) : null}
       {tiers.map(({ tier, price, silver, priceLabel }) => {
+        const overCap = planet.silver + silver > planet.silverCap;
         const disabled =
-          busyTier !== null ||
-          !stakingActive ||
-          !configReady ||
-          planet.silver + silver > planet.silverCap;
+          busyTier !== null || !stakingActive || !configReady || overCap;
         return (
           <TierRow key={tier}>
             <span>
-              {TIER_LABELS[tier]}：{priceLabel} {tokenSymbol} →{" "}
-              {silver.toLocaleString()} 银
+              {SILVER_TIER_PERCENTS[tier]}%：{priceLabel} {tokenSymbol} →{" "}
+              {silver.toLocaleString()} 银{overCap ? "（容量不足）" : ""}
             </span>
             <Btn
               disabled={disabled}

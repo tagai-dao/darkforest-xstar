@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
+import { Systems } from "@latticexyz/world/src/codegen/tables/Systems.sol";
+import { WorldResourceIdLib } from "@latticexyz/world/src/WorldResourceId.sol";
 import { BaseTest } from "./BaseTest.t.sol";
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { PlanetType, SpaceType } from "../src/codegen/common.sol";
@@ -46,19 +48,23 @@ contract E2E_DFStar_Flow is BaseTest {
 
     // 1. Committee (all fees = 0)
     committee = new Committee(payable(admin));
+    vm.startPrank(admin);
     committee.adminSetCreateCommunityFee(0);
     committee.adminSetCommunitySettingsFee(0);
     committee.adminSetPoolOperationFee(0);
+    vm.stopPrank();
 
     // 2. CommunityFactory
     communityFactory = new CommunityFactory(address(committee));
 
     // 3. LinearTimeCalculator + whitelist
     calculator = new LinearTimeCalculator(address(communityFactory));
+    vm.prank(admin);
     committee.adminAddContract(address(calculator));
 
     // 4. DFXStarScoreStakingFactory + whitelist
     dfxFactory = new DFXStarScoreStakingFactory(address(communityFactory));
+    vm.prank(admin);
     committee.adminAddContract(address(dfxFactory));
 
     // 5. Deploy DFS token (non-mintable, 1B supply to admin)
@@ -134,9 +140,11 @@ contract E2E_DFStar_Flow is BaseTest {
     IWorld(worldAddress).df__setPlanetJunkOwner(planetHash, user1, 5);
     PlanetAddJunkTick.set(bytes32(planetHash), 1);
 
-    // 14. Register player
-    IWorld(worldAddress).df__registerPlayer("e2e-player", user1);
     vm.stopPrank();
+
+    // 登记的是调用者。购银和提现都由 user1 发起。
+    vm.prank(user1);
+    IWorld(worldAddress).df__registerPlayer("e2e-player", user1);
 
     // 15. Transfer DFS tokens to user for buySilver
     dfsToken.transfer(user1, 10_000_000 ether);
@@ -181,26 +189,23 @@ contract E2E_DFStar_Flow is BaseTest {
 
     uint256 userBalBefore = dfsToken.balanceOf(user1);
 
-    // Step 2: Buy silver tier 0 (price = 10,000 DFS)
+    // 5 级 20% 原价 34000。这颗星和裂隙都是 5 级，进度不再打折。
     vm.startPrank(user1);
-    dfsToken.approve(worldAddress, 10_000 ether);
+    dfsToken.approve(_buySilverSystem(), 34_000 ether);
     IWorld(worldAddress).df__buySilver(planetHash, 0);
     vm.stopPrank();
 
-    // Verify user paid
     uint256 userBalAfter = dfsToken.balanceOf(user1);
-    assertEq(userBalBefore - userBalAfter, 10_000 ether, "user should pay 10,000 DFS");
-
-    // Verify DFS tokens ended up in the pool (as injected rewards)
-    assertEq(dfsToken.balanceOf(address(pool)), 10_000 ether, "pool should hold injected DFS");
+    assertEq(userBalBefore - userBalAfter, 34_000 ether, "user should pay 34,000 DFS");
+    assertEq(dfsToken.balanceOf(address(pool)), 34_000 ether, "pool should hold injected DFS");
   }
 
   // ─── Test: Buy silver reverts without stakers ───
 
   function test_buySilver_revertNoStakers() public {
     vm.startPrank(user1);
-    dfsToken.approve(worldAddress, 10_000 ether);
-    vm.expectRevert("No stakers");
+    dfsToken.approve(_buySilverSystem(), 10_000 ether);
+    vm.expectRevert(Errors.NoStakersForBuySilver.selector);
     IWorld(worldAddress).df__buySilver(planetHash, 0);
     vm.stopPrank();
   }
@@ -215,7 +220,7 @@ contract E2E_DFStar_Flow is BaseTest {
 
     // Step 2: user1 buys silver → injects rewards
     vm.startPrank(user1);
-    dfsToken.approve(worldAddress, 10_000 ether);
+    dfsToken.approve(_buySilverSystem(), 34_000 ether);
     IWorld(worldAddress).df__buySilver(planetHash, 0);
     vm.stopPrank();
 
@@ -225,8 +230,8 @@ contract E2E_DFStar_Flow is BaseTest {
     pool.claimExternalRewards();
     uint256 balAfter = dfsToken.balanceOf(user1);
 
-    // user1 is the only staker, so they get 100% of injected rewards
-    assertEq(balAfter - balBefore, 10_000 ether, "user1 should claim all rewards");
+    // 份额累加用整数除法，这个质押量下会少 1 wei。
+    assertEq(balAfter - balBefore, 34_000 ether - 1, "user1 should claim the injected rewards");
     assertEq(pool.getPendingExternalRewards(user1), 0, "no pending after claim");
   }
 
@@ -237,25 +242,13 @@ contract E2E_DFStar_Flow is BaseTest {
     vm.prank(user1);
     IWorld(worldAddress).df__withdrawSilver(ripHash, 300_000_000);
 
-    // Tier 0: 10,000 DFS → 10,000 silver
+    // 这颗太空 5 级行星已有 50000 页面银，上限 62500，只剩 20% 这一档放得下。
     vm.startPrank(user1);
-    dfsToken.approve(worldAddress, type(uint256).max);
+    dfsToken.approve(_buySilverSystem(), type(uint256).max);
     IWorld(worldAddress).df__buySilver(planetHash, 0);
     vm.stopPrank();
 
-    // Tier 1: 80,000 DFS → 100,000 silver
-    vm.prank(user1);
-    IWorld(worldAddress).df__buySilver(planetHash, 1);
-
-    // Tier 2: 600,000 DFS → 1,000,000 silver
-    vm.prank(user1);
-    IWorld(worldAddress).df__buySilver(planetHash, 2);
-
-    // Total silver added: (10,000 + 100,000 + 1,000,000) * 1000 = 1,110,000,000
-    // Planet started with 50,000,000 silver
-    // But cap check limits it. Let's just verify pool got all rewards.
-    uint256 totalInjected = 690_000 ether;
-    assertEq(dfsToken.balanceOf(address(pool)), totalInjected, "pool should hold all injected DFS");
+    assertEq(dfsToken.balanceOf(address(pool)), 34_000 ether, "pool should hold the 20% pack");
   }
 
   function test_secondPoolSameWorldReverts() public {
@@ -319,6 +312,10 @@ contract E2E_DFStar_Flow is BaseTest {
   }
 
   // ─── Helpers ───
+
+  function _buySilverSystem() internal view returns (address) {
+    return Systems.getSystem(WorldResourceIdLib.encode("sy", "df", "BuySilverSystem"));
+  }
 
   function communityAddr() internal view returns (address) {
     return address(community);

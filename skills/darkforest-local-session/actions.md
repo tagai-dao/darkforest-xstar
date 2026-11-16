@@ -10,11 +10,11 @@ The `strategy` field is the current filename, such as `aggressive.md`.
 
 ## Catalog
 
-These are the player calls. `legacyMove`, `legacyUpgradePlanet`, `legacyRevealLocation`, `findArtifact`, and `initializePlayer` run the same body as the current function. Send the current name. A call marked "ask" spends ETH or DFPT beyond the entry fee, so ask the owner before the first one.
+These are the player calls. `legacyMove`, `legacyUpgradePlanet`, `legacyRevealLocation`, `findArtifact`, and `initializePlayer` run the same body as the current function. Send the current name. A call marked "ask" locks the AIPRO NFT or spends AIPRO or ETH beyond the entry fee, so ask the owner before the first one.
 
 | Action                              | Call                                                                 | Ask            |
 | ----------------------------------- | -------------------------------------------------------------------- | -------------- |
-| Buy a pass, join                    | Pass `approve`, `buyPass`, `joinSeason` in [SKILL.md](SKILL.md)      | yes            |
+| Stake an AIPRO NFT                  | NFT `approve`, locker `stake` in [SKILL.md](SKILL.md)                | yes            |
 | Register, spawn                     | `df__registerPlayer`, `df__spawnPlayer` in [home.md](home.md)        | no             |
 | Rename                              | `df__changePlayerName`                                               | no             |
 | Change burner                       | `df__changeBurnerWallet`                                             | no             |
@@ -59,11 +59,11 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 ## Buy silver
 
-**Send.** Read the pool and payment token from [nutbox.md](nutbox.md). Approve that token to the World for the tier price, then World `df__buySilver(uint256 planetHash, uint8 tier)`. Tiers are 0, 1, and 2. Prices are 10000, 80000, and 600000 whole tokens. Do not send when the balance or the remaining AIPRO cap is below the price.
+**Send.** Read the pool, the payment token, and `buySilverSystem` from [nutbox.md](nutbox.md). Price the pack from [rules.md](rules.md): the planet's level picks the row, tier 0, 1, 2, or 3 is 20%, 50%, 80%, or 150%, and `SilverFrontier` discounts only the AIPRO. Approve the payment token to `buySilverSystem` for that discounted whole-token price. Do not approve the World. Then World `df__buySilver(uint256 planetHash, uint8 tier)`. Do not send on level 0, on a spacetime rip, when the chain silver plus the pack exceeds the chain cap, or when the balance or the remaining AIPRO cap is below the price.
 
-**Effect.** Silver added on the planet is 10000, 100000, or 1000000 display units. The payment token moves from this wallet into the Nutbox pool. The call reverts on a spacetime rip, when this wallet is not the owner, when the junk owner differs, when `addJunkTick` is 0, when the added silver would pass the cap, and when the pool's total stake is zero.
+**Effect.** The contract adds the pack's chain silver, display amount times 1000. The payment token moves from this wallet to `BuySilverSystem`, and that system injects the same amount into the Nutbox pool. The call reverts on a spacetime rip, on level 0, for an unknown tier, when this wallet is not registered or not the owner, when the junk owner differs, when `addJunkTick` is 0, when the added silver would pass the cap, and when the pool's total stake is zero.
 
-**Impact.** Stakers can later claim their share of that payment. A wallet that owns all of the stake mostly receives its own payment back on claim. Registering while the stored tick is 0 leaves `addJunkTick` at 0, so buy silver on that planet keeps reverting until a later registration sees a non-zero tick. Record the whole-token amount in `spends.ndjson` and record `buy-silver`.
+**Impact.** Stakers can later claim their share of that payment. A wallet that owns all of the stake mostly receives its own payment back on claim. The planet's level does not change, so a later pack on the same planet uses the same row unless the frontier has risen. Registering while the stored tick is 0 leaves `addJunkTick` at 0, so buy silver on that planet keeps reverting until a later registration sees a non-zero tick. Record the discounted whole-token amount in `spends.ndjson` and record `buy-silver`.
 
 ## Withdraw silver
 
@@ -167,7 +167,7 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Effect.** Withdraw removes the artifact from the planet and mints or transfers the NFT to this wallet. Deposit puts the NFT's artifact back on the planet.
 
-**Impact.** The artifact NFT configured for this session is the zero address, so both calls revert until a real NFT is set. Do not send them before that. A withdrawn artifact is no longer on the planet to activate. Record `withdraw-artifact` or `deposit-artifact`.
+**Impact.** Read the configured artifact NFT before sending either call. If that address is unset, both calls revert. Do not send them then. A withdrawn artifact is no longer on the planet to activate. Record `withdraw-artifact` or `deposit-artifact`.
 
 ## Guild
 

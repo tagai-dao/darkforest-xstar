@@ -43,7 +43,7 @@ While `paused` is true, step 1 writes nothing. The call settles only up to the s
 
 The inner circle starts at radius 75000. While the ticker advances, the radius falls by 0.087 each tick. At 0 it stops. Reaching 0 does not end the season, does not zero score, and does not pay anyone. The snapshot field `innerRadius` is the wall for this round.
 
-A season is open while the game pass has a world and a non-zero season number. The pass owner sets that pair, or clears it. Players join the open season with their pass. A later season requires joining again. No score, no radius, and no clock closes the season by itself.
+A season is open while the locker has a world and a non-zero season number. The locker owner sets that pair, or clears it. A player enters by staking one AIPRO NFT, and only a wallet with a non-empty Binance handle can stake. The NFT stays in the locker until that season is no longer the active one. A later season requires staking again. No score, no radius, and no clock closes the season by itself.
 
 ## 3. Map
 
@@ -157,7 +157,29 @@ The silver spent can no longer be withdrawn. A higher range changes which planet
 
 Growth uses the ticks from the later of `addJunkTick` and `lastUpdateTick`, and only while the owner and the junk owner match. Energy follows a logistic curve toward the energy cap. It does not grow when energy growth is 0, which is the quasar case. Silver grows by `silverGrowth` per tick, up to the silver cap, and does not grow when silver growth is 0. Materials grow by that same `silverGrowth` per tick, up to `silverCap`, and only on an asteroid field.
 
-Buying silver adds it immediately, in display units of 10000, 100000, or 1000000, at AIPRO prices of 10000, 80000, and 600000 whole tokens. The payment is injected into the pool. The call reverts on a spacetime rip, when the junk owner differs, when `addJunkTick` is 0, when the silver would pass the cap, and when the pool's total stake is 0.
+Buying silver adds it immediately. The quantity and the undiscounted price depend only on the planet's level. Use the nebula planet's base silver cap from section 4, before the space-type scale and before the type adjustment. A planet, an asteroid field, a foundry, and a quasar of the same level buy the same pack. A spacetime rip reverts. Level 0 has no pack and does not raise the frontier.
+
+Display silver is the chain amount divided by 1000. The nebula base caps in display units are 100, 500, 2500, 12000, 50000, 100000, 200000, 300000, and 400000 for levels 1 through 9. Tiers 0, 1, 2, and 3 are 20%, 50%, 80%, and 150% of that cap. The table is whole AIPRO, then display silver. These are the prices before the frontier discount.
+
+| Level | 20%            | 50%             | 80%             | 150%            |
+| ----- | -------------- | --------------- | --------------- | --------------- |
+| 1     | 1000 / 20      | 2500 / 50       | 4000 / 80       | 7500 / 150      |
+| 2     | 2500 / 100     | 6250 / 250      | 10000 / 400     | 18750 / 750     |
+| 3     | 6250 / 500     | 15625 / 1250    | 25000 / 2000    | 46875 / 3750    |
+| 4     | 15000 / 2400   | 37500 / 6000    | 60000 / 9600    | 112500 / 18000  |
+| 5     | 34000 / 10000  | 85000 / 25000   | 135000 / 40000  | 255000 / 75000  |
+| 6     | 50000 / 20000  | 125000 / 50000  | 200000 / 80000  | 375000 / 150000 |
+| 7     | 75000 / 40000  | 187500 / 100000 | 300000 / 160000 | 562500 / 300000 |
+| 8     | 95000 / 60000  | 237500 / 150000 | 380000 / 240000 | 712500 / 450000 |
+| 9     | 110000 / 80000 | 275000 / 200000 | 440000 / 320000 | 825000 / 600000 |
+
+`SilverFrontier` stores one `uint8`, the highest planet level a non-zero owner has ever received. It rises on that write and never falls when the planet is abandoned, cleared, or transferred. While the frontier is 0, or not above this planet's level, every tier stays at the table. Otherwise the percent is `100 - 10 × (frontier - level)`. Apply it to the AIPRO of all four tiers. The silver quantity does not change. Round half a token up: `(base × percent + 50) / 100`. At frontier 6, level 5 is 90% and level 1 is 50%. At frontier 9, level 1 is 20%. Level 3's 50% pack is 15625; at frontier 4 that is 90%, which is 14062.5 and charges 14063 AIPRO for the same 1250 display silver.
+
+An upgrade does not change the planet's level or its silver cap, so buying one pack and then upgrading does not cheapen the next pack.
+
+The 150% pack often does not fit. A nebula planet's cap is the base, and a space planet's cap is 5/4 of the base, so neither holds it. A deep-space planet's cap is 3/2 of the base and holds it only when its silver is 0. A dead-space planet's cap is twice the base and still has room. A quasar's cap is 10 times the planet cap of that space type, so an empty quasar can hold it. An asteroid's cap is twice the planet cap, but it starts with silver equal to half of its own cap. A nebula or space asteroid has to move silver off first. A deep-space asteroid's remaining room equals this pack. A dead-space asteroid can buy it with its initial silver still there. Compare the chain amount, which is the display silver times 1000, with the planet's chain silver and chain cap.
+
+The payment is still injected into the Nutbox pool and split by the stake already there, including this wallet's own stake. The call the player sends is still World `df__buySilver`. The `df` system runs by a normal call, so the token is pulled by `BuySilverSystem`, not by the World. That system then calls `injectRewards`. Approve the payment token to the `buySilverSystem` address in `DFXStarConfig`, not to the World. The call also reverts when the player is not registered, when this wallet is not the owner, when the junk owner differs, when `addJunkTick` is 0, when the silver would pass the cap, when the pool or payment token is unset, and when the pool's total stake is 0.
 
 Withdrawing silver or materials requires a spacetime rip that this wallet both owns and has registered. The amount must be at least one fifth of the cap: `cap ≤ amount × 5`. For silver the cap is `silverCap`. For a material the cap is also `silverCap`.
 
@@ -184,13 +206,11 @@ A zero delta does not call the pool. The pool receives the increment, not the cu
 
 ## 9. The pool
 
-`depositFromGame` adds the increment to this wallet's stake and to the total. There is no decrease, no expiry, and no season argument. Pending injected AIPRO is this wallet's share of what has been injected since its last update. Pending community AIPRO is its share of the community release. On this local community the calculator has no release, so that pending stays 0. `claimExternalRewards` pays the injected pending and leaves the stake in place. Community rewards are claimed from the community contract.
+`depositFromGame` adds the increment to this wallet's stake and to the total. There is no decrease, no expiry, and no season argument. Pending injected AIPRO is this wallet's share of what has been injected since its last update. Pending community AIPRO is its share of the community release. Read both from the pool. Do not invent an emission rate. `claimExternalRewards` pays the injected pending and leaves the stake in place. Community rewards are claimed from the community contract.
 
-Buying silver is an injection. It is split by the stake already in the pool, including this wallet's own stake. A wallet that holds the whole stake is paid its own injection back when it claims, minus nothing in the local fee configuration, because the committee fees are 0.
+Buying silver is an injection. It is split by the stake already in the pool, including this wallet's own stake.
 
-Changing the pass to a new season does not read the pool. Stake and unclaimed rewards stay where they are. A new world starts its own `PlayerScore` at 0. If that world still points at this pool, the next withdraw adds a new increment on top of the old stake. One claim pays the whole pending balance. The pool does not keep a separate balance per season.
-
-The agreed later change is not in the live pool. When it is added, a new season will make every effective stake 0 without deleting the AIPRO already owed, and one claim will still pay every season's unpaid balance together. Until that code is deployed, read `getUserStakedAmount` and do not treat a new season number as a wiped stake.
+A new season does not change the pool. Stake and unclaimed rewards stay where they are. A new world starts its own `PlayerScore` at 0. If that world still points at this pool, the next withdraw adds a new increment on top of the old stake. One claim pays the whole pending balance. The pool does not keep a separate balance per season. Read `getUserStakedAmount`. Do not treat a new season number as a wiped stake.
 
 ## 10. Where the other rules are
 

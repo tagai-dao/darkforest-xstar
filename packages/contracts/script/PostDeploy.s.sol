@@ -7,6 +7,7 @@ import { StoreSwitch } from "@latticexyz/store/src/StoreSwitch.sol";
 import { stdToml } from "forge-std/StdToml.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { WorldResourceIdLib } from "@latticexyz/world/src/WorldResourceId.sol";
+import { Systems } from "@latticexyz/world/src/codegen/tables/Systems.sol";
 import { StakeScoreSystem } from "../src/systems/StakeScoreSystem.sol";
 import { DFXStarStakingLib } from "../src/lib/DFXStarStakingLib.sol";
 
@@ -30,6 +31,7 @@ import { RevealedPlanet, PlanetBiomeConfig, PlanetBiomeConfigData, ArtifactConfi
 import { JunkConfig, JunkConfigData } from "../src/codegen/index.sol";
 import { DFXStarConfig } from "../src/codegen/index.sol";
 import { SilverPurchaseConfig } from "../src/codegen/index.sol";
+import { SilverMarket } from "../src/lib/SilverMarket.sol";
 import { ArtifactInstallModule } from "../src/modules/atfs/ArtifactInstallModule.sol";
 import { installCannon } from "../src/modules/atfs/PhotoidCannon/CannonInstallLibrary.sol";
 import { installWormhole } from "../src/modules/atfs/Wormhole/WormholeInstallLibrary.sol";
@@ -38,6 +40,8 @@ import { installPinkBomb } from "../src/modules/atfs/PinkBomb/PinkBombInstallLib
 import { IArtifactNFT } from "../src/tokens/IArtifactNFT.sol";
 import { ArtifactNFT } from "../src/tokens/ArtifactNFT.sol";
 import { AiproNftStake } from "../src/tokens/AiproNftStake.sol";
+import { LocalAiproNft } from "../src/tokens/LocalAiproNft.sol";
+import { LocalHandleRegistry } from "../src/tokens/LocalHandleRegistry.sol";
 import { EntryFee } from "codegen/tables/EntryFee.sol";
 import { Committee } from "nutbox/Committee.sol";
 import { CommunityFactory } from "nutbox/CommunityFactory.sol";
@@ -211,6 +215,9 @@ contract PostDeploy is Script {
         false
       );
       PlanetOwner.set(planets[i].planetHash, planets[i].owner);
+      if (planets[i].owner != address(0)) {
+        SilverMarket.noteCapture(planets[i].level);
+      }
       RevealedPlanet.set(planets[i].planetHash, planets[i].x, planets[i].y, planets[i].owner);
     }
   }
@@ -232,29 +239,31 @@ contract PostDeploy is Script {
     address paymentToken = toml.readAddress(".dfxstar.payment_token");
     address stakingFactory = toml.readAddress(".dfxstar.staking_factory");
     address community = toml.readAddress(".dfxstar.community");
-    address buySilverSystem = toml.readAddress(".dfxstar.buy_silver_system");
+    // df 命名空间的系统是普通 call，扣款的是系统合约，不是 World。
+    address buySilverSystem = Systems.getSystem(WorldResourceIdLib.encode("sy", "df", "BuySilverSystem"));
 
-    // 本地 anvil 没有现成社区时，才部署一套与 AIPRO 相同计算器的 Nutbox。
-    // df.config.toml 里一旦写了 AIPRO 的 community / token / factory，就只记录地址，不新建社区，也不在这里建池。
-    bool attachExisting = paymentToken != address(0) || stakingFactory != address(0) || community != address(0);
-    if (!attachExisting && scoreStakingPool == address(0)) {
-      console.log("DFXStar: bootstrapping local Nutbox stack...");
+    // 配置里写的是主网地址。这条链上没有代码时，部署本地的 AIPRO 社区，不能把空地址写进表。
+    // 分叉上这些合约已经有代码，就沿用，不另建社区。
+    bool configuredLive = paymentToken.code.length > 0 && community.code.length > 0 && stakingFactory.code.length > 0;
+    if (!configuredLive) {
+      console.log("DFXStar: configured AIPRO stack has no code, bootstrapping local Nutbox...");
       uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
       address deployer = vm.addr(deployerPrivateKey);
       NutboxAddresses memory addrs = _bootstrapNutbox(deployer, worldAddress);
       scoreStakingPool = addrs.pool;
-      paymentToken = addrs.dfsToken;
+      paymentToken = addrs.paymentToken;
       stakingFactory = addrs.dfxFactory;
       community = addrs.community;
       Committee(payable(addrs.committee)).adminAddFeeFreeAddress(worldAddress);
       console.log("DFXStar: local Nutbox bootstrap complete");
-    } else if (attachExisting && scoreStakingPool == address(0)) {
+    } else if (scoreStakingPool.code.length == 0) {
       console.log("DFXStar: existing community set, pool is created later by AddAIPRODFXStarPool");
     }
 
     if (scoreStakingPool != address(0) || paymentToken != address(0)) {
       DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem);
       console.log("DFXStar: config set");
+      console.log("  BuySilverSystem:", buySilverSystem);
     }
   }
 
@@ -264,7 +273,7 @@ contract PostDeploy is Script {
     address calculator;
     address dfxFactory;
     address community;
-    address dfsToken;
+    address paymentToken;
     address pool;
   }
 
@@ -299,9 +308,8 @@ contract PostDeploy is Script {
     addrs.dfxFactory = address(dfxFactory);
     console.log("  DFXStarScoreStakingFactory:", addrs.dfxFactory);
 
-    // 6. Create DFS community with Mintable ERC20
-    // Token meta: name="DFS", symbol="DFS", supply=1B, owner=deployer
-    bytes memory tokenMeta = _encodeTokenMeta("DFS", "DFS", 1_000_000_000 ether, owner);
+    // 6. 本地代币用 AIPRO 这个名字，总量 10 亿，全部铸给部署者。主网那枚代币在这条链上没有代码。
+    bytes memory tokenMeta = _encodeTokenMeta("AIPRO", "AIPRO", 1_000_000_000 ether, owner);
 
     address communityAddr = communityFactory.createCommunity(
       true, // isMintable
@@ -312,13 +320,14 @@ contract PostDeploy is Script {
       bytes("")
     );
     addrs.community = communityAddr;
-    console.log("  DFS Community:", addrs.community);
+    console.log("  AIPRO Community:", addrs.community);
 
-    // 7. Get DFS token address
-    addrs.dfsToken = Community(payable(communityAddr)).getCommunityToken();
-    console.log("  DFS Token:", addrs.dfsToken);
+    // 7. 社区代币就是买银和注入用的 AIPRO。
+    addrs.paymentToken = Community(payable(communityAddr)).getCommunityToken();
+    console.log("  AIPRO Token:", addrs.paymentToken);
 
-    // 8. Create DFXStar pool (100% ratio)
+    // 8. 主网 DFX 池的比例是 0，每小时释放分给另外三个池。这里没有那三个池的工厂。
+    // 比例总和必须是 10000 或 0，所以这个唯一的池拿满 10000。计算器的 policy 仍是空的，不会自动释放。
     uint16[] memory ratios = new uint16[](1);
     ratios[0] = 10000;
     // meta 里的 World 会写进池子，之后不能改。记分只认这个地址。
@@ -363,6 +372,7 @@ contract PostDeploy is Script {
     return meta;
   }
 
+  /// @dev 旧的三档全局表。购银已改读 SilverMarket，这里只是继续把配置写入，避免旧部署脚本缺字段。
   function _setSilverPurchaseConfig(string memory toml) internal {
     uint256[3] memory tierPrices;
     uint256[3] memory tierSilverAmounts;
@@ -379,13 +389,16 @@ contract PostDeploy is Script {
   function _setGamePassConfig(string memory toml, address worldAddress) internal {
     address nftAddress = toml.readAddress(".game_pass.nft_address");
     address handleRegistry = toml.readAddress(".game_pass.handle_registry");
-    // 本地链上没有这枚 NFT 时不部署保管合约，入场检查保持关闭。
+
+    // 本地 anvil 上没有主网合约。部署同接口的测试 NFT 和 handle 登记处，入场检查仍然打开。
     if (nftAddress == address(0) || nftAddress.code.length == 0) {
-      console.log("Game pass: NFT has no code, entry stays open");
-      GamePassNFTTable.set(address(0));
-      return;
+      nftAddress = address(new LocalAiproNft());
+      console.log("Local AIPRO NFT:", nftAddress);
     }
-    require(handleRegistry != address(0), "handle registry required");
+    if (handleRegistry == address(0) || handleRegistry.code.length == 0) {
+      handleRegistry = address(new LocalHandleRegistry());
+      console.log("Local handle registry:", handleRegistry);
+    }
 
     AiproNftStake locker = new AiproNftStake(nftAddress, handleRegistry);
     GamePassNFTTable.set(address(locker));

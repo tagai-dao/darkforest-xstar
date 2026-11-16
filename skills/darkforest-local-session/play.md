@@ -87,8 +87,9 @@ Table ids:
 - PlanetAddJunkTick `0x74626466000000000000000000000000506c616e65744164644a756e6b546963`
 - PlayerJunk `0x74626466000000000000000000000000506c617965724a756e6b000000000000`
 - PlayerJunkLimit `0x74626466000000000000000000000000506c617965724a756e6b4c696d697400`
+- SilverFrontier `0x7462646600000000000000000000000053696c76657246726f6e746965720000`
 
-Planet, PlanetOwner, PlanetConstants, PlanetJunkOwner, PlanetAddJunkTick, and PendingMove use the planet hash as the key. PlayerJunk and PlayerJunkLimit use the left-padded wallet, same as PlayerScore. Junk owner is the first 20 bytes of that record. `addJunkTick`, used junk, and the junk limit are one `uint256` each. Move uses that destination hash plus the queue index. PlayerScore uses the left-padded wallet. The singleton tables use an empty key tuple. On the pool from [nutbox.md](nutbox.md), call `getTotalStakedAmount`, `getUserStakedAmount(player)`, and `getPendingAllRewards(player)`. Use the pool address in `DFXStarConfig`. Do not use the mainnet addresses in `df.config.toml`.
+Planet, PlanetOwner, PlanetConstants, PlanetJunkOwner, PlanetAddJunkTick, and PendingMove use the planet hash as the key. PlayerJunk and PlayerJunkLimit use the left-padded wallet, same as PlayerScore. Junk owner is the first 20 bytes of that record. `addJunkTick`, used junk, and the junk limit are one `uint256` each. Move uses that destination hash plus the queue index. PlayerScore uses the left-padded wallet. The singleton tables use an empty key tuple. On the pool from [nutbox.md](nutbox.md), call `getTotalStakedAmount`, `getUserStakedAmount(player)`, and `getPendingAllRewards(player)`. Use the pool address in `DFXStarConfig`.
 
 ### Revealed coordinates
 
@@ -123,7 +124,7 @@ Write one object per fleet:
 
 ### Example
 
-The repository does not contain this reader. Save the example as a temporary file and run it with Node. Do not commit it. Replace `WALLET` if this session's wallet folder is different. Run `reveal` before rebuilding the planet files, and `voyages` after `owned.json` is rewritten.
+The repository does not contain this reader. Save the example as a temporary file and run it with Node. Do not commit it. Set `WALLET` to this wallet's folder from [SKILL.md](SKILL.md). Run `reveal` before rebuilding the planet files, and `voyages` after `owned.json` is rewritten.
 
 ```bash
 node /tmp/darkforest-round-read.mjs reveal
@@ -136,9 +137,9 @@ import path from "node:path";
 
 const PHASE = process.argv[2]; // reveal | voyages
 const WALLET =
-  "/Volumes/Extreme Pro/wangxi/study/mud-study/31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-1/0x2ee03331a6e02c9f90e6d558fd0e48e016746acc";
+  "<save root>/31337-0x3295a33430bb33696b5f04dc12dd91276213100e-<season>/<wallet lowercase>";
 const RPC = "http://127.0.0.1:8545";
-const WORLD = "0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f";
+const WORLD = "0x3295A33430Bb33696b5F04DC12DD91276213100e";
 const MULTI = "0xcA11bde05977b3631167028862bE2a173976CA11";
 const SET_RECORD =
   "0x8dbb3a9672eebfd3773e72dd9c102393436816d832c7ba9e1e1ac8fcadcac7a9";
@@ -448,7 +449,7 @@ Append one JSON line to `actions.ndjson` after each receipt:
   "time": "2026-11-05T06:00:00Z",
   "strategy": "aggressive.md",
   "action": "buy-silver",
-  "detail": "tier 0 on home",
+  "detail": "tier 0 on a level-1 planet",
   "tx": "0x"
 }
 ```

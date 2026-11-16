@@ -97,6 +97,7 @@ interface Errors {
   // buy silver / dfxstar
   error BuySilverOnSpacetimeRip();
   error InvalidSilverPurchaseTier();
+  error InvalidSilverPurchaseLevel();
   error InsufficientPlanetSilverCapacity();
   error NoStakersForBuySilver();
   error DFXStarPoolNotConfigured();

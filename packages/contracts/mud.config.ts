@@ -743,6 +743,13 @@ export default defineWorld({
       },
       key: [],
     },
+    // 购银进度：有人第一次占领更高等级的星球后只升不降。名字不超过 16 字节。
+    SilverFrontier: {
+      schema: {
+        level: "uint8",
+      },
+      key: [],
+    },
     PlayerStats: {
       schema: {
         player: "address",

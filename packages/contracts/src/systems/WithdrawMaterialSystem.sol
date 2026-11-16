@@ -71,9 +71,9 @@ contract WithdrawMaterialSystem is BaseSystem {
     uint256 currentMaterial = planet.getMaterial(materialType);
     uint256 playerWithdrawMaterialAmount = PlayerWithdrawMaterial.get(executor, uint8(materialType));
 
-    // Calculate biome-based score multiplier
+    // 分数 = 提现数量 × 材料乘数，不再除。银提现是 1:1，见 getBiomeScoreMultiplier。
     uint256 scoreMultiplier = getBiomeScoreMultiplier(materialType);
-    uint256 scorePoints = (materialToWithdraw * scoreMultiplier);
+    uint256 scorePoints = materialToWithdraw * scoreMultiplier;
 
     // Remove material from planet
     planet.setMaterial(materialType, currentMaterial - materialToWithdraw);
@@ -98,41 +98,38 @@ contract WithdrawMaterialSystem is BaseSystem {
   }
 
   /**
-   * @notice Get material-specific score multiplier for material withdrawal
-   * @param materialType The material being withdrawn
-   * @return multiplier The score multiplier
+   * @notice 材料提现的分数乘数。得分 = 提现数量 × 返回值，结果直接入账，不再除以 10 或 100。
+   * @dev 银提现是 1 单位 1 分，而且银可以用代币买。若材料只比银贵几倍，买银再提走就等于付费质押。
+   *      这里的地板是 100：同样数量的最便宜材料也值 105 倍银，买来的银因此留作升级。
+   *      100 到 600 只是材料之间的风险阶梯，水晶体 105，腐化水晶 600，大约 6 倍，不是相对银的 6 倍。
+   *      按材料类型取值，不按生物群系。
    */
   function getBiomeScoreMultiplier(MaterialType materialType) internal pure returns (uint256 multiplier) {
-    // Base multiplier starts at 1
-    multiplier = 1;
-
-    // Apply material-specific bonuses based on actual MaterialType enum
     if (materialType == MaterialType.CORRUPTED_CRYSTAL) {
-      multiplier = 600; // 6x for corrupted crystals (highest value)
+      multiplier = 600;
     } else if (materialType == MaterialType.BLACKALLOY) {
-      multiplier = 400; // 4x for blackalloy
+      multiplier = 400;
     } else if (materialType == MaterialType.PYROSTEEL) {
-      multiplier = 300; // 3x for pyrosteel
+      multiplier = 300;
     } else if (materialType == MaterialType.SCRAPIUM) {
-      multiplier = 250; // 2.5x for scrapium (will be divided by 10)
+      multiplier = 250;
     } else if (materialType == MaterialType.CRYOSTONE) {
-      multiplier = 200; // 2x for cryostone
+      multiplier = 200;
     } else if (materialType == MaterialType.SANDGLASS) {
-      multiplier = 180; // 1.8x for sandglass (will be divided by 10)
+      multiplier = 180;
     } else if (materialType == MaterialType.MYCELIUM) {
-      multiplier = 150; // 1.5x for mycelium (will be divided by 10)
+      multiplier = 150;
     } else if (materialType == MaterialType.AURORIUM) {
-      multiplier = 130; // 1.3x for aurorium (will be divided by 10)
+      multiplier = 130;
     } else if (materialType == MaterialType.WINDSTEEL) {
-      multiplier = 120; // 1.2x for windsteel (will be divided by 10)
+      multiplier = 120;
     } else if (materialType == MaterialType.LIVING_WOOD) {
-      multiplier = 110; // 1.1x for living wood (will be divided by 10)
+      multiplier = 110;
     } else if (materialType == MaterialType.WATER_CRYSTALS) {
-      multiplier = 105; // 1.05x for water crystals (will be divided by 100)
-    } else if (materialType == MaterialType.UNKNOWN) {
-      multiplier = 100; // 1x for unknown materials
+      multiplier = 105;
     } else {
-      multiplier = 100; // Default multiplier for any other materials
+      // UNKNOWN 以及未单列的材料。地板 100，避免和可购买的银（1 分）挤在同一档。
+      multiplier = 100;
     }
   }
 }
