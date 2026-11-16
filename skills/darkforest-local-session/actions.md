@@ -61,9 +61,9 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Send.** Read the pool, the payment token, and `buySilverSystem` from [nutbox.md](nutbox.md). Price the pack from [rules.md](rules.md): the planet's level picks the row, tier 0, 1, 2, or 3 is 20%, 50%, 80%, or 150%, and `SilverFrontier` discounts only the AIPRO. Approve the payment token to `buySilverSystem` for that discounted whole-token price. Do not approve the World. Then World `df__buySilver(uint256 planetHash, uint8 tier)`. Do not send on level 0, on a spacetime rip, when the chain silver plus the pack exceeds the chain cap, or when the balance or the remaining AIPRO cap is below the price.
 
-**Effect.** The contract adds the pack's chain silver, display amount times 1000. The payment token moves from this wallet to `BuySilverSystem`, and that system injects the same amount into the Nutbox pool. The call reverts on a spacetime rip, on level 0, for an unknown tier, when this wallet is not registered or not the owner, when the junk owner differs, when `addJunkTick` is 0, when the added silver would pass the cap, and when the pool's total stake is zero.
+**Effect.** The contract adds the pack's chain silver, display amount times 1000. The payment token moves from this wallet to `BuySilverSystem`. That system burns `price × burnBps / 10000`, rounded down, to `0x000000000000000000000000000000000000dEaD`, and injects the remainder into the Nutbox pool. Read `burnBps` from `DFXStarConfig`; deploy writes 5000. The call reverts on a spacetime rip, on level 0, for an unknown tier, when this wallet is not registered or not the owner, when the junk owner differs, when `addJunkTick` is 0, or when the added silver would pass the cap. It also reverts when the remainder is above 0 and the pool's total stake is zero. A `burnBps` of 10000 leaves a zero remainder and does not need stakers.
 
-**Impact.** Stakers can later claim their share of that payment. A wallet that owns all of the stake mostly receives its own payment back on claim. The planet's level does not change, so a later pack on the same planet uses the same row unless the frontier has risen. Registering while the stored tick is 0 leaves `addJunkTick` at 0, so buy silver on that planet keeps reverting until a later registration sees a non-zero tick. Record the discounted whole-token amount in `spends.ndjson` and record `buy-silver`.
+**Impact.** Stakers can later claim their share of the injected remainder. The burned part is not claimable. A wallet that owns all of the stake mostly receives that remainder back on claim. The planet's level does not change, so a later pack on the same planet uses the same row unless the frontier has risen. Registering while the stored tick is 0 leaves `addJunkTick` at 0, so buy silver on that planet keeps reverting until a later registration sees a non-zero tick. Record the discounted whole-token amount in `spends.ndjson` and record `buy-silver`.
 
 ## Withdraw silver
 
@@ -71,7 +71,7 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Effect.** Silver on the planet falls. `PlayerScore` rises by that amount. The same amount is staked with `depositFromGame`. No AIPRO moves. It reverts when the pool has no code or the World is not a factory admin. Those checks are in [nutbox.md](nutbox.md).
 
-**Impact.** This is how the pool gets its first stake. Until some wallet has done it, buy silver reverts. A larger stake takes a larger share of later buy-silver payments. If this wallet is in a guild, the guild silver rises by the same amount. Record `withdraw-silver`.
+**Impact.** This is how the pool gets its first stake. Until some wallet has done it, a buy whose remainder is above 0 reverts. A larger stake takes a larger share of later injections. If this wallet is in a guild, the guild silver rises by the same amount. Record `withdraw-silver`.
 
 ## Add junk
 

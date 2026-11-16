@@ -96,7 +96,7 @@ contract E2E_DFStar_Flow is BaseTest {
     if (Ticker.getPaused()) {
       IWorld(worldAddress).df__unpause();
     }
-    DFXStarConfig.set(address(pool), address(dfsToken), address(dfxFactory), communityAddr, address(this));
+    DFXStarConfig.set(address(pool), address(dfsToken), address(dfxFactory), communityAddr, address(this), 5000);
 
     // 11. Configure SilverPurchaseConfig
     uint256[3] memory prices;
@@ -197,7 +197,8 @@ contract E2E_DFStar_Flow is BaseTest {
 
     uint256 userBalAfter = dfsToken.balanceOf(user1);
     assertEq(userBalBefore - userBalAfter, 34_000 ether, "user should pay 34,000 DFS");
-    assertEq(dfsToken.balanceOf(address(pool)), 34_000 ether, "pool should hold injected DFS");
+    assertEq(dfsToken.balanceOf(address(pool)), 17_000 ether, "pool should hold the unburned half");
+    assertEq(dfsToken.balanceOf(_burnAddress()), 17_000 ether, "dead address should hold the burned half");
   }
 
   // ─── Test: Buy silver reverts without stakers ───
@@ -230,8 +231,8 @@ contract E2E_DFStar_Flow is BaseTest {
     pool.claimExternalRewards();
     uint256 balAfter = dfsToken.balanceOf(user1);
 
-    // 份额累加用整数除法，这个质押量下会少 1 wei。
-    assertEq(balAfter - balBefore, 34_000 ether - 1, "user1 should claim the injected rewards");
+    // 注入只剩一半。份额累加用整数除法，这个质押量下会少 1 wei。
+    assertEq(balAfter - balBefore, 17_000 ether - 1, "user1 should claim the injected rewards");
     assertEq(pool.getPendingExternalRewards(user1), 0, "no pending after claim");
   }
 
@@ -248,7 +249,7 @@ contract E2E_DFStar_Flow is BaseTest {
     IWorld(worldAddress).df__buySilver(planetHash, 0);
     vm.stopPrank();
 
-    assertEq(dfsToken.balanceOf(address(pool)), 34_000 ether, "pool should hold the 20% pack");
+    assertEq(dfsToken.balanceOf(address(pool)), 17_000 ether, "pool should hold half of the 20% pack");
   }
 
   function test_secondPoolSameWorldReverts() public {
@@ -285,7 +286,7 @@ contract E2E_DFStar_Flow is BaseTest {
     address other = community.activedPools(1);
 
     vm.startPrank(admin);
-    DFXStarConfig.set(address(0), address(dfsToken), address(dfxFactory), address(community), worldAddress);
+    DFXStarConfig.set(address(0), address(dfsToken), address(dfxFactory), address(community), worldAddress, 5000);
     vm.expectRevert(Errors.ScorePoolWorldMismatch.selector);
     IWorld(worldAddress).df__setDFXStarConfig(
       other,
@@ -299,7 +300,7 @@ contract E2E_DFStar_Flow is BaseTest {
 
   function test_setConfig_acceptsBoundPoolOnce() public {
     vm.startPrank(admin);
-    DFXStarConfig.set(address(0), address(0), address(0), address(0), address(0));
+    DFXStarConfig.set(address(0), address(0), address(0), address(0), address(0), 0);
     IWorld(worldAddress).df__setDFXStarConfig(
       address(pool),
       address(dfsToken),
@@ -312,6 +313,10 @@ contract E2E_DFStar_Flow is BaseTest {
   }
 
   // ─── Helpers ───
+
+  function _burnAddress() internal pure returns (address) {
+    return 0x000000000000000000000000000000000000dEaD;
+  }
 
   function _buySilverSystem() internal view returns (address) {
     return Systems.getSystem(WorldResourceIdLib.encode("sy", "df", "BuySilverSystem"));

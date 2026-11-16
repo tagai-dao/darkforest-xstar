@@ -52,6 +52,10 @@ describe("game docs", () => {
         ],
       ]),
     });
+    const buy = resources.blocks.find(
+      (block) => block.kind === "p" && block.text.includes("销毁地址"),
+    );
+    expect(buy && buy.kind === "p" ? buy.text : "").toContain("5000");
     const discount = resources.blocks.find(
       (block) => block.kind === "table" && block.headers[0] === "进度",
     );

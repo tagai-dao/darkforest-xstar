@@ -26,7 +26,7 @@ contract WithdrawStakeDeltaTest is BaseTest {
     if (Ticker.getPaused()) {
       IWorld(worldAddress).df__unpause();
     }
-    DFXStarConfig.set(address(pool), address(0), address(0), address(0), address(0));
+    DFXStarConfig.set(address(pool), address(0), address(0), address(0), address(0), 5000);
     IWorld(worldAddress).df__createPlanet(
       planetHash,
       user1,

@@ -733,6 +733,8 @@ export default defineWorld({
         stakingFactory: "address",
         community: "address",
         buySilverSystem: "address",
+        // 买银付款里销毁的万分比。5000 是一半，10000 是整笔。
+        burnBps: "uint16",
       },
       key: [],
     },

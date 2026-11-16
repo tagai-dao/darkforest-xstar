@@ -12,7 +12,7 @@ Silver grows on an asteroid field. It can also be bought onto a planet, or carri
 
 Materials grow only on an asteroid field. Withdrawing them at a spacetime rip adds `amount × multiplier` to score and to stake. The multipliers are in section 8.
 
-AIPRO paid into the pool, including AIPRO spent to buy silver, is split by stake share. Claiming pays this wallet's pending AIPRO and does not reduce its stake.
+AIPRO that reaches the pool is split by stake share. AIPRO spent to buy silver is split first: `burnBps` in `DFXStarConfig` is sent to `0x000000000000000000000000000000000000dEaD`, and the remainder is injected. Deploy writes 5000, which is half. Claiming pays this wallet's pending AIPRO and does not reduce its stake. The burned part is not claimable.
 
 A higher-level planet has more range, a higher energy cap, and faster energy growth, so the next voyage can reach farther. Zone and space type change that level and those stats. Junk is the cap on how many planets can be held at once.
 
@@ -179,7 +179,7 @@ An upgrade does not change the planet's level or its silver cap, so buying one p
 
 The 150% pack often does not fit. A nebula planet's cap is the base, and a space planet's cap is 5/4 of the base, so neither holds it. A deep-space planet's cap is 3/2 of the base and holds it only when its silver is 0. A dead-space planet's cap is twice the base and still has room. A quasar's cap is 10 times the planet cap of that space type, so an empty quasar can hold it. An asteroid's cap is twice the planet cap, but it starts with silver equal to half of its own cap. A nebula or space asteroid has to move silver off first. A deep-space asteroid's remaining room equals this pack. A dead-space asteroid can buy it with its initial silver still there. Compare the chain amount, which is the display silver times 1000, with the planet's chain silver and chain cap.
 
-The payment is still injected into the Nutbox pool and split by the stake already there, including this wallet's own stake. The call the player sends is still World `df__buySilver`. The `df` system runs by a normal call, so the token is pulled by `BuySilverSystem`, not by the World. That system then calls `injectRewards`. Approve the payment token to the `buySilverSystem` address in `DFXStarConfig`, not to the World. The call also reverts when the player is not registered, when this wallet is not the owner, when the junk owner differs, when `addJunkTick` is 0, when the silver would pass the cap, when the pool or payment token is unset, and when the pool's total stake is 0.
+The player still pays the full quoted price. `BuySilverSystem` sends `price × burnBps / 10000`, rounded down, to `0x000000000000000000000000000000000000dEaD`, and injects the remainder. The remainder is split by the stake already in the pool, including this wallet's own stake. Deploy writes `burnBps` 5000. The namespace owner changes it with `df__updateSilverBurnBps`, and the value must be 0 through 10000. 0 injects the whole payment. 10000 burns the whole payment and does not call `injectRewards`. The call the player sends is still World `df__buySilver`. The `df` system runs by a normal call, so the token is pulled by `BuySilverSystem`, not by the World. Approve the payment token to the `buySilverSystem` address in `DFXStarConfig`, not to the World. The call also reverts when the player is not registered, when this wallet is not the owner, when the junk owner differs, when `addJunkTick` is 0, when the silver would pass the cap, or when the pool or payment token is unset. It also reverts when the remainder is above 0 and the pool's total stake is 0. A remainder of 0 does not need stakers.
 
 Withdrawing silver or materials requires a spacetime rip that this wallet both owns and has registered. The amount must be at least one fifth of the cap: `cap ≤ amount × 5`. For silver the cap is `silverCap`. For a material the cap is also `silverCap`.
 
@@ -208,7 +208,7 @@ A zero delta does not call the pool. The pool receives the increment, not the cu
 
 `depositFromGame` adds the increment to this wallet's stake and to the total. There is no decrease, no expiry, and no season argument. Pending injected AIPRO is this wallet's share of what has been injected since its last update. Pending community AIPRO is its share of the community release. Read both from the pool. Do not invent an emission rate. `claimExternalRewards` pays the injected pending and leaves the stake in place. Community rewards are claimed from the community contract.
 
-Buying silver is an injection. It is split by the stake already in the pool, including this wallet's own stake.
+Buying silver burns `burnBps` of the payment and injects the remainder. The injected part is split by the stake already in the pool, including this wallet's own stake. The burned part does not come back on claim.
 
 A new season does not change the pool. Stake and unclaimed rewards stay where they are. A new world starts its own `PlayerScore` at 0. If that world still points at this pool, the next withdraw adds a new increment on top of the old stake. One claim pays the whole pending balance. The pool does not keep a separate balance per season. Read `getUserStakedAmount`. Do not treat a new season number as a wiped stake.
 

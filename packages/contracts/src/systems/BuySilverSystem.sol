@@ -12,9 +12,15 @@ import { DFUtils } from "libraries/DFUtils.sol";
 import { SilverMarket } from "libraries/SilverMarket.sol";
 import { IDFXStarScoreStaking } from "interfaces/nutbox/IDFXStarScoreStaking.sol";
 
-/// @notice Purchase silver packages on non–spacetime-rip planets; payment injects Nutbox DFXStar pool rewards.
+/// @notice 买银付款先按 burnBps 拆开：一部分打到销毁地址，剩下的才注入 Nutbox 矿池。
 contract BuySilverSystem is BaseSystem {
   using SafeERC20 for IERC20;
+
+  /// @dev 常用销毁地址。代币转到这里就离开流通，合约不再持有。
+  address internal constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
+
+  /// @dev 万分比的分母。5000 是一半，10000 是整笔。
+  uint256 internal constant BPS_DENOMINATOR = 10_000;
 
   /**
    * @param planetHash 目标星球。等级决定档位，种类和空间加成不改价格和数量。
@@ -23,10 +29,6 @@ contract BuySilverSystem is BaseSystem {
   function buySilver(uint256 planetHash, uint8 tier) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
     address pool = DFXStarConfig.getScoreStakingPool();
     if (pool == address(0)) revert DFXStarPoolNotConfigured();
-
-    if (IDFXStarScoreStaking(pool).getTotalStakedAmount() == 0) {
-      revert NoStakersForBuySilver();
-    }
 
     address paymentToken = DFXStarConfig.getPaymentToken();
     if (paymentToken == address(0)) revert PaymentTokenNotConfigured();
@@ -49,10 +51,24 @@ contract BuySilverSystem is BaseSystem {
       revert InsufficientPlanetSilverCapacity();
     }
 
+    // 向下取整归销毁，多出来的 1 单位进矿池，两笔加起来等于报价。
+    uint256 burnAmount = (price * DFXStarConfig.getBurnBps()) / BPS_DENOMINATOR;
+    uint256 poolAmount = price - burnAmount;
+
+    // 整笔销毁时矿池收不到代币，不再要求池里已经有人质押。
+    if (poolAmount != 0 && IDFXStarScoreStaking(pool).getTotalStakedAmount() == 0) {
+      revert NoStakersForBuySilver();
+    }
+
     IERC20 token = IERC20(paymentToken);
     token.safeTransferFrom(executor, address(this), price);
-    token.forceApprove(pool, price);
-    IDFXStarScoreStaking(pool).injectRewards(price);
+    if (burnAmount != 0) {
+      token.safeTransfer(BURN_ADDRESS, burnAmount);
+    }
+    if (poolAmount != 0) {
+      token.forceApprove(pool, poolAmount);
+      IDFXStarScoreStaking(pool).injectRewards(poolAmount);
+    }
 
     planet.silver += packageSilver;
     planet.writeToStore();

@@ -102,6 +102,8 @@ interface Errors {
   error NoStakersForBuySilver();
   error DFXStarPoolNotConfigured();
   error PaymentTokenNotConfigured();
+  // 销毁比例只接受 0 到 10000。
+  error SilverBurnBpsOutOfRange();
   // 积分池地址已经写过，不能改成另一个，也不能清掉。
   error ScorePoolAlreadyBound();
   // 这个池子绑的不是当前 World。

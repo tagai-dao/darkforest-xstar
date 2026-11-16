@@ -261,7 +261,8 @@ contract PostDeploy is Script {
     }
 
     if (scoreStakingPool != address(0) || paymentToken != address(0)) {
-      DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem);
+      // 5000 是默认销毁一半。管理员之后用 updateSilverBurnBps 改。
+      DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem, 5000);
       console.log("DFXStar: config set");
       console.log("  BuySilverSystem:", buySilverSystem);
     }

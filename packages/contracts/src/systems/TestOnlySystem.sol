@@ -190,7 +190,9 @@ contract TestOnlySystem is BaseSystem {
     if (scoreStakingPool != address(0) && IDFXStarScoreStaking(scoreStakingPool).world() != _world()) {
       revert ScorePoolWorldMismatch();
     }
-    DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem);
+    // 改地址时保留已经写好的销毁比例，避免把管理员设过的数清成 0。
+    uint16 burnBps = DFXStarConfig.getBurnBps();
+    DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem, burnBps);
   }
 
   function addMaterial(uint256 planetHash, MaterialType materialType, uint256 amount) public {

@@ -1,14 +1,15 @@
 # Nutbox score pool
 
-Score withdrawals stake into this pool. Buy-silver payments are injected here and split by stake. Read the pool from the chain before either action. Use the addresses below. If one of them has no code, stop. Do not deploy a pool.
+Score withdrawals stake into this pool. The unburned part of a buy-silver payment is injected here and split by stake. Read the pool from the chain before either action. Use the addresses below. If one of them has no code, stop. Do not deploy a pool.
 
-`DFXStarConfig` is the source of the pool addresses. Its table id is in [play.md](play.md). Static data is five addresses packed from the left, 20 bytes each:
+`DFXStarConfig` is the source of the pool addresses and the burn ratio. Its table id is in [play.md](play.md). Static data is packed from the left:
 
-1. `scoreStakingPool`
-2. `paymentToken`
-3. `stakingFactory`
-4. `community`
-5. `buySilverSystem` (the `BuySilverSystem` contract, not the World; approve the payment token to this address)
+1. `scoreStakingPool`, 20 bytes
+2. `paymentToken`, 20 bytes
+3. `stakingFactory`, 20 bytes
+4. `community`, 20 bytes
+5. `buySilverSystem`, 20 bytes (the `BuySilverSystem` contract, not the World; approve the payment token to this address)
+6. `burnBps`, 2 bytes, big-endian `uint16`. 5000 burns half. 0 injects the whole payment. 10000 burns the whole payment.
 
 `DFXStarConfig` on this world is:
 
@@ -31,13 +32,13 @@ One Multicall3 `aggregate3`, `allowFailure` false. Use the pool, factory, and pa
 | Pool code size                             | `0` means the pool is not there. Stop. Do not deploy one                                    |
 | Pool `world()`                             | Must equal the World `0x3295A33430Bb33696b5F04DC12DD91276213100e`. This is the bound scorer |
 | Factory `poolOfWorld(world)`               | Must equal the pool. A second pool for the same World cannot be created                     |
-| Pool `getTotalStakedAmount()`              | Buy silver reverts while this is 0. The first score deposit may be the stake that opens it  |
+| Pool `getTotalStakedAmount()`              | A buy with a non-zero remainder reverts while this is 0. `burnBps` 10000 does not           |
 | Pool `getUserStakedAmount(player)`         | This wallet's score stake                                                                   |
 | Pool `getPendingAllRewards(player)`        | Two `uint256` words: community pending, then injected pending                               |
 | Token `balanceOf(player)`                  | This wallet's AIPRO. Score staking does not transfer it                                     |
 | Token `allowance(player, buySilverSystem)` | Buy silver pulls tokens into `BuySilverSystem`. Approve that address, not the World         |
 
-`getPendingAllRewards` does not pay the wallet. Read both numbers from the pool. Do not invent an AIPRO emission rate. Buy-silver payments are injected into the pool and split by stake. They are separate from the community release.
+`getPendingAllRewards` does not pay the wallet. Read both numbers from the pool. Do not invent an AIPRO emission rate. The unburned part of a buy-silver payment is injected into the pool and split by stake. The burned part is not in that pending balance. Both are separate from the community release.
 
 Write `totalStaked`, `myStaked`, `pendingCommunity`, `pendingInjected`, and `pool` into the round's `snapshots.ndjson` line. `pool` is the score-staking address from config.
 
@@ -49,9 +50,9 @@ The withdraw system does not call the pool itself. It calls the root system `Sta
 
 This call does not move AIPRO. It increases `userStakes` and `totalStaked`. It can be the first stake in the pool. It reverts when the pool has no code, when `pool.world()` is not this World, or when the pool's community calls fail. Send it with no ETH attached. `pool.world()` is `0x3295A33430Bb33696b5F04DC12DD91276213100e`.
 
-## Buy silver injects AIPRO
+## Buy silver burns, then injects the remainder
 
-The send is in [actions.md](actions.md). The price is in [rules.md](rules.md). Approve the payment token to `buySilverSystem` for the discounted whole-token price, then call World `df__buySilver`. The `df` system is a normal call, so `BuySilverSystem` pulls the tokens and calls `injectRewards`. The pool splits that amount across current stakers by stake. The call reverts when `totalStaked` is 0, so a score deposit has to land first. A score deposit is different: only the World, through the root `StakeScoreSystem`, may call `depositFromGame`.
+The send is in [actions.md](actions.md). The price is in [rules.md](rules.md). Approve the payment token to `buySilverSystem` for the discounted whole-token price, then call World `df__buySilver`. The `df` system is a normal call, so `BuySilverSystem` pulls the full price. It sends `price × burnBps / 10000`, rounded down, to `0x000000000000000000000000000000000000dEaD`, then calls `injectRewards` with the remainder. The pool splits that remainder across current stakers by stake. When the remainder is above 0, the call reverts while `totalStaked` is 0, so a score deposit has to land first. When `burnBps` is 10000 the remainder is 0, `injectRewards` is not called, and no stake is required. A score deposit is different: only the World, through the root `StakeScoreSystem`, may call `depositFromGame`. The namespace owner changes the ratio with `df__updateSilverBurnBps`. Values above 10000 revert. Rewriting the pool addresses with `df__setDFXStarConfig` leaves `burnBps` as it is.
 
 The whole-token amount counts against the cap in [play.md](play.md). If `balanceOf` is below the price, or the remaining cap is below the price, do not send it. Tell the owner. Do not mint AIPRO and do not spend another account's tokens.
 

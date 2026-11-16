@@ -44,7 +44,8 @@ contract BuySilverTest is BaseTest {
     SilverPurchaseConfig.setTierPrices(prices);
     SilverPurchaseConfig.setTierSilverAmounts(silvers);
 
-    DFXStarConfig.set(address(pool), address(token), address(0), address(0), address(this));
+    // 部署默认销毁一半。
+    DFXStarConfig.set(address(pool), address(token), address(0), address(0), address(this), 5000);
     vm.stopPrank();
 
     // 登记的是调用者，不是第二个参数。第二个参数只是 burner。
@@ -108,7 +109,8 @@ contract BuySilverTest is BaseTest {
     IWorld(worldAddress).df__buySilver(planetHash, 0);
     vm.stopPrank();
 
-    assertEq(pool.lastInjectAmount(), 34_000 ether);
+    assertEq(pool.lastInjectAmount(), 17_000 ether);
+    assertEq(token.balanceOf(_burnAddress()), 17_000 ether);
     assertEq(token.balanceOf(user1), 1_000_000 ether - 34_000 ether);
     // 5 级 20% 是页面上的 10000 银，链上再乘 1000。
     assertEq(PlanetTable.getSilver(bytes32(planetHash)), 10_000_000);
@@ -123,7 +125,7 @@ contract BuySilverTest is BaseTest {
     IWorld(worldAddress).df__buySilver(planetHash, 0);
     vm.stopPrank();
 
-    assertEq(pool.lastInjectAmount(), 34_000 ether);
+    assertEq(pool.lastInjectAmount(), 17_000 ether);
     assertEq(PlanetTable.getSilver(bytes32(planetHash)), 10_000_000);
   }
 
@@ -137,8 +139,9 @@ contract BuySilverTest is BaseTest {
     IWorld(worldAddress).df__buySilver(planetHash, 1);
     vm.stopPrank();
 
-    // 进度 4、星球 3，价格 90%。15625 × 90% = 14062.5，进一成 14063。
-    assertEq(pool.lastInjectAmount(), 14_063 ether);
+    // 进度 4、星球 3，价格 90%。15625 × 90% = 14062.5，进一成 14063。一半销毁。
+    assertEq(pool.lastInjectAmount(), 14_063 ether / 2);
+    assertEq(token.balanceOf(_burnAddress()), 14_063 ether - 14_063 ether / 2);
     assertEq(PlanetTable.getSilver(bytes32(planetHash)), 1_250_000);
   }
 
@@ -151,7 +154,7 @@ contract BuySilverTest is BaseTest {
     IWorld(worldAddress).df__buySilver(planetHash, 3);
     vm.stopPrank();
 
-    assertEq(pool.lastInjectAmount(), 255_000 ether);
+    assertEq(pool.lastInjectAmount(), 127_500 ether);
     assertEq(PlanetTable.getSilver(bytes32(planetHash)), 75_000_000);
   }
 
@@ -175,6 +178,67 @@ contract BuySilverTest is BaseTest {
     vm.expectRevert(Errors.InvalidSilverPurchaseTier.selector);
     IWorld(worldAddress).df__buySilver(planetHash, 4);
     vm.stopPrank();
+  }
+
+  function testBuySilver_zeroBurnSendsEverythingToPool() public {
+    vm.prank(admin);
+    IWorld(worldAddress).df__updateSilverBurnBps(0);
+
+    uint256 planetHash = _ownPlanet("no-burn", 5, PlanetType.PLANET, SpaceType.NEBULA, 0);
+    pool.depositFromGame(user2, 1);
+
+    vm.startPrank(user1);
+    token.approve(_buySilverSystem(), type(uint256).max);
+    IWorld(worldAddress).df__buySilver(planetHash, 0);
+    vm.stopPrank();
+
+    assertEq(pool.lastInjectAmount(), 34_000 ether);
+    assertEq(token.balanceOf(_burnAddress()), 0);
+  }
+
+  function testBuySilver_fullBurnSkipsPoolAndStakers() public {
+    vm.prank(admin);
+    IWorld(worldAddress).df__updateSilverBurnBps(10_000);
+
+    uint256 planetHash = _ownPlanet("all-burn", 5, PlanetType.PLANET, SpaceType.NEBULA, 0);
+
+    vm.startPrank(user1);
+    token.approve(_buySilverSystem(), type(uint256).max);
+    IWorld(worldAddress).df__buySilver(planetHash, 0);
+    vm.stopPrank();
+
+    assertEq(pool.lastInjectAmount(), 0);
+    assertEq(token.balanceOf(_burnAddress()), 34_000 ether);
+    assertEq(token.balanceOf(user1), 1_000_000 ether - 34_000 ether);
+    assertEq(PlanetTable.getSilver(bytes32(planetHash)), 10_000_000);
+  }
+
+  function testUpdateSilverBurnBps_rejectsOutOfRangeAndStrangers() public {
+    vm.expectRevert();
+    vm.prank(user1);
+    IWorld(worldAddress).df__updateSilverBurnBps(1);
+
+    vm.startPrank(admin);
+    vm.expectRevert(Errors.SilverBurnBpsOutOfRange.selector);
+    IWorld(worldAddress).df__updateSilverBurnBps(10_001);
+    IWorld(worldAddress).df__updateSilverBurnBps(2_500);
+    vm.stopPrank();
+
+    assertEq(DFXStarConfig.getBurnBps(), 2_500);
+  }
+
+  function testSetDFXStarConfig_keepsBurnBps() public {
+    vm.startPrank(admin);
+    IWorld(worldAddress).df__updateSilverBurnBps(2_500);
+    IWorld(worldAddress).df__setDFXStarConfig(address(pool), address(token), address(0), address(0), address(this));
+    vm.stopPrank();
+
+    assertEq(DFXStarConfig.getBurnBps(), 2_500);
+    assertEq(DFXStarConfig.getScoreStakingPool(), address(pool));
+  }
+
+  function _burnAddress() internal pure returns (address) {
+    return 0x000000000000000000000000000000000000dEaD;
   }
 
   function _buySilverSystem() internal view returns (address) {
