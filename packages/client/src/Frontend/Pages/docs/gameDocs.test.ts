@@ -60,6 +60,18 @@ describe("game docs", () => {
     });
   });
 
+  it("explains the foundry prospect window", () => {
+    const planets = findChapter("planets");
+    expect(chapterHeadings(planets).map((heading) => heading.id)).toContain(
+      "prospect",
+    );
+    const text = planets.blocks
+      .flatMap((block) => (block.kind === "p" ? [block.text] : []))
+      .join("\n");
+    expect(text).toContain("其后第 256 个区块");
+    expect(text).toContain("可以重新勘探");
+  });
+
   it("shows the energy growth formulas in resources", () => {
     const resources = findChapter("resources");
     expect(chapterHeadings(resources).map((heading) => heading.id)).toContain(

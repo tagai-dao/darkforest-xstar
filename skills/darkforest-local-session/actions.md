@@ -139,11 +139,13 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 ## Prospect and find an artifact
 
-**Send.** `df__prospectPlanet(uint256 planetHash)` requires an owned foundry, a matching junk owner, and the explored flag unset. A foundry is contract type 3. The client calls that type ruins. `df__findingArtifact` uses the same biomebase proof as `df__addJunk`: the proof plus the 7 public signals, with the planet hash inside that input. Find must be sent while `prospect block + 256` is still at least the current block.
+These are two calls. Prospect does not create an artifact. Find does. The client button "Prospect Artifact" sends prospect, waits until it is mined, then sends find. Send them as two transactions when calling the world directly. Both pay the entry fee. The contract does not require a gear ship on the foundry.
 
-**Effect.** Prospect stores the current block. Find creates an artifact on the planet and sets the explored flag. After that flag is set, prospect and find both revert.
+**Send.** `df__prospectPlanet(uint256 planetHash)` takes only the planet hash. The caller must own the foundry and be its junk owner. A foundry is contract type 3. The client calls that type ruins. The explored flag must be unset. If this foundry was prospected before and `prospect block + 256` is still at least the current block, prospect reverts. `df__findingArtifact` uses the same biomebase proof as `df__addJunk`: the Groth16 proof plus the 7 public signals, with the planet hash inside that input. Find reverts unless a prospect block is stored and `prospect block + 256` is still at least the current block. It also reverts when the explored flag is set.
 
-**Impact.** The artifact can then be charged, activated, moved, or left in place. Missing the 256-block window means prospecting again before another find. A found artifact occupies one of the planet's artifact slots. Record `prospect`, then `find-artifact`.
+**Effect.** Prospect writes `ProspectedPlanet` to the current block number. Energy, silver, and materials stay as they are. Find builds one artifact and pushes it into a free slot on that foundry. A foundry holds at most 8. The seed is `keccak256(planetHash, block.timestamp, blockhash(prospect block))`. The chain returns a block hash only for the last 256 blocks, so the find has to land in that window for the prospect block's hash to be part of the seed. Rarity follows the foundry level: level 0–1 common, 2–3 rare, 4–5 epic, 6–7 legendary, 8–9 mythic. The seed gives about a 1/16 chance of treating the level as one higher and about a 1/64 chance of two higher. The type is drawn from that rarity's probability table. The biome comes from the space type and the biomebase in the proof. Dead space is always corrupted. The same call sets the explored flag. Find does not charge or activate the artifact.
+
+**Impact.** After a successful find, prospect and find both revert on this foundry. If the 256-block window ends before find, the explored flag is still unset, so prospect can be sent again and opens a new window. Charge, activate, shutdown, and moving the artifact are separate calls below. Record `prospect`, then `find-artifact`.
 
 ## Charge, activate, shut down
 
