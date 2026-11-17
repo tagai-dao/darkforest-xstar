@@ -82,12 +82,14 @@ export class UIRenderer implements UIRendererType {
       } else {
         const myPlanet = uiManager.getPlanetWithCoords(from);
         if (myPlanet && isLocatable(myPlanet) && to !== from) {
+          whiteA[3] = 255;
           lR.queueLineWorld(
             from,
             to,
             uiManager.isAbandoning() ? orangeA : whiteA,
             2,
             RenderZIndex.Voyages,
+            true,
           );
 
           let effectiveEnergy = myPlanet.energy;
@@ -124,6 +126,19 @@ export class UIRenderer implements UIRendererType {
           }
         }
       }
+    }
+
+    const preview = uiManager.getAttackPreview();
+    if (preview) {
+      whiteA[3] = 255;
+      lR.queueLineWorld(
+        preview.from,
+        preview.to,
+        whiteA,
+        2,
+        RenderZIndex.Voyages,
+        true,
+      );
     }
   }
 

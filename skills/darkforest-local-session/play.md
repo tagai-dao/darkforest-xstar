@@ -137,9 +137,9 @@ import path from "node:path";
 
 const PHASE = process.argv[2]; // reveal | voyages
 const WALLET =
-  "<save root>/31337-0x3295a33430bb33696b5f04dc12dd91276213100e-<season>/<wallet lowercase>";
+  "<save root>/31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-<season>/<wallet lowercase>";
 const RPC = "http://127.0.0.1:8545";
-const WORLD = "0x3295A33430Bb33696b5F04DC12DD91276213100e";
+const WORLD = "0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f";
 const MULTI = "0xcA11bde05977b3631167028862bE2a173976CA11";
 const SET_RECORD =
   "0x8dbb3a9672eebfd3773e72dd9c102393436816d832c7ba9e1e1ac8fcadcac7a9";

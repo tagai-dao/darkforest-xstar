@@ -51,14 +51,21 @@ const normalizeAddress = (value: string): Address => {
 export const GamePassAdminPanel = () => {
   const {
     network: { publicClient, waitForTransaction, worldContract },
-    components: { GamePassNFT },
+    components: { GamePassNFT, DFXStarConfig },
   } = useMUD();
   const gamePassConfig = useComponentValue(GamePassNFT, singletonEntity);
+  // 买银扣的是这枚 ERC20，地址写在 DFXStarConfig，和上面的 AIPRO NFT 不是同一个合约。
+  const starConfig = useComponentValue(DFXStarConfig, singletonEntity);
 
   const lockerAddress = useMemo(() => {
     const addr = gamePassConfig?.addr as Address | undefined;
     return addr && addr !== zeroAddress ? addr : undefined;
   }, [gamePassConfig?.addr]);
+
+  const aiproToken = useMemo(() => {
+    const addr = starConfig?.paymentToken as Address | undefined;
+    return addr && addr !== zeroAddress ? addr : undefined;
+  }, [starConfig?.paymentToken]);
 
   const [lockerOwner, setLockerOwner] = useState<Address>();
   const [nftAddress, setNftAddress] = useState<Address>();
@@ -283,6 +290,7 @@ export const GamePassAdminPanel = () => {
         <div>保管合约：{lockerAddress ?? "还没配置"}</div>
         <div>管理员：{lockerOwner ?? "-"}</div>
         <div>AIPRO NFT：{nftAddress ?? "-"}</div>
+        <div>AIPRO 代币：{aiproToken ?? "-"}</div>
         <div>Handle 注册表：{handleRegistry ?? "-"}</div>
         <div>当前世界：{activeWorld ?? "-"}</div>
         <div>当前轮：{activeSeason ?? "-"}</div>

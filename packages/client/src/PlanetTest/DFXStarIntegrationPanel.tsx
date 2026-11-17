@@ -351,7 +351,7 @@ export const DFXStarIntegrationPanel = () => {
           />
         </label>
         <label className="flex flex-col gap-1">
-          Community Token {tokenSymbol ? `(${tokenSymbol})` : ""}
+          AIPRO 代币 {tokenSymbol ? `(${tokenSymbol})` : ""}
           <input
             className="rounded border border-gray-600 bg-black/40 px-2 py-1 font-mono text-xs"
             value={paymentToken}

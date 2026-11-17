@@ -421,7 +421,11 @@ class Viewport {
   onMouseMove(canvasCoords: CanvasCoords) {
     const uiEmitter = UIEmitter.getInstance();
 
-    if (this.isPanning && this.mouseLastCoords) {
+    const launching = this.gameUIManager.canLaunchFrom(
+      this.gameUIManager.getMouseDownPlanet(),
+    );
+    // 从自己的星球拖出去时要画攻击线，不能把这次移动当成平移地图。
+    if (this.isPanning && this.mouseLastCoords && !launching) {
       // if panning, don't need to emit mouse move event
       const dx = this.scale * (this.mouseLastCoords.x - canvasCoords.x);
       const dy = -this.scale * (this.mouseLastCoords.y - canvasCoords.y);

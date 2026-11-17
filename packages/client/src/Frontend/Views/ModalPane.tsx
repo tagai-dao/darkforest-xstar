@@ -65,6 +65,8 @@ export type ModalProps = PaneProps & {
     x: number;
     y: number;
   };
+  // right：贴在屏幕右边。已保存的旧位置不再把它拉回中间。
+  dock?: "right";
 };
 
 /**
@@ -97,6 +99,7 @@ export function ModalPane({
   helpContent,
   width,
   initialPosition,
+  dock,
   id,
 }: ModalProps) {
   const uiManager = useUIManager();
@@ -132,7 +135,16 @@ export function ModalPane({
     [push],
   );
 
-  const initialPos = modalPosition || initialPosition;
+  const paneWidth = Number.parseInt(width ?? "350", 10) || 350;
+  // 点星球后信息固定在右边，留出 16px，避免贴边。
+  const dockedPosition =
+    dock === "right"
+      ? {
+          x: Math.max(12, window.innerWidth - paneWidth - 16),
+          y: 72,
+        }
+      : undefined;
+  const initialPos = dockedPosition ?? modalPosition ?? initialPosition;
   const showingHelp = helpContent !== undefined && showingInformationSection;
 
   const api: ModalHandle = useMemo<ModalHandle>(

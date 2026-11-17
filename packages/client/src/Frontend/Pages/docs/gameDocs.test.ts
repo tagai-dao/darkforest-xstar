@@ -53,9 +53,14 @@ describe("game docs", () => {
       ]),
     });
     const buy = resources.blocks.find(
-      (block) => block.kind === "p" && block.text.includes("销毁地址"),
+      (block) => block.kind === "p" && block.text.includes("直接销毁"),
     );
-    expect(buy && buy.kind === "p" ? buy.text : "").toContain("5000");
+    const buyText = buy && buy.kind === "p" ? buy.text : "";
+    expect(buyText).toContain(
+      "购买使用的 AIPRO 中有 50% 会直接销毁，50% 会分给游戏的积分排行榜，由玩家瓜分。",
+    );
+    expect(buyText).not.toContain("销毁地址");
+    expect(buyText).not.toContain("管理员");
     const discount = resources.blocks.find(
       (block) => block.kind === "table" && block.headers[0] === "进度",
     );

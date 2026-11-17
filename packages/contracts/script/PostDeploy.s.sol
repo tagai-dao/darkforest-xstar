@@ -105,9 +105,10 @@ contract PostDeploy is Script {
     if (toml.readBool(".artifact_nft.set_current_round")) {
       IArtifactNFT(artifactNftAddress).setDF(roundNum, worldAddress);
     }
-    _setGamePassConfig(toml, worldAddress);
     _setSilverPurchaseConfig(toml);
+    // 付费铸造要扣本地 AIPRO，所以先建社区代币，再部署 NFT。
     _setDFXStarConfig(toml, worldAddress);
+    _setGamePassConfig(toml, worldAddress);
 
     // set entry fee
     uint256 entryFee = toml.readUint(".entry_fee.value");
@@ -391,14 +392,16 @@ contract PostDeploy is Script {
     address nftAddress = toml.readAddress(".game_pass.nft_address");
     address handleRegistry = toml.readAddress(".game_pass.handle_registry");
 
-    // 本地 anvil 上没有主网合约。部署同接口的测试 NFT 和 handle 登记处，入场检查仍然打开。
-    if (nftAddress == address(0) || nftAddress.code.length == 0) {
-      nftAddress = address(new LocalAiproNft());
-      console.log("Local AIPRO NFT:", nftAddress);
-    }
+    // 本地 anvil 上没有主网合约。登记处要先于 NFT，因为铸造时要读 handle。
     if (handleRegistry == address(0) || handleRegistry.code.length == 0) {
       handleRegistry = address(new LocalHandleRegistry());
       console.log("Local handle registry:", handleRegistry);
+    }
+    if (nftAddress == address(0) || nftAddress.code.length == 0) {
+      address paymentToken = DFXStarConfig.getPaymentToken();
+      require(paymentToken.code.length > 0, "AIPRO token required");
+      nftAddress = address(new LocalAiproNft(paymentToken, handleRegistry));
+      console.log("Local AIPRO NFT:", nftAddress);
     }
 
     AiproNftStake locker = new AiproNftStake(nftAddress, handleRegistry);

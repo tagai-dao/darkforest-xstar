@@ -28,6 +28,8 @@ import GuildContextPane from "../Panes/GuildPane";
 import { HelpPane } from "../Panes/HelpPane";
 import { HotkeysArtShipPane, HotkeysMainLinePane } from "../Panes/HotKeyPane";
 import { HoverPlanetPane } from "../Panes/HoverPlanetPane";
+import { MoveOrderNotice } from "../Panes/MoveOrderNotice";
+import { SelectedPlanetSidePane } from "../Panes/SelectedPlanetSidePane";
 import { LeaderboardPane } from "../Panes/LeaderboardPane";
 import OnboardingPane from "../Panes/OnboardingPane";
 import { PlanetContextPane } from "../Panes/PlanetContextPane";
@@ -514,6 +516,8 @@ export function GameWindowLayout({
             )}
 
           <HoverPlanetPane />
+          <SelectedPlanetSidePane />
+          <MoveOrderNotice />
           <ArtifactHoverPane />
           <SelectedVoyageDisplay />
           {!spectate && <TutorialPane tutorialHook={tutorialHook} />}

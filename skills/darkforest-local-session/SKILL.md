@@ -1,6 +1,6 @@
 ---
 name: darkforest-local-session
-description: Join the local Dark Forest simulation, initialize a home planet, mine outward from that home, and play with a named strategy file. Use when the owner wants an agent to start this local game, stake an AIPRO NFT, spawn a home, mine, or take the next game action.
+description: Join the local Dark Forest simulation, initialize a home planet, mine outward from that home, and play with a named strategy file. Use when the owner wants an agent to start this local game, stake an AIPRO NFT, spawn a home, mine, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, or DARKFOREST_UPGRADE.
 ---
 
 # Local simulation
@@ -11,22 +11,81 @@ The owner does not know the chain, contracts, or price. Do not ask for them. The
 | --------------- | --------------------------------------------------------------------------------------- |
 | Chain ID        | `31337`                                                                                 |
 | RPC             | `http://127.0.0.1:8545` (`http://localhost:8545` is the same)                           |
-| World           | `0x3295A33430Bb33696b5F04DC12DD91276213100e`                                            |
-| AIPRO NFT       | `0x90c84237fDdf091b1E63f369AF122EB46000bc70`                                            |
-| Handle registry | `0x3D63c50AD04DD5aE394CAB562b7691DD5de7CF6f`                                            |
-| Locker          | `0x103A3b128991781EE2c8db0454cA99d67b257923`                                            |
+| World           | `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`                                            |
+| AIPRO NFT       | `0x3a622DB2db50f463dF562Dc5F341545A64C580fc`                                            |
+| Handle registry | `0xc6B407503dE64956Ad3cF5Ab112cA4f56AA13517`                                            |
+| Locker          | `0x6A47346e722937B60Df7a1149168c0E76DD6520f`                                            |
 | Entry           | Stake one AIPRO NFT in the locker. There is no DFPT and no pass to buy.                 |
 | Season          | Read `activeSeason()` on the locker.                                                    |
 | Multicall3      | `0xcA11bde05977b3631167028862bE2a173976CA11`. If this address has no code, stop.        |
 | Player          | The wallet the owner connected for this run. Do not write that address into this skill. |
 
-Use these addresses. If this wallet is not already in the season, approve one NFT to the locker, then call `stake` on the locker. Stake transfers that NFT into the locker, so a wallet already in the season has an NFT balance of 0 and still plays. Do not call `mint` or `setHandle`. If a chain read of the NFT, the handle registry, the locker, or the World does not match this table, stop.
+After each local deploy, rewrite the AIPRO NFT, handle registry, and locker above, and the five Nutbox addresses in [nutbox.md](nutbox.md), from that deploy's PostDeploy log. Leave World and Multicall3 unchanged when the log shows the same values.
+
+Anvil can reset while reusing chain ID, World address, and season number. At the start of a new run, verify the current World, locker, NFT, handle registry, and pool on chain before opening a wallet save. A matching folder name alone does not prove that its files belong to this deployment. If the owner removed the previous game files, treat the new wallet folder as empty; do not restore old `homeLocations.json`, `knownBoard.ndjson`, `planets`, `voyages`, `actions.ndjson`, or `strategy.txt` from another run. Create fresh files only after the current chain and wallet state have been read. Keep stopped mining and strategy processes stopped until the owner explicitly starts them for this run.
+
+After a restart, treat any earlier chain snapshot, transaction receipt, staked NFT, registered name, home, and in-memory signer as unverified. Pin a fresh block and read the current `GamePassNFT` World record through the verified Multicall3; check the locker, NFT, handle registry, and pool against the current deployment before making a game decision. Derive the player address from a signer that is **still live**, then read that player's current-season membership and `SpawnPlanet` from this deployment. A socket path or a saved address by itself does not prove that its old signer process survived the restart. Do not resume an old transaction plan or copy a prior season's map or action log into the new save. The PostDeploy log and a wallet folder are supporting evidence; the current chain state decides what is live.
+
+Use the active World from `packages/contracts/worlds.json` for chain 31337, and verify its code before using it. Read the locker from the World table and the NFT and handle registry from that locker. If this wallet is not already in the season and holds an NFT, approve that NFT to the locker, then call `stake` on the locker. Stake transfers that NFT into the locker, so a wallet already in the season has an NFT balance of 0 and still plays. A wallet with a handle and no NFT pays to mint first. Do not call `setHandle`. Stop if any required address has no code or the locker reports a different active World.
 
 Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost` before calling the RPC. If the RPC cannot be reached, stop.
 
+## Pasted fleet
+
+The game page does not send a fleet when the owner drags from one planet to another. It copies a block. The first line is `DARKFOREST_MOVE`. The next line is one JSON object with `"kind": "darkforest-move"`.
+
+That JSON is the whole move. The moment it is recognized, prove and send it in this turn. Do not wait for another message. Do not ask to start, do not ask which planet, and do not ask how much energy or silver to send. `population` is the energy for this departure, and `silver` is the silver. Both are already chain units. Do not multiply them by 1000 again. Do not mine, do not open the map to choose a source or a destination, and do not run a strategy round before this send. Do not change `population`, `silver`, `artifactId`, `materials`, or any field inside `circuit`.
+
+Prove from `packages/client`, with `packages/client/public/snarkjs.min.js`, `packages/client/src/Shared/snarks/move.wasm`, and `packages/client/src/Shared/snarks/move.zkey`. Pass `circuit` to `groth16.fullProve` as the input. Every value in `circuit` is already a string. Do not recompute coordinates, `distMax`, or `targetDistFromOriginSquare`.
+
+Turn the snarkjs proof into the World proof before sending:
+
+- `A` is `[pi_a[0], pi_a[1]]`. Drop `pi_a[2]`.
+- `B` is `[[pi_b[0][1], pi_b[0][0]], [pi_b[1][1], pi_b[1][0]]]`. Reverse each inner pair. Drop `pi_b[2]`.
+- `C` is `[pi_c[0], pi_c[1]]`. Drop `pi_c[2]`.
+- The MoveInput is the 11 `publicSignals` in the order the prover returned them. Do not sort or rebuild that array.
+
+The first public signal must equal `fromHash`. The second must equal `toHash`. Both are decimal planet hashes. If either differs, stop and do not send.
+
+Call World `df__move` with that proof, that MoveInput, `population`, `silver`, `artifactId`, and `materials`. `materials` is the pasted array of `{ resourceId, amount }`. Each `amount` is already chain units. An empty array sends no materials. Attach `entryFeeWei` wei as the transaction value. Sign with the player wallet. Wait for a successful receipt. Then record `move` as [actions.md](actions.md) describes, with `to` set to `toHashHex`: 64 lowercase hex characters and no `0x` prefix. If the proof fails or the receipt reverts, tell the owner and do not write `actions.ndjson`.
+
+## Pasted material score
+
+The game page does not withdraw material. On a spacetime rip it copies a block. The first line is `DARKFOREST_WITHDRAW_MATERIAL`. The next line is one JSON object with `"kind": "darkforest-withdraw-material"`.
+
+That JSON is the whole withdrawal. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start, do not ask which planet, and do not ask which material or how much to withdraw. `amount` is already chain units. Do not multiply it by 1000. Do not mine, do not open the map, and do not run a strategy round before this send. Do not change `planetHash`, `materialType`, or `amount`.
+
+Call World `df__withdrawMaterial` with `planetHash`, `materialType`, and `amount`. There is no proof. Attach `entryFeeWei` wei as the transaction value. Sign with the player wallet. Wait for a successful receipt. Then record `withdraw-material` as [actions.md](actions.md) describes. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
+
+## Pasted silver score
+
+The game page does not withdraw silver. On a spacetime rip it copies a block. The first line is `DARKFOREST_WITHDRAW_SILVER`. The next line is one JSON object with `"kind": "darkforest-withdraw-silver"`.
+
+That JSON is the whole withdrawal. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start, do not ask which planet, and do not ask how much silver to withdraw. `amount` is already chain units. Do not multiply it by 1000. Do not mine, do not open the map, and do not run a strategy round before this send. Do not change `planetHash` or `amount`. A silver mine cannot take this call. The pasted `planetHash` is the spacetime rip.
+
+Call World `df__withdrawSilver` with `planetHash` and `amount`. There is no proof. Attach `entryFeeWei` wei as the transaction value. Sign with the player wallet. Wait for a successful receipt. Then record `withdraw-silver` as [actions.md](actions.md) describes. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
+
+## Pasted silver purchase
+
+The game page does not buy silver. On a planet that can buy it, the page copies a block. The first line is `DARKFOREST_BUY_SILVER`. The next line is one JSON object with `"kind": "darkforest-buy-silver"`.
+
+That JSON is the whole purchase. The moment it is recognized, approve and send it in this turn. Do not wait for another message. Do not ask to start, do not ask which planet, and do not ask which tier. Do not change `planetHash`, `tier`, `priceWei`, `paymentToken`, or `buySilverSystem`. Do not mine and do not open the map. `tier` is 0, 1, 2, or 3. The call does not take a silver amount.
+
+If `allowance(player, buySilverSystem)` is below `priceWei`, approve `paymentToken` to `buySilverSystem` for `priceWei`. Do not approve the World. Then call World `df__buySilver` with `planetHash` and `tier`. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Record `priceWhole` in `spends.ndjson` and record `buy-silver` as [actions.md](actions.md) describes. If the approval or the receipt reverts, tell the owner and do not write `actions.ndjson` or `spends.ndjson`.
+
+## Pasted upgrade
+
+The game page does not upgrade a planet. On an owned planet it copies a block. The first line is `DARKFOREST_UPGRADE`. The next line is one JSON object with `"kind": "darkforest-upgrade"`.
+
+That JSON is the whole upgrade. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start, do not ask which planet, and do not ask which stat. Do not change `planetHash`, `rangeTimes`, `speedTimes`, or `defenseTimes`. Those three counts are the extra levels for this call, not the new totals. There is no proof.
+
+Call World `df__upgradePlanet` with `planetHash`, `rangeTimes`, `speedTimes`, and `defenseTimes`. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Then record `upgrade` as [actions.md](actions.md) describes. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
+
+A message can contain more than one of these blocks. Send every fleet first, then every silver withdrawal, then every material withdrawal, then every silver purchase, then every upgrade, all in this turn.
+
 ## Ask first
 
-After reading this skill, ask whether to start. Do not ask again in this conversation if the owner already answered.
+After reading this skill, ask whether to start. Do not ask again in this conversation if the owner already answered. A message that contains `DARKFOREST_MOVE`, `DARKFOREST_WITHDRAW_MATERIAL`, `DARKFOREST_WITHDRAW_SILVER`, `DARKFOREST_BUY_SILVER`, or `DARKFOREST_UPGRADE` is an order, not a new start. Send each order as its pasted section describes, and do not ask this question.
 
 > Start this local simulation? I will read the connected wallet and then decide whether to stake an AIPRO NFT for this season, or initialize a home.
 
@@ -51,7 +110,7 @@ export NO_PROXY=127.0.0.1,localhost
 export no_proxy=127.0.0.1,localhost
 RPC=http://127.0.0.1:8545
 MULTI=0xcA11bde05977b3631167028862bE2a173976CA11
-WORLD=0x3295A33430Bb33696b5F04DC12DD91276213100e
+WORLD=0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f
 
 ETH=$(cast calldata "getEthBalance(address)" <player>)
 LOCKER_REC=$(cast calldata "getRecord(bytes32,bytes32[])" 0x7462646600000000000000000000000047616d65506173734e46540000000000 "[]")
@@ -107,7 +166,7 @@ Follow this order. Take the first match. A wallet already in the season keeps it
 2. The wallet is in the season, `SpawnPlanet` is not zero, and `homeLocations.json` does not contain that hash: **stop**. The home is already on chain and its coordinates were not saved. Coordinates are not recoverable from the chain. Do not search for another planet.
 3. The wallet is in the season and `SpawnPlanet` is zero: there is **no home**. Read [home.md](home.md). If the player index is zero, ask for a name and wait before registering. Do not invent a name. After the home files exist, ask in that same reply whether to mine and which strategy starts play, as [home.md](home.md) and [mining.md](mining.md) describe. Do not stop after only reporting the coordinates.
 4. The wallet is not in the season and `handleOf(player)` is empty: **no Binance handle**. Stop. Do not call `setHandle`, and do not invent a handle.
-5. The wallet is not in the season and the NFT balance is 0: **no AIPRO NFT**. Stop. Do not mint, and do not look for a token to buy.
+5. The wallet is not in the season, has a handle, and the NFT balance is 0: **paid mint**. Ask before spending. Then stake the minted token.
 6. The wallet is not in the season, has a handle, and holds an NFT: **stake**.
 
 Before staking, registering, or spawning, if the ETH balance cannot pay for one ordinary transaction, decide **not enough gas** and do not send a transaction. Registering uses the name the owner just gave. Spawning does not need its own yes once a legal home coordinate is known. A search the owner already stopped stays stopped. A home that just got saved is followed by the mining and strategy question, and mining starts only after they answer.
@@ -132,7 +191,11 @@ Example, when this wallet has a handle and an NFT and has not staked:
 
 No Binance handle. Do not send a transaction. Tell the owner this wallet has an empty handle, so it cannot stake. Ask whether this is the wallet they mean.
 
-No AIPRO NFT, and not already in the season. Do not send a transaction. Tell the owner this wallet holds none and has not staked, so it cannot join. Ask whether this is the wallet they mean. A wallet already in the season is not this case. Its balance is 0 because the locker holds the NFT, and play continues.
+No AIPRO NFT, and not already in the season. Ask before minting. The question names the wallet, the AIPRO price, and the native fee.
+
+> Mint an AIPRO NFT with this wallet now? It costs 100000 AIPRO and 0.01 ETH. The NFT stays in this wallet until it is staked.
+
+A wallet already in the season is not this case. Its balance is 0 because the locker holds the NFT, and play continues. If the owner says no, stop.
 
 Not enough gas. Do not send a transaction. Tell the owner this wallet needs ETH for gas.
 
@@ -143,6 +206,13 @@ Joined, but no home yet. If this player is not registered, ask for a name before
 ## Transactions after confirmation
 
 Sign with the current wallet. A legacy transaction is fine. Do not write a private key into any file, and do not let the page sign. Wait for each receipt before the next step. If a transaction fails, tell the owner the reason and do not retry against a different contract.
+
+Paid mint, only after the owner says yes:
+
+1. Read `communityTokenPrice()` and `nativePrice()` on the NFT. The local collection returns `100000` AIPRO, which is `100000` ether in raw units, and `0.01` ether. Stop if either value differs.
+2. Read the AIPRO balance. The payment token is `paymentToken` in `DFXStarConfig`, the address in [nutbox.md](nutbox.md). Stop if the balance is below the price, or the ETH balance cannot cover `0.01` ether plus gas. Tell the owner which one is short. Do not mint from another wallet.
+3. Read `allowance(player, NFT)`. If it is below the price, approve the NFT for the price. Approve the NFT contract, not the locker and not the World.
+4. Call NFT `mint(uint256 referrerTokenId)` with value `nativePrice`. Pass `0` unless the owner named a referrer token id. The receipt mints the next token to this wallet. The wallet must already have a handle. Do not call `setHandle`.
 
 Stake:
 
@@ -158,6 +228,10 @@ export NO_PROXY=127.0.0.1,localhost
 export no_proxy=127.0.0.1,localhost
 RPC=http://127.0.0.1:8545
 
+# Paid mint. $AIPRO is the payment token. Value is nativePrice, 0.01 ether.
+cast send --legacy --rpc-url $RPC $AIPRO "approve(address,uint256)" $NFT 100000000000000000000000
+cast send --legacy --rpc-url $RPC $NFT "mint(uint256)" 0 --value 0.01ether
+
 cast send --legacy --rpc-url $RPC $NFT "approve(address,uint256)" $LOCKER <tokenId>
 cast send --legacy --rpc-url $RPC $LOCKER "stake(uint256)" <tokenId>
 ```
@@ -168,7 +242,7 @@ The root is the folder the owner named. The wallet folder contains `agent.json` 
 
 Add two levels under the root:
 
-`<root>/31337-0x3295a33430bb33696b5f04dc12dd91276213100e-<season>/<wallet lowercase>/agent.json`
+`<root>/31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-<season>/<wallet lowercase>/agent.json`
 
 `agent.json` contains only:
 
@@ -181,7 +255,7 @@ Add two levels under the root:
 ```json
 {
   "chainId": 31337,
-  "world": "0x3295a33430bb33696b5f04dc12dd91276213100e",
+  "world": "0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f",
   "season": 1
 }
 ```

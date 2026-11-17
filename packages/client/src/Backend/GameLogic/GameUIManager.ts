@@ -78,6 +78,7 @@ import type { TerminalHandle } from "../../Frontend/Views/Terminal";
 import type { MiningPattern } from "../Miner/MiningPatterns";
 import { coordsEqual } from "../Utils/Coordinates";
 import type { GameManager } from "./GameManager";
+import { copyText, formatMoveOrder } from "./moveOrder";
 import { GameManagerEvent } from "./GameManager";
 import type { GameObjects } from "./GameObjects";
 import type { GuildUtils } from "./GuildUtils";
@@ -110,6 +111,8 @@ export class GameUIManager extends EventEmitter {
   private selectedPlanetId: LocationId | undefined;
   private selectedCoords: WorldCoords | undefined;
   private mouseDownOverPlanet: LocatablePlanet | undefined;
+  // 松手后仍画着的攻击线。页面不发交易，但这条线要留在两个星球之间。
+  private attackPreview: { from: WorldCoords; to: WorldCoords } | undefined;
   private mouseDownOverCoords: WorldCoords | undefined;
   private mouseHoveringOverPlanet: LocatablePlanet | undefined;
   private mouseHoveringOverCoords: WorldCoords | undefined;
@@ -907,16 +910,18 @@ export class GameUIManager extends EventEmitter {
         this.terminal.current?.println(``);
       } else if (
         mouseDownPlanet &&
-        (mouseDownPlanet.owner === this.gameManager.getAccount() ||
-          this.gameManager.checkDelegateCondition(
-            mouseDownPlanet.owner,
-            this.gameManager.getAccount(),
-          ) ||
+        (this.canLaunchFrom(mouseDownPlanet) ||
           this.isSendingShip(mouseDownPlanet.locationId))
       ) {
         // move initiated if enough forces
         const from = mouseDownPlanet;
         const to = mouseUpOverPlanet;
+        if (isLocatable(to)) {
+          this.attackPreview = {
+            from: { x: from.location.coords.x, y: from.location.coords.y },
+            to: { x: to.location.coords.x, y: to.location.coords.y },
+          };
+        }
 
         // TODO: the following code block needs to be in a Planet class
         let effectiveEnergy = from.energy;
@@ -965,23 +970,37 @@ export class GameUIManager extends EventEmitter {
           const abandoning = this.isAbandoning();
           const silver = Math.floor((from.silver * effPercentSilver) / 100);
           const materials = this.getMaterialsSending(from.locationId) ?? [];
-          // TODO: do something like JSON.stringify(args) so we know formatting is correct
-          this.terminal.current?.printShellLn(
-            `df.move('${from.locationId}', '${to.locationId}', ${forces}, ${silver}, ${JSON.stringify(materials ?? [])})`,
-          );
           const artifact = this.getArtifactSending(from.locationId);
-
-          this.playClickSound();
-          this.gameManager.move(
-            from.locationId,
-            to.locationId,
+          const hashConfig = this.getHashConfig();
+          // 页面不再发交易。这里的文本就是 agent 的整张出兵单。
+          const orderText = formatMoveOrder({
+            fromId: from.locationId,
+            toId: to.locationId,
+            fromX: from.location.coords.x,
+            fromY: from.location.coords.y,
+            toX: to.location.coords.x,
+            toY: to.location.coords.y,
+            worldRadius: this.getWorldRadius(),
             forces,
             silver,
-            artifact?.id,
+            artifactId: artifact?.id,
             abandoning,
             materials,
-          );
-          tutorialManager.acceptInput(TutorialState.SendFleet);
+            planetHashKey: hashConfig.planetHashKey,
+            spaceTypeKey: hashConfig.spaceTypeKey,
+            scale: hashConfig.perlinLengthScale,
+            mirrorX: hashConfig.perlinMirrorX,
+            mirrorY: hashConfig.perlinMirrorY,
+            entryFeeWei: this.gameManager.getTransactionFee(),
+          });
+          this.terminal.current?.printShellLn(orderText);
+          this.playClickSound();
+          void copyText(orderText).then((copied) => {
+            uiEmitter.emit(UIEmitterEvent.MoveOrderCopied, {
+              text: orderText,
+              copied,
+            });
+          });
         }
 
         if (
@@ -998,6 +1017,7 @@ export class GameUIManager extends EventEmitter {
       this.linkSourceArtifactType = ArtifactType.Unknown;
       this.linkSourceArtifactRarity = ArtifactRarity.Unknown;
     } else {
+      this.attackPreview = undefined;
       uiEmitter.emit(UIEmitterEvent.SendCancelled);
     }
 
@@ -1260,6 +1280,27 @@ export class GameUIManager extends EventEmitter {
 
   public getSelectedCoords(): WorldCoords | undefined {
     return this.selectedCoords;
+  }
+
+  public getAttackPreview():
+    | { from: WorldCoords; to: WorldCoords }
+    | undefined {
+    return this.attackPreview;
+  }
+
+  // 自己的星球，或公会授权可以代发的星球。地址大小写不一致也算自己的。
+  public canLaunchFrom(planet: Planet | undefined): boolean {
+    if (!planet) {
+      return false;
+    }
+    const account = this.gameManager.getAccount();
+    if (!account || !planet.owner) {
+      return false;
+    }
+    if (planet.owner.toLowerCase() === account.toLowerCase()) {
+      return true;
+    }
+    return this.gameManager.checkDelegateCondition(planet.owner, account);
   }
 
   public getMouseDownPlanet(): LocatablePlanet | undefined {
@@ -1802,19 +1843,8 @@ export class GameUIManager extends EventEmitter {
   }
 
   public isOverOwnPlanet(coords: WorldCoords): Planet | undefined {
-    const res = this.viewportEntities.getNearestVisiblePlanet(coords);
-    const planet: LocatablePlanet | undefined = res;
-    if (!planet) {
-      return undefined;
-    }
-
-    return this.gameManager.checkDelegateCondition(
-      planet.owner,
-      this.gameManager.getAccount(),
-    )
-      ? planet
-      : undefined;
-    return planet.owner === this.gameManager.getAccount() ? planet : undefined;
+    const planet = this.viewportEntities.getNearestVisiblePlanet(coords);
+    return this.canLaunchFrom(planet) ? planet : undefined;
   }
 
   public getMyArtifacts(): Artifact[] {

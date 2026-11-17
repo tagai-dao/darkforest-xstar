@@ -15,11 +15,11 @@ Score withdrawals stake into this pool. The unburned part of a buy-silver paymen
 
 | Role                | Address                                      |
 | ------------------- | -------------------------------------------- |
-| Pool                | `0x77C42321c605832B29367a0fc7b20678d1D0B82A` |
-| Staking factory     | `0xDDa0648FA8c9cD593416EC37089C2a2E6060B45c` |
-| Community           | `0x7bDE4d116192B38372DAD2F493753ea1D0Dafcf8` |
-| Payment token AIPRO | `0xfBDA3b5495D8f5F61804FfeB8C61FdEa50D531F5` |
-| BuySilverSystem     | `0x839eB592E11947397F3A56360af225d38F44ED97` |
+| Pool                | `0xaaF713E1F8478318288836FDeACe0AC28d9316D3` |
+| Staking factory     | `0x20d7B364E8Ed1F4260b5B90C41c2deC3C1F6D367` |
+| Community           | `0x06AA8A7AEDb0359074388dA43e5D51D62496DBb7` |
+| Payment token AIPRO | `0xd8Aa1F8B035DF250aD349D1928a07fEB3ABAd7a1` |
+| BuySilverSystem     | `0x3f8ed9647e0A96038AA0484c777C8625770e8295` |
 
 The community address is a contract. Do not send AIPRO to it as if it were a wallet. The pool stores this World once and cannot change it. `depositFromGame` accepts only that World. Do not call `addAdmin`, `removeAdmin`, or fee setters. Do not mint AIPRO.
 
@@ -30,7 +30,7 @@ One Multicall3 `aggregate3`, `allowFailure` false. Use the pool, factory, and pa
 | Call                                       | What it decides                                                                             |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | Pool code size                             | `0` means the pool is not there. Stop. Do not deploy one                                    |
-| Pool `world()`                             | Must equal the World `0x3295A33430Bb33696b5F04DC12DD91276213100e`. This is the bound scorer |
+| Pool `world()`                             | Must equal the World `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`. This is the bound scorer |
 | Factory `poolOfWorld(world)`               | Must equal the pool. A second pool for the same World cannot be created                     |
 | Pool `getTotalStakedAmount()`              | A buy with a non-zero remainder reverts while this is 0. `burnBps` 10000 does not           |
 | Pool `getUserStakedAmount(player)`         | This wallet's score stake                                                                   |
@@ -48,7 +48,7 @@ The send is in [actions.md](actions.md). After the receipt the planet's silver f
 
 The withdraw system does not call the pool itself. It calls the root system `StakeScoreSystem`, which runs inside the World, so the pool sees the World as the caller. That caller must equal `pool.world()`. Do not add the withdraw systems as admins. A player calling `StakeScoreSystem` does not stake. Material withdrawal uses the same call.
 
-This call does not move AIPRO. It increases `userStakes` and `totalStaked`. It can be the first stake in the pool. It reverts when the pool has no code, when `pool.world()` is not this World, or when the pool's community calls fail. Send it with no ETH attached. `pool.world()` is `0x3295A33430Bb33696b5F04DC12DD91276213100e`.
+This call does not move AIPRO. It increases `userStakes` and `totalStaked`. It can be the first stake in the pool. It reverts when the pool has no code, when `pool.world()` is not this World, or when the pool's community calls fail. Send it with no ETH attached. `pool.world()` is `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`.
 
 ## Buy silver burns, then injects the remainder
 

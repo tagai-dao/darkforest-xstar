@@ -1,4 +1,8 @@
 import { formatNumber } from "@df/gamelogic";
+import {
+  copyText,
+  formatWithdrawMaterialOrder,
+} from "../../Backend/GameLogic/moveOrder";
 import type { LocationId, Materials, MaterialType } from "@df/types";
 import { ModalName } from "@df/types";
 import { getMaterialTooltipName } from "@frontend/Panes/Tooltip";
@@ -15,6 +19,7 @@ import { NumberInput } from "../Components/Input";
 // import { Sub, Text } from "../Components/Text";
 import dfstyles from "../Styles/dfstyles";
 import { usePlanet, useUIManager } from "../Utils/AppHooks";
+import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 import { useEmitterValue } from "../Utils/EmitterHooks";
 import type { ModalHandle } from "../Views/ModalPane";
 import { ModalPane } from "../Views/ModalPane";
@@ -441,12 +446,25 @@ export function PlanetMaterialsPane({
     [key: number]: number;
   }>({});
 
+  // 页面不发送提取。复制换分单，agent 读到后直接调用 df__withdrawMaterial。
   const handleWithdraw = (materialType: MaterialType, amount: number) => {
-    if (amount > 0 && planet) {
-      uiManager.withdrawMaterial(planet.locationId, materialType, amount);
-      // Clear the input after withdrawal
-      setWithdrawAmounts((prev) => ({ ...prev, [materialType]: 0 }));
+    if (!(amount > 0 && planet)) {
+      return;
     }
+    const text = formatWithdrawMaterialOrder({
+      planetId: planet.locationId,
+      materialType,
+      displayAmount: amount,
+      entryFeeWei: uiManager.getGameManager().getTransactionFee(),
+    });
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label: "已复制换分单，直接粘贴给 agent",
+      });
+    });
+    setWithdrawAmounts((prev) => ({ ...prev, [materialType]: 0 }));
   };
 
   const handleAmountChange = (materialType: MaterialType, value: string) => {
@@ -704,7 +722,7 @@ export function PlanetMaterialsPane({
                           isBelowThreshold
                         }
                       >
-                        Withdraw
+                        复制换分
                       </WithdrawButton>
                     </MaterialWithdrawContainer>
                   </MaterialWithdrawBar>

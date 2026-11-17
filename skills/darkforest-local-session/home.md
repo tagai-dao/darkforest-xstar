@@ -8,7 +8,7 @@ Do this before [mining.md](mining.md). Do not mine from `0, 0`. The center of th
 
 ## Read the chain
 
-Use the world `0x3295A33430Bb33696b5F04DC12DD91276213100e` and Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send ETH to Multicall3.
+Use the world `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f` and Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send ETH to Multicall3.
 
 | Table       | Id                                                                   |
 | ----------- | -------------------------------------------------------------------- |
@@ -27,7 +27,7 @@ export NO_PROXY=127.0.0.1,localhost
 export no_proxy=127.0.0.1,localhost
 RPC=http://127.0.0.1:8545
 MULTI=0xcA11bde05977b3631167028862bE2a173976CA11
-WORLD=0x3295A33430Bb33696b5F04DC12DD91276213100e
+WORLD=0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f
 KEY=$(cast abi-encode "x(address)" <player>)
 SPAWN=$(cast calldata "getRecord(bytes32,bytes32[])" 0x74626466000000000000000000000000537061776e506c616e65740000000000 "[$KEY]")
 PLAYER_REC=$(cast calldata "getRecord(bytes32,bytes32[])" 0x74626466000000000000000000000000506c6179657200000000000000000000 "[$KEY]")

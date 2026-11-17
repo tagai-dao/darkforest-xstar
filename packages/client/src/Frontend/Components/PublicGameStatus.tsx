@@ -221,7 +221,7 @@ export function PublicGameStatus({
 
   return (
     <>
-      <Panel>
+      <Panel data-public-status>
         <div>相关信息</div>
         <div>AIPRO 价格 {aiproPriceLabel(priceText)}</div>
         <div>收缩圈半径 {innerRadius ?? "..."}</div>

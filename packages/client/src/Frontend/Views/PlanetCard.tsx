@@ -208,8 +208,15 @@ export function PlanetCard({
         </AlignCenterHorizontally>
         <StatRow>
           <Sub>
-            坐标 ({Math.round(planet.location.coords.x)},{" "}
-            {Math.round(planet.location.coords.y)})
+            坐标 (
+            {planet.location.coords.x.toLocaleString("zh-CN", {
+              maximumFractionDigits: 2,
+            })}
+            ,{" "}
+            {planet.location.coords.y.toLocaleString("zh-CN", {
+              maximumFractionDigits: 2,
+            })}
+            )
           </Sub>
         </StatRow>
         {active && (

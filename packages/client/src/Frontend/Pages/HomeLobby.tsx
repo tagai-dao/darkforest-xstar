@@ -8,6 +8,7 @@ import styled from "styled-components";
 
 import dfstyles from "../Styles/dfstyles";
 import { DocsCorner } from "./docs/DocsCorner";
+import { HomeLeaderboardPanel } from "./HomeLeaderboardPanel";
 import { skillPack } from "./skillPack";
 import type { HomeAssets } from "./useHomeAssets";
 
@@ -127,6 +128,13 @@ const Center = styled.div`
   gap: 10px;
 `;
 
+const ButtonRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+`;
+
 const ImportButton = styled.button`
   min-width: 220px;
   padding: 14px 18px;
@@ -140,6 +148,15 @@ const ImportButton = styled.button`
 
   &:hover {
     background: rgba(0, 220, 130, 0.16);
+  }
+`;
+
+const BoardButton = styled(ImportButton)`
+  border-color: ${dfstyles.colors.dfpink};
+  color: ${dfstyles.colors.dfpink};
+
+  &:hover {
+    background: rgba(255, 105, 180, 0.16);
   }
 `;
 
@@ -336,6 +353,7 @@ export function HomeLobby({
   onChangeFolder: () => void;
 }) {
   const match = useMatchFacts();
+  const [boardOpen, setBoardOpen] = useState(false);
 
   return (
     <Page>
@@ -372,9 +390,21 @@ export function HomeLobby({
           ))}
           <Hud />
           <Center>
-            <ImportButton type="button" disabled={importing} onClick={onImport}>
-              {importing ? "正在读取" : "导入游戏数据"}
-            </ImportButton>
+            <ButtonRow>
+              <ImportButton
+                type="button"
+                disabled={importing}
+                onClick={onImport}
+              >
+                {importing ? "正在读取" : "导入游戏数据"}
+              </ImportButton>
+              <BoardButton
+                type="button"
+                onClick={() => setBoardOpen((open) => !open)}
+              >
+                {boardOpen ? "收起排行榜" : "排行榜"}
+              </BoardButton>
+            </ButtonRow>
             {notice && <Notice role="status">{notice}</Notice>}
             {card && (
               <>
@@ -386,6 +416,8 @@ export function HomeLobby({
             )}
           </Center>
         </Stage>
+
+        {boardOpen && <HomeLeaderboardPanel />}
 
         <Facts>
           <Card>

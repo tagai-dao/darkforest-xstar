@@ -131,6 +131,7 @@ export interface RendererGameContext extends DiagnosticUpdater {
   getWorldRadius(): number;
   getInnerRadius(): number;
   getMouseDownPlanet(): LocatablePlanet | undefined;
+  getAttackPreview(): { from: WorldCoords; to: WorldCoords } | undefined;
   getLocationsAndChunks(): {
     chunks: Set<Chunk>;
     cachedPlanets: Map<LocationId, PlanetRenderInfo>;

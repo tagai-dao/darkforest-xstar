@@ -14,6 +14,7 @@ These are the player calls. `legacyMove`, `legacyUpgradePlanet`, `legacyRevealLo
 
 | Action                              | Call                                                                 | Ask            |
 | ----------------------------------- | -------------------------------------------------------------------- | -------------- |
+| Mint an AIPRO NFT                   | NFT `mint(uint256)` payable in [SKILL.md](SKILL.md)                  | yes            |
 | Stake an AIPRO NFT                  | NFT `approve`, locker `stake` in [SKILL.md](SKILL.md)                | yes            |
 | Register, spawn                     | `df__registerPlayer`, `df__spawnPlayer` in [home.md](home.md)        | no             |
 | Rename                              | `df__changePlayerName`                                               | no             |
@@ -45,6 +46,8 @@ Do not call these. They are closed or limited to the namespace owner: `Initializ
 
 World `df__move` takes the Groth16 proof, the 11 public signals in this order, then population, silver, artifact id, and a materials array: from hash, to hash, perlin at the destination, world radius, distMax, `1729`, `1730`, `8192`, `0`, `0`, destination radius square. It reverts with `PlanetOwnershipMismatch` when the source owner and junk owner differ. The destination's junk owner is not checked.
 
+**Pasted order.** The page copies a `DARKFOREST_MOVE` block when the owner drags from one planet to another. That block is the move to send. Follow [SKILL.md](SKILL.md) under Pasted fleet and send it in the same turn it is read. Use its `circuit` as the prover input, its `population`, `silver`, `artifactId`, and `materials` as the call arguments, and its `entryFeeWei` as the transaction value. `population` is the departure energy. Do not ask for another amount. Do not choose another planet. Record `to` as `toHashHex`.
+
 **Effect.** The source energy, silver, and materials fall by the amounts sent. Silver and materials arrive in full. Energy arrives after the distance loss in [rules.md](rules.md). The fleet stays in flight until the arrival tick. A paused ticker does not advance that tick, so the fleet does not arrive. On arrival, a capture of an unowned planet leaves the arrived energy there and sets the owner to this wallet. A reinforce adds that energy to a planet this wallet or the same guild already owns, and adds the silver and materials up to the destination cap. An attack reduces the destination, and a successful attack sets the owner to this wallet. Silver and materials do not increase the damage.
 
 **Impact.** Energy gathered on a planet this wallet holds can leave again from that planet. The next voyage uses that planet's range and speed, so an attack from a farther-ranged or faster planet can arrive sooner, or with energy, when a direct send from the producing planet would not. That second send waits until this fleet has arrived, and the departure planet must already be registered by this wallet. The destination junk owner does not move with a capture, so a newly captured planet cannot launch until this wallet registers it. The previous junk owner keeps that quota until then. Other players can see the fleet when they know the destination. Record `move` with `to` set to the destination hash, 64 lowercase hex characters and no `0x` prefix. The next round reads that fleet from `to`. Other actions omit `to`.
@@ -57,6 +60,8 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Impact.** A higher range changes which planets the next move can reach. The silver spent is no longer available for another upgrade or for a later withdraw. Record `upgrade`.
 
+**Pasted order.** The page copies a `DARKFOREST_UPGRADE` block when the owner clicks an upgrade. That block is the upgrade to send. Follow [SKILL.md](SKILL.md) under Pasted upgrade and send it in the same turn it is read. Call `df__upgradePlanet` with `planetHash`, `rangeTimes`, `speedTimes`, and `defenseTimes`. Attach `entryFeeWei`. Do not ask which stat.
+
 ## Buy silver
 
 **Send.** Read the pool, the payment token, and `buySilverSystem` from [nutbox.md](nutbox.md). Price the pack from [rules.md](rules.md): the planet's level picks the row, tier 0, 1, 2, or 3 is 20%, 50%, 80%, or 150%, and `SilverFrontier` discounts only the AIPRO. Approve the payment token to `buySilverSystem` for that discounted whole-token price. Do not approve the World. Then World `df__buySilver(uint256 planetHash, uint8 tier)`. Do not send on level 0, on a spacetime rip, when the chain silver plus the pack exceeds the chain cap, or when the balance or the remaining AIPRO cap is below the price.
@@ -65,6 +70,8 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Impact.** Stakers can later claim their share of the injected remainder. The burned part is not claimable. A wallet that owns all of the stake mostly receives that remainder back on claim. The planet's level does not change, so a later pack on the same planet uses the same row unless the frontier has risen. Registering while the stored tick is 0 leaves `addJunkTick` at 0, so buy silver on that planet keeps reverting until a later registration sees a non-zero tick. Record the discounted whole-token amount in `spends.ndjson` and record `buy-silver`.
 
+**Pasted order.** The page copies a `DARKFOREST_BUY_SILVER` block when the owner clicks one silver tier. That block is the purchase to send. Follow [SKILL.md](SKILL.md) under Pasted silver purchase and send it in the same turn it is read. Approve `paymentToken` to `buySilverSystem` for `priceWei`, then call `df__buySilver` with `planetHash` and `tier`. Attach `entryFeeWei`. Do not ask which tier. Record `priceWhole` as the spend.
+
 ## Withdraw silver
 
 **Send.** World `df__withdrawSilver(uint256 planetHash, uint256 amount)`. The amount is chain units, display times 1000, and must be at least one fifth of the silver cap. The planet must be an owned spacetime rip with this wallet as junk owner.
@@ -72,6 +79,8 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 **Effect.** Silver on the planet falls. `PlayerScore` rises by that amount. The same amount is staked with `depositFromGame`. No AIPRO moves. It reverts when the pool has no code or the World is not a factory admin. Those checks are in [nutbox.md](nutbox.md).
 
 **Impact.** This is how the pool gets its first stake. Until some wallet has done it, a buy whose remainder is above 0 reverts. A larger stake takes a larger share of later injections. If this wallet is in a guild, the guild silver rises by the same amount. Record `withdraw-silver`.
+
+**Pasted order.** The page copies a `DARKFOREST_WITHDRAW_SILVER` block when the owner copies a spacetime-rip silver conversion. That block is the withdrawal to send. Follow [SKILL.md](SKILL.md) under Pasted silver score and send it in the same turn it is read. Use its `planetHash` and `amount` as the call arguments, and its `entryFeeWei` as the transaction value. `amount` is already chain units. Do not ask for another amount. Do not choose another planet. A silver mine cannot take this call.
 
 ## Add junk
 
@@ -136,6 +145,8 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 **Effect.** That material on the planet falls by the amount. Score added is `amount * multiplier`, with multipliers 100, 105, 110, 120, 130, 150, 180, 200, 250, 300, 400, and 600 for ids 0 through 11. `PlayerScore` rises by that score and the same delta is staked with `depositFromGame`. No AIPRO moves.
 
 **Impact.** The score shown on the page rises by the display amount of that score. Stake share rises with it, so later buy-silver payments pay this wallet a larger share. Guild silver rises by the same score when this wallet is in a guild. The material is no longer on the planet to withdraw again. Record `withdraw-material`.
+
+**Pasted order.** The page copies a `DARKFOREST_WITHDRAW_MATERIAL` block when the owner copies a spacetime-rip conversion. That block is the withdrawal to send. Follow [SKILL.md](SKILL.md) under Pasted material score and send it in the same turn it is read. Use its `planetHash`, `materialType`, and `amount` as the call arguments, and its `entryFeeWei` as the transaction value. `amount` is already chain units. Do not ask for another amount. Do not choose another planet or material.
 
 ## Prospect and find an artifact
 

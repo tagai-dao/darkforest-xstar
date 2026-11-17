@@ -8,24 +8,24 @@ import { useMUD } from "@mud/MUDContext";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { type Address, parseAbi, zeroAddress } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { usePublicClient } from "wagmi";
 
+import {
+  copyText,
+  formatBuySilverOrder,
+} from "../../Backend/GameLogic/moveOrder";
 import type { Wrapper } from "../../Backend/Utils/Wrapper";
 import { Btn } from "../Components/Btn";
 import { Red, Text } from "../Components/Text";
 import dfstyles from "../Styles/dfstyles";
 import { useAccount, useUIManager } from "../Utils/AppHooks";
+import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 
 const POOL_ABI = parseAbi([
   "function getTotalStakedAmount() external view returns (uint256)",
 ]);
 
-const ERC20_ABI = parseAbi([
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function balanceOf(address owner) view returns (uint256)",
-  "function symbol() view returns (string)",
-]);
+const ERC20_ABI = parseAbi(["function symbol() view returns (string)"]);
 
 const Container = styled.div`
   display: flex;
@@ -57,7 +57,6 @@ export function BuySilverPane({
   const gameManager = uiManager.getGameManager();
   const account = useAccount(uiManager);
   const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
   const {
     components: { DFXStarConfig, SilverFrontier },
   } = useMUD();
@@ -68,9 +67,6 @@ export function BuySilverPane({
 
   const [totalStaked, setTotalStaked] = useState<bigint | null>(null);
   const [tokenSymbol, setTokenSymbol] = useState("TOKEN");
-  const [tokenBalance, setTokenBalance] = useState<bigint | null>(null);
-  const [busyTier, setBusyTier] = useState<number | null>(null);
-  const [status, setStatus] = useState("");
 
   const planet = planetWrapper.value;
   const paymentToken = dfxConfig?.paymentToken as Address | undefined;
@@ -108,31 +104,16 @@ export function BuySilverPane({
   }, [publicClient, pool]);
 
   const refreshTokenState = useCallback(async () => {
-    if (
-      !publicClient ||
-      !paymentToken ||
-      paymentToken === zeroAddress ||
-      !account
-    ) {
-      setTokenBalance(null);
+    if (!publicClient || !paymentToken || paymentToken === zeroAddress) {
       return;
     }
-    const [balance, symbol] = await Promise.all([
-      publicClient.readContract({
-        address: paymentToken,
-        abi: ERC20_ABI,
-        functionName: "balanceOf",
-        args: [account as Address],
-      }),
-      publicClient.readContract({
-        address: paymentToken,
-        abi: ERC20_ABI,
-        functionName: "symbol",
-      }),
-    ]);
-    setTokenBalance(balance);
+    const symbol = await publicClient.readContract({
+      address: paymentToken,
+      abi: ERC20_ABI,
+      functionName: "symbol",
+    });
     setTokenSymbol(symbol);
-  }, [publicClient, paymentToken, account]);
+  }, [publicClient, paymentToken]);
 
   useEffect(() => {
     refreshPoolState().catch(() => undefined);
@@ -175,62 +156,29 @@ export function BuySilverPane({
   );
   const pricePercent = tiers[0]?.percent ?? 100;
 
-  const ensureAllowance = async (spender: Address, amount: bigint) => {
-    if (!walletClient || !publicClient || !account) {
-      throw new Error("请先连接钱包");
-    }
-    const allowance = await publicClient.readContract({
-      address: paymentToken!,
-      abi: ERC20_ABI,
-      functionName: "allowance",
-      args: [account as Address, spender],
+  // 页面不购买。复制购银单，agent 读到后授权并调用 df__buySilver。
+  const copyTier = (tier: number, price: bigint, silver: number) => {
+    if (!planet || !paymentToken || !buySilverSpender) return;
+    if (planet.silver + silver > planet.silverCap) return;
+    const quote = quoteSilverPurchase(level, tier, frontier);
+    if (!quote || quote.priceWei !== price) return;
+    const text = formatBuySilverOrder({
+      planetId: planet.locationId,
+      tier,
+      priceWhole: quote.priceWhole,
+      priceWei: quote.priceWei,
+      silverDisplay: quote.silverDisplay,
+      paymentToken,
+      buySilverSystem: buySilverSpender,
+      entryFeeWei: gameManager.getTransactionFee(),
     });
-    if (allowance >= amount) return;
-
-    setStatus(`正在授权 ${tokenSymbol}…`);
-    const hash = await walletClient.writeContract({
-      chain: publicClient.chain,
-      account: account as Address,
-      address: paymentToken!,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [spender, amount],
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label: "已复制购银单，直接粘贴给 agent",
+      });
     });
-    await publicClient.waitForTransactionReceipt({ hash });
-  };
-
-  const buyTier = async (tier: number, price: bigint, silver: number) => {
-    if (!planet) return;
-    if (!configReady) {
-      setStatus("DFXStar 或购银档位尚未配置，请先在 /test 面板写入配置。");
-      return;
-    }
-    if (!stakingActive) {
-      setStatus("质押池尚无质押：请先在时空裂隙提银或提矿，再购银。");
-      return;
-    }
-    if (tokenBalance !== null && tokenBalance < price) {
-      setStatus(`${tokenSymbol} 余额不足。`);
-      return;
-    }
-    if (planet.silver + silver > planet.silverCap) {
-      setStatus("星球银容量不足，无法购买该档位。");
-      return;
-    }
-
-    try {
-      setBusyTier(tier);
-      setStatus("");
-      await ensureAllowance(buySilverSpender!, price);
-      setStatus("正在提交购银交易…");
-      await gameManager.buySilver(planet.locationId, tier);
-      setStatus("购银交易已提交。");
-      await Promise.all([refreshPoolState(), refreshTokenState()]);
-    } catch (error) {
-      setStatus((error as Error).message);
-    } finally {
-      setBusyTier(null);
-    }
   };
 
   return (
@@ -247,8 +195,7 @@ export function BuySilverPane({
       ) : null}
       {tiers.map(({ tier, price, silver, priceLabel }) => {
         const overCap = planet.silver + silver > planet.silverCap;
-        const disabled =
-          busyTier !== null || !stakingActive || !configReady || overCap;
+        const disabled = !stakingActive || !configReady || overCap;
         return (
           <TierRow key={tier}>
             <span>
@@ -257,14 +204,13 @@ export function BuySilverPane({
             </span>
             <Btn
               disabled={disabled}
-              onClick={() => buyTier(tier, price, silver)}
+              onClick={() => copyTier(tier, price, silver)}
             >
-              {busyTier === tier ? "…" : "购买"}
+              复制购买
             </Btn>
           </TierRow>
         );
       })}
-      {status ? <Text>{status}</Text> : null}
     </Container>
   );
 }

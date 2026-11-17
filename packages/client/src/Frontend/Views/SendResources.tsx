@@ -334,7 +334,7 @@ function SendRow({
   abandoning?: boolean;
   disabled?: boolean;
 }) {
-  let content = "Send";
+  let content = "复制进攻";
   if (artifact) {
     const artifactName = artifactNameFromArtifact(artifact);
     if (isSpaceShip(artifact.artifactType)) {
