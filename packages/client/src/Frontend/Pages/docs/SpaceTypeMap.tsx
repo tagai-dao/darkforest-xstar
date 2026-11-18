@@ -15,8 +15,8 @@ const DEEP = "#9189d9";
 const DEAD = "#c46500";
 
 const Figure = styled.figure`
-  margin: 0 0 16px;
-  max-width: 740px;
+  margin: 0 auto 16px;
+  max-width: 560px;
   padding: 14px 14px 10px;
   border: 1px solid rgba(0, 220, 130, 0.28);
   border-radius: 4px;

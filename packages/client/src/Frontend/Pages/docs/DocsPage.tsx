@@ -16,7 +16,8 @@ import { SpaceTypeMapFigure } from "./SpaceTypeMap";
 
 const Shell = styled.div`
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 220px;
+  /* 左栏是原来 220px 的一半，右栏是原来的 2/3。 */
+  grid-template-columns: 110px minmax(0, 1fr) calc(220px * 2 / 3);
   height: 100vh;
   background: ${dfstyles.colors.background};
   color: ${dfstyles.colors.text};
@@ -85,7 +86,6 @@ const Title = styled.h1`
 
 const Paragraph = styled.p`
   margin: 0 0 14px;
-  max-width: 740px;
   font-size: 16px;
   line-height: 1.75;
 `;
@@ -100,7 +100,6 @@ const SectionTitle = styled.h2`
 const BulletList = styled.ul`
   margin: 0 0 14px;
   padding-left: 20px;
-  max-width: 740px;
   font-size: 16px;
   line-height: 1.7;
 `;

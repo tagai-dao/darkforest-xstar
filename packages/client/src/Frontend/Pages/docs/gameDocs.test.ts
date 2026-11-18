@@ -132,6 +132,34 @@ describe("game docs", () => {
     ).toBe(true);
   });
 
+  it("lists artifact numbers by rarity", () => {
+    const more = findChapter("more");
+    const cannon = more.blocks.find(
+      (block) => block.kind === "table" && block.headers[1] === "充能时防御",
+    );
+    expect(cannon).toMatchObject({
+      rows: expect.arrayContaining([
+        ["普通", "×1/2", "×2", "×5"],
+        ["神话", "×1/10", "×2", "×25"],
+      ]),
+    });
+    const wormhole = more.blocks.find(
+      (block) => block.kind === "table" && block.headers[1] === "距离系数",
+    );
+    expect(wormhole).toMatchObject({
+      rows: expect.arrayContaining([
+        ["传说", "62"],
+        ["神话", "31"],
+      ]),
+    });
+    const bomb = more.blocks.find(
+      (block) => block.kind === "table" && block.headers[2] === "摧毁半径",
+    );
+    expect(bomb).toMatchObject({
+      rows: expect.arrayContaining([["史诗", "4 到 6", "1500"]]),
+    });
+  });
+
   it("opens on the overview", () => {
     expect(gameDocs[0].id).toBe("overview");
     expect(findChapter(undefined).id).toBe("overview");

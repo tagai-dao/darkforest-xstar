@@ -30,8 +30,13 @@ type SpaceGroup = {
   types: TypeShotKey[];
   // 相对星云。同一空间里的生态共用这些数字。
   stats: string[];
+  // 这个空间的铸造厂能发现的神器。四种等概率，不看生态。
+  artifacts: string[];
   biomes: BiomeRow[];
 };
+
+// 合约按稀有度的概率表抽类型，每一档都是这四项各 1024。
+const FOUNDRY_ARTIFACTS = ["粉红炸弹", "布隆过滤器", "虫洞", "火炮"];
 
 const ALL_TYPES: TypeShotKey[] = TYPE_SHOTS.map((type) => type.key);
 
@@ -41,6 +46,7 @@ const GROUPS: SpaceGroup[] = [
     spaceType: SpaceType.NEBULA,
     types: ["planet", "mine", "rip", "quasar"],
     stats: ["等级上限 4", "升级合计 3", "没有铸造厂"],
+    artifacts: ["没有铸造厂"],
     biomes: [
       {
         biome: Biome.OCEAN,
@@ -81,6 +87,7 @@ const GROUPS: SpaceGroup[] = [
       "防御 ×1/2",
       "初始能量 ×4",
     ],
+    artifacts: FOUNDRY_ARTIFACTS,
     biomes: [
       {
         biome: Biome.TUNDRA,
@@ -117,6 +124,7 @@ const GROUPS: SpaceGroup[] = [
       "防御 ×1/4",
       "初始能量 ×10",
     ],
+    artifacts: FOUNDRY_ARTIFACTS,
     biomes: [
       {
         biome: Biome.ICE,
@@ -153,6 +161,7 @@ const GROUPS: SpaceGroup[] = [
       "防御 ×3/20",
       "初始能量 ×20",
     ],
+    artifacts: FOUNDRY_ARTIFACTS,
     biomes: [
       {
         biome: Biome.CORRUPTED,
@@ -170,11 +179,16 @@ const GROUPS: SpaceGroup[] = [
   },
 ];
 
+// 星云单独一格。后面三个空间出的神器相同，合成一格。
+const FOUNDRY_ROW_SPAN = GROUPS.slice(1).reduce(
+  (count, group) => count + group.biomes.length,
+  0,
+);
+
 const BORDER = "1px solid rgba(215, 255, 228, 0.28)";
 
 const Figure = styled.figure`
   margin: 0 0 16px;
-  max-width: 740px;
 `;
 
 const TableWrap = styled.div`
@@ -198,11 +212,27 @@ const Table = styled.table`
   }
 
   th:nth-child(1) {
-    width: 46%;
+    width: 320px;
+  }
+
+  th:nth-child(2) {
+    width: 200px;
+  }
+
+  th:nth-child(3) {
+    width: 72px;
   }
 
   th:nth-child(4) {
-    width: 12%;
+    width: 22%;
+  }
+
+  th:nth-child(5) {
+    width: 108px;
+  }
+
+  th:nth-child(6) {
+    width: 136px;
   }
 
   th {
@@ -212,7 +242,11 @@ const Table = styled.table`
 `;
 
 const StatsCell = styled.td`
-  width: 12%;
+  width: 22%;
+`;
+
+const NameCell = styled.td`
+  white-space: nowrap;
 `;
 
 const Stats = styled.div`
@@ -289,69 +323,89 @@ export function BiomeTable() {
               <th>生态</th>
               <th>空间</th>
               <th>空间属性</th>
+              <th>铸造厂神器</th>
               <th>小行星带材料</th>
             </tr>
           </thead>
           <tbody>
-            {GROUPS.map((group) =>
-              group.biomes.map((row, index) => (
-                <tr key={row.biome}>
-                  <td>
-                    <Shots>
-                      {TYPE_SHOTS.filter((type) =>
-                        group.types.includes(type.key),
-                      ).map((type) => {
-                        const src = shots[row.biome]?.[type.key];
-                        return (
-                          <Shot key={type.key}>
-                            {src ? (
-                              <PlanetShot
-                                src={src}
-                                alt={`${row.name} ${type.label}`}
-                              />
-                            ) : (
-                              <PlanetShot
-                                as="div"
-                                role="img"
-                                aria-label={`${row.name} ${type.label}`}
-                              />
-                            )}
-                            <ShotLabel>{type.label}</ShotLabel>
-                          </Shot>
-                        );
-                      })}
-                    </Shots>
-                  </td>
-                  <td>{row.name}</td>
-                  {index === 0 && (
-                    <td rowSpan={group.biomes.length}>{group.space}</td>
-                  )}
-                  {index === 0 && (
-                    <StatsCell rowSpan={group.biomes.length}>
-                      <Stats>
-                        {group.stats.map((stat) => (
-                          <div key={stat}>{stat}</div>
-                        ))}
-                      </Stats>
-                    </StatsCell>
-                  )}
-                  <td>
-                    {row.materials.map((material) => (
-                      <div
-                        key={material.id}
-                        style={{ color: getMaterialColor(material.id) }}
-                      >
-                        {material.name} ×{material.multiplier}
-                      </div>
-                    ))}
-                  </td>
-                </tr>
-              )),
+            {GROUPS.map((group, groupIndex) =>
+              group.biomes.map((row, index) => {
+                const showArtifacts =
+                  (groupIndex === 0 && index === 0) ||
+                  (groupIndex === 1 && index === 0);
+                const artifactSpan =
+                  groupIndex === 0 ? group.biomes.length : FOUNDRY_ROW_SPAN;
+                return (
+                  <tr key={row.biome}>
+                    <td>
+                      <Shots>
+                        {TYPE_SHOTS.filter((type) =>
+                          group.types.includes(type.key),
+                        ).map((type) => {
+                          const src = shots[row.biome]?.[type.key];
+                          return (
+                            <Shot key={type.key}>
+                              {src ? (
+                                <PlanetShot
+                                  src={src}
+                                  alt={`${row.name} ${type.label}`}
+                                />
+                              ) : (
+                                <PlanetShot
+                                  as="div"
+                                  role="img"
+                                  aria-label={`${row.name} ${type.label}`}
+                                />
+                              )}
+                              <ShotLabel>{type.label}</ShotLabel>
+                            </Shot>
+                          );
+                        })}
+                      </Shots>
+                    </td>
+                    <NameCell>{row.name}</NameCell>
+                    {index === 0 && (
+                      <td rowSpan={group.biomes.length}>{group.space}</td>
+                    )}
+                    {index === 0 && (
+                      <StatsCell rowSpan={group.biomes.length}>
+                        <Stats>
+                          {group.stats.map((stat) => (
+                            <div key={stat}>{stat}</div>
+                          ))}
+                        </Stats>
+                      </StatsCell>
+                    )}
+                    {showArtifacts && (
+                      <td rowSpan={artifactSpan}>
+                        <Stats>
+                          {group.artifacts.map((artifact) => (
+                            <div key={artifact}>{artifact}</div>
+                          ))}
+                        </Stats>
+                      </td>
+                    )}
+                    <td>
+                      {row.materials.map((material) => (
+                        <div
+                          key={material.id}
+                          style={{ color: getMaterialColor(material.id) }}
+                        >
+                          {material.name} ×{material.multiplier}
+                        </div>
+                      ))}
+                    </td>
+                  </tr>
+                );
+              }),
             )}
           </tbody>
         </Table>
       </TableWrap>
-      <Caption>{error}</Caption>
+      <Caption>
+        铸造厂神器四种等概率，不看生态。生态只刻在神器上。稀有度看铸造厂等级。
+        {error}
+      </Caption>
     </Figure>
   );
 }

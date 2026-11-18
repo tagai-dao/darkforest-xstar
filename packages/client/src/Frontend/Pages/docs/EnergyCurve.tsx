@@ -51,7 +51,6 @@ const Den = styled.span`
 
 const Figure = styled.figure`
   margin: 0 0 16px;
-  max-width: 740px;
   padding: 14px 14px 10px;
   border: 1px solid rgba(0, 220, 130, 0.28);
   border-radius: 4px;
