@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import styled, { css } from "styled-components";
+import styled from "styled-components";
 
 import dfstyles from "../Styles/dfstyles";
 import { Table } from "./Table";
@@ -9,21 +9,35 @@ const TableCell = styled.div`
 `;
 
 const Header = styled(TableCell)`
-  ${({ isActive, isReverse }: { isActive: boolean; isReverse: boolean }) => css`
-    padding: 2px 4px;
-    font-weight: normal;
-    color: ${dfstyles.colors.text};
-    user-select: none;
-    cursor: pointer;
-    ${isActive && "text-decoration: underline;"}
-    ${isActive && "font-weight: bold;"}
-    ${isReverse && "transform: scaleY(-1);"}
+  padding: 2px 4px;
+  font-weight: normal;
+  color: ${dfstyles.colors.text};
+  user-select: none;
+  cursor: pointer;
 
-    &:hover {
-      text-decoration: underline;
-    }
-  `}
+  &:hover {
+    text-decoration: underline;
+  }
 `;
+
+const HeaderInner = styled.span<{ $active: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: ${({ $active }) => ($active ? "bold" : "normal")};
+`;
+
+// 表头旁边的双向箭头。点中后，当前方向用亮色。
+function SortIcon({ active, reverse }: { active: boolean; reverse: boolean }) {
+  const up = active && !reverse ? "#e8eef7" : "#6d7b8c";
+  const down = active && reverse ? "#e8eef7" : "#6d7b8c";
+  return (
+    <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true">
+      <path d="M5 1 L8.5 5 H1.5 Z" fill={up} />
+      <path d="M5 11 L1.5 7 H8.5 Z" fill={down} />
+    </svg>
+  );
+}
 
 export function SortableTable<T>({
   rows,
@@ -32,6 +46,7 @@ export function SortableTable<T>({
   sortFunctions,
   alignments,
   paginated,
+  sortable,
 }: {
   rows: T[];
   headers: React.ReactNode[];
@@ -39,6 +54,8 @@ export function SortableTable<T>({
   sortFunctions: Array<(left: T, right: T) => number>;
   alignments?: Array<"r" | "c" | "l">;
   paginated?: boolean;
+  // 没有标题，或明确标成不可排序的列，不画排序图标。
+  sortable?: boolean[];
 }): JSX.Element {
   const [sortByColumn, setSortByColumn] = useState<number | undefined>(
     undefined,
@@ -88,16 +105,22 @@ export function SortableTable<T>({
         top: 0,
       }}
       rows={sortedRows}
-      headers={headers.map((originalHeader, i) => (
-        <Header
-          key={i}
-          onClick={() => onColumnTitleClicked(i)}
-          isActive={sortByColumn === i}
-          isReverse={reverse && sortByColumn === i}
-        >
-          {originalHeader}
-        </Header>
-      ))}
+      headers={headers.map((originalHeader, i) => {
+        const active = sortByColumn === i;
+        const showIcon =
+          sortable?.[i] !== false &&
+          originalHeader !== "" &&
+          originalHeader !== undefined &&
+          originalHeader !== null;
+        return (
+          <Header key={i} onClick={() => onColumnTitleClicked(i)}>
+            <HeaderInner $active={active}>
+              {originalHeader}
+              {showIcon && <SortIcon active={active} reverse={reverse} />}
+            </HeaderInner>
+          </Header>
+        );
+      })}
       columns={columns.map(
         (originalColumn) =>
           function Column(t, i) {

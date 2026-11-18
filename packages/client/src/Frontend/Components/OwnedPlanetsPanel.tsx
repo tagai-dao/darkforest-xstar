@@ -1,6 +1,6 @@
 import { formatNumber, isLocatable } from "@df/gamelogic";
 import { getPlanetName } from "@df/procedural";
-import type { Planet } from "@df/types";
+import type { ArtifactId, LocationId, Planet } from "@df/types";
 import { PlanetType } from "@df/types";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
@@ -10,6 +10,8 @@ import dfstyles from "../Styles/dfstyles";
 import { useUIManager } from "../Utils/AppHooks";
 import { PlanetLink } from "../Views/PlanetLink";
 import { SortableTable } from "../Views/SortableTable";
+import { ArtifactUseActions } from "./ArtifactUseActions";
+import type { OwnedArtifactLine } from "./ownedArtifacts";
 
 export const PLANET_TYPE_NAME: Record<number, string> = {
   [PlanetType.PLANET]: "行星",
@@ -86,11 +88,6 @@ const CloseButton = styled.button`
   background: transparent;
   border: 1px solid ${dfstyles.colors.borderDark};
   padding: 4px 8px;
-`;
-
-const Hint = styled.div`
-  margin-bottom: 8px;
-  opacity: 0.8;
 `;
 
 /** 这个地址还持有的星球。地址大小写不一致也算同一人。 */
@@ -282,7 +279,6 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
           关闭
         </CloseButton>
       </TitleRow>
-      <Hint>点击名称，镜头移到那颗星球。表头可以排序。</Hint>
       <Filters>
         <FilterButton
           type="button"
@@ -319,3 +315,70 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
     </Shell>
   );
 }
+
+const RARITY_ORDER = ["", "未知", "普通", "稀有", "史诗", "传说", "神话"];
+
+/** 和占领星球同一块弹窗。点位置时，镜头移到放着这件神器的星球。 */
+export function OwnedArtifactsPanel({
+  artifacts,
+  onClose,
+}: {
+  artifacts: OwnedArtifactLine[];
+  onClose: () => void;
+}) {
+  const uiManager = useUIManager();
+  const place = (line: OwnedArtifactLine) => {
+    if (!line.planetId) return line.place;
+    const planet = uiManager.getPlanetWithId(line.planetId as LocationId);
+    if (!planet || !isLocatable(planet)) return line.place;
+    return <PlanetLink planet={planet}>{line.place}</PlanetLink>;
+  };
+  // 在钱包里的神器先存回星球才能充能或激活。
+  const use = (line: OwnedArtifactLine) => {
+    if (!line.planetId) return "在钱包，先放回星球";
+    const planet = uiManager.getPlanetWithId(line.planetId as LocationId);
+    if (!planet || !isLocatable(planet)) return "坐标还未知";
+    const artifact = uiManager.getArtifactWithId(line.id as ArtifactId);
+    if (!artifact) return "神器还没同步";
+    return <ArtifactUseActions planet={planet} artifact={artifact} />;
+  };
+
+  return (
+    <ArtifactShell>
+      <TitleRow>
+        <div>拥有神器 {artifacts.length}</div>
+        <CloseButton type="button" onClick={onClose}>
+          关闭
+        </CloseButton>
+      </TitleRow>
+      {artifacts.length === 0 ? (
+        <div>还没有神器。</div>
+      ) : (
+        <SortableTable
+          rows={artifacts}
+          headers={["名称", "稀有度", "位置", "使用"]}
+          columns={[
+            (line) => line.name,
+            (line) => line.rarity || "未知",
+            (line) => place(line),
+            (line) => use(line),
+          ]}
+          sortFunctions={[
+            (left, right) => left.name.localeCompare(right.name),
+            (left, right) =>
+              RARITY_ORDER.indexOf(right.rarity) -
+              RARITY_ORDER.indexOf(left.rarity),
+            (left, right) => left.place.localeCompare(right.place),
+            () => 0,
+          ]}
+          alignments={["l", "l", "l", "l"]}
+          sortable={[true, true, true, false]}
+        />
+      )}
+    </ArtifactShell>
+  );
+}
+
+const ArtifactShell = styled(Shell)`
+  width: min(980px, calc(100vw - 360px));
+`;

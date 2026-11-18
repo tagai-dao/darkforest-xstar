@@ -78,10 +78,10 @@ import type { TerminalHandle } from "../../Frontend/Views/Terminal";
 import type { MiningPattern } from "../Miner/MiningPatterns";
 import { coordsEqual } from "../Utils/Coordinates";
 import type { GameManager } from "./GameManager";
-import { copyText, formatMoveOrder } from "./moveOrder";
 import { GameManagerEvent } from "./GameManager";
 import type { GameObjects } from "./GameObjects";
 import type { GuildUtils } from "./GuildUtils";
+import { copyText, formatMoveOrder } from "./moveOrder";
 import { PluginManager } from "./PluginManager";
 import TutorialManager, { TutorialState } from "./TutorialManager";
 import { ViewportEntities } from "./ViewportEntities";
@@ -999,6 +999,7 @@ export class GameUIManager extends EventEmitter {
             uiEmitter.emit(UIEmitterEvent.MoveOrderCopied, {
               text: orderText,
               copied,
+              label: artifact ? "已复制运送单，直接粘贴给 agent" : undefined,
             });
           });
         }

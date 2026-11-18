@@ -8,8 +8,13 @@ import { aiproPriceLabel } from "./ActionHistory";
 import {
   heldByAccount,
   MATERIAL_NAME,
+  OwnedArtifactsPanel,
   OwnedPlanetsPanel,
 } from "./OwnedPlanetsPanel";
+import {
+  collectOwnedArtifacts,
+  type OwnedArtifactLine,
+} from "./ownedArtifacts";
 
 const Panel = styled.div`
   position: fixed;
@@ -43,6 +48,8 @@ const HomeNotice = styled.div`
 `;
 
 const OpenButton = styled.button`
+  display: block;
+  width: 100%;
   background: none;
   border: none;
   color: inherit;
@@ -62,6 +69,7 @@ type WalletFacts = {
   users?: number;
   chunks?: number;
   planetCount: number;
+  artifacts: OwnedArtifactLine[];
   energy?: number;
   silver?: number;
   // 链上 junk 就是额度。0 级星球占 50，出生上限是 1000。这里不要再除以 1000。
@@ -72,7 +80,11 @@ type WalletFacts = {
   materials: MaterialLine[];
 };
 
-const EMPTY_FACTS: WalletFacts = { planetCount: 0, materials: [] };
+const EMPTY_FACTS: WalletFacts = {
+  planetCount: 0,
+  artifacts: [],
+  materials: [],
+};
 
 function whole(value: number | undefined): string {
   if (value === undefined || !Number.isFinite(value)) {
@@ -131,6 +143,7 @@ export function PublicGameStatus({
   const [worldRadius, setWorldRadius] = useState<number | undefined>();
   const [facts, setFacts] = useState<WalletFacts>(EMPTY_FACTS);
   const [planetsOpen, setPlanetsOpen] = useState(false);
+  const [artifactsOpen, setArtifactsOpen] = useState(false);
   const seenFacts = useRef("");
 
   useEffect(() => {
@@ -161,7 +174,11 @@ export function PublicGameStatus({
         // 画面或内圈表还没准备好。
       }
 
-      const next: WalletFacts = { planetCount: 0, materials: [] };
+      const next: WalletFacts = {
+        planetCount: 0,
+        artifacts: [],
+        materials: [],
+      };
       try {
         next.users = uiManager.getSpawnedPlayerCount();
       } catch {
@@ -173,6 +190,14 @@ export function PublicGameStatus({
         if (account) {
           const held = heldByAccount(uiManager.getAllOwnedPlanets(), account);
           next.planetCount = held.length;
+          const game = uiManager.getGameManager();
+          next.artifacts = collectOwnedArtifacts(
+            held,
+            (id) => game.getArtifactWithId(id),
+            game.getMyArtifacts(),
+            (id) => game.getPlanetWithId(id),
+            account,
+          );
           next.energy = held.reduce((sum, planet) => sum + planet.energy, 0);
           next.silver = held.reduce((sum, planet) => sum + planet.silver, 0);
           next.materials = sumMaterials(held);
@@ -195,6 +220,12 @@ export function PublicGameStatus({
         next.users,
         next.chunks,
         next.planetCount,
+        next.artifacts
+          .map(
+            (artifact) =>
+              `${artifact.id}:${artifact.name}:${artifact.rarity}:${artifact.place}:${artifact.planetId ?? ""}`,
+          )
+          .join(","),
         next.junkUsed,
         next.junkLimit,
         next.score,
@@ -230,8 +261,23 @@ export function PublicGameStatus({
         <div>{homeReady ? "家已写入存档" : "家尚未初始化"}</div>
         <div>总用户 {whole(facts.users)}</div>
         <div>已挖块 {whole(facts.chunks)}</div>
-        <OpenButton type="button" onClick={() => setPlanetsOpen(true)}>
+        <OpenButton
+          type="button"
+          onClick={() => {
+            setArtifactsOpen(false);
+            setPlanetsOpen(true);
+          }}
+        >
           占领星球 {facts.planetCount}
+        </OpenButton>
+        <OpenButton
+          type="button"
+          onClick={() => {
+            setPlanetsOpen(false);
+            setArtifactsOpen(true);
+          }}
+        >
+          拥有神器 {facts.artifacts.length}
         </OpenButton>
         <div>
           垃圾额度 {whole(facts.junkUsed)} / {whole(facts.junkLimit)}
@@ -254,6 +300,12 @@ export function PublicGameStatus({
       </Panel>
       {planetsOpen && (
         <OwnedPlanetsPanel onClose={() => setPlanetsOpen(false)} />
+      )}
+      {artifactsOpen && (
+        <OwnedArtifactsPanel
+          artifacts={facts.artifacts}
+          onClose={() => setArtifactsOpen(false)}
+        />
       )}
       {!homeReady && (
         <HomeNotice>

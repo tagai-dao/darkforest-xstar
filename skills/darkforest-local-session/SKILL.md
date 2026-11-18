@@ -1,6 +1,6 @@
 ---
 name: darkforest-local-session
-description: Join the local Dark Forest simulation, initialize a home planet, mine outward from that home, and play with a named strategy file. Use when the owner wants an agent to start this local game, stake an AIPRO NFT, spawn a home, mine, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, or DARKFOREST_CLEAR_JUNK.
+description: Join the local Dark Forest simulation, initialize a home planet, mine outward from that home, and play with a named strategy file. Use when the owner wants an agent to start this local game, stake an AIPRO NFT, spawn a home, mine, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, DARKFOREST_FIND_ARTIFACT, DARKFOREST_USE_ARTIFACT, or DARKFOREST_CLEAR_JUNK.
 ---
 
 # Local simulation
@@ -47,7 +47,7 @@ Turn the snarkjs proof into the World proof before sending:
 
 The first public signal must equal `fromHash`. The second must equal `toHash`. Both are decimal planet hashes. If either differs, stop and do not send.
 
-Call World `df__move` with that proof, that MoveInput, `population`, `silver`, `artifactId`, and `materials`. `materials` is the pasted array of `{ resourceId, amount }`. Each `amount` is already chain units. An empty array sends no materials. Attach `entryFeeWei` wei as the transaction value. Sign with the player wallet. Wait for a successful receipt. Then record `move` as [actions.md](actions.md) describes, with `to` set to `toHashHex`: 64 lowercase hex characters and no `0x` prefix. If the proof fails or the receipt reverts, tell the owner and do not write `actions.ndjson`.
+Call World `df__move` with that proof, that MoveInput, `population`, `silver`, `artifactId`, and `materials`. `materials` is the pasted array of `{ resourceId, amount }`. Each `amount` is already chain units. An empty array sends no materials. When `artifactId` is not `0`, that artifact travels with this fleet. Do not clear it. Attach `entryFeeWei` wei as the transaction value. Sign with the player wallet. Wait for a successful receipt. Then record `move` as [actions.md](actions.md) describes, with `to` set to `toHashHex`: 64 lowercase hex characters and no `0x` prefix. If the proof fails or the receipt reverts, tell the owner and do not write `actions.ndjson`.
 
 ## Pasted material score
 
@@ -91,17 +91,45 @@ Prove from `packages/client`, with `packages/client/public/snarkjs.min.js`, `pac
 
 Call World `df__addJunk` with `planetHash`, `biomebase`, and that proof. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Then record `add-junk` as [actions.md](actions.md) describes. If the proof fails or the receipt reverts, tell the owner and do not write `actions.ndjson`.
 
+## Pasted artifact
+
+The game page does not prospect or find an artifact. On a foundry this wallet owns and has registered, it copies a block. The first line is `DARKFOREST_FIND_ARTIFACT`. The next line is one JSON object with `"kind": "darkforest-find-artifact"`.
+
+That JSON is the whole artifact. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start, and do not ask which foundry. Do not change `planetHash`, `biomebase`, `phase`, or any field inside `circuit`. Do not mine and do not open the map.
+
+`phase` is `prospect-then-find` or `find`. When it is `prospect-then-find`, call World `df__prospectPlanet` with `planetHash`. Attach `entryFeeWei` wei. Sign with the player wallet and wait for that receipt. If it reverts because this foundry is already inside its 256-block window, continue to the find. If it reverts for any other reason, tell the owner and do not write `actions.ndjson`. If it succeeds, continue in this same turn. Do not wait for another message between the two calls. When `phase` is `find`, do not call `df__prospectPlanet`.
+
+Prove from `packages/client`, with the same `biomebase.wasm` and `biomebase.zkey` as Pasted junk registration. Pass `circuit` to `groth16.fullProve`. Turn the snarkjs proof into the World proof the same way Pasted fleet describes. This proof has 7 public signals, in the order the prover returned them. The first must equal `planetHash`. The second must equal `biomebase`. If either differs, stop and do not send the find. If prospect already succeeded, record `prospect` and do not record `find-artifact`.
+
+Call World `df__findingArtifact` with that proof and the BiomebaseInput of those 7 signals, in prover order: planetHash, biomebase, mimcHashKey, biomebaseKey, perlinLengthScale, perlinMirrorX, perlinMirrorY. Attach `entryFeeWei` wei. Wait for a successful receipt. Record `prospect` when this order's prospect receipt succeeded, then record `find-artifact`, as [actions.md](actions.md) describes. If the find receipt reverts, tell the owner. Record `prospect` only when that receipt succeeded, and do not record `find-artifact`.
+
+## Pasted artifact use
+
+The game page does not charge, activate, shut down, or land an artifact. On an artifact this wallet owns, it copies a block. The first line is `DARKFOREST_USE_ARTIFACT`. The next line is one JSON object with `"kind": "darkforest-use-artifact"`.
+
+That JSON is the whole use. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start, and do not ask which artifact. Do not change `action`, `planetHash`, `artifactId`, `dataKind`, `targetHash`, `revealPlanetHash`, or any field inside `circuit`. Do not mine and do not open the map.
+
+`action` is `charge`, `activate`, `shutdown`, or `land`. `call` names the function. `valueWei` is the transaction value. Charge, activate, and shutdown call the World function in `call` with `planetHash`, `artifactId`, and the bytes described below. Attach `valueWei`. Shutdown takes no bytes. Land is not a `df__` call. Read the world ABI and call `destroy` on namespace `atf.1`, system `ProxySystem`, as [actions.md](actions.md) describes under Land a pink bomb. Pass `artifactId` as the bomb id, then the proof and the reveal input as two arguments. Attach `valueWei`, which is 0. Do not invent a `df__` name. The bomb may already have left the planet. Still send the land call.
+
+When `dataKind` is `empty`, the bytes argument is `0x`.
+
+When `dataKind` is `wormhole`, the bytes argument is `abi.encode` of one `bytes32`. That value is `targetHash`. `targetHashHex` is the same value as 64 hex characters without `0x`.
+
+When `dataKind` is `reveal`, prove from `packages/client`, with `packages/client/public/snarkjs.min.js`, `packages/client/src/Shared/snarks/reveal.wasm`, and `packages/client/src/Shared/snarks/reveal.zkey`. Pass `circuit` to `groth16.fullProve`. Turn the snarkjs proof into the World proof the same way Pasted fleet describes. This proof has 9 public signals, in the order the prover returned them. The first must equal `revealPlanetHash`. If it differs, stop and do not send. Fill a RevealInput from those 9 signals, in prover order: planetHash, perlin, x, y, mimcHashKey, spaceTypeKey, perlinLengthScale, perlinMirrorX, perlinMirrorY. For charge and activate, the bytes argument is `abi.encode` of the proof and that RevealInput. For land, pass them as the two arguments after the bomb id.
+
+Wait for a successful receipt. Record `charge-artifact`, `activate-artifact`, `shutdown-artifact`, or `land-bomb`, matching `action`, as [actions.md](actions.md) describes. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
+
 ## Pasted junk clear
 
 The game page does not clear junk. It copies a block. The first line is `DARKFOREST_CLEAR_JUNK`. The next line is one JSON object with `"kind": "darkforest-clear-junk"`.
 
 That JSON is the whole clear. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start, and do not ask which planet. Do not change `planetHash`. There is no proof. Call World `df__clearJunk` with `planetHash`. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Then record `clear-junk` as [actions.md](actions.md) describes. When `ownsPlanet` is true, the planet was abandoned. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
 
-A message can contain more than one of these blocks. Send every fleet first, then every junk registration, then every silver withdrawal, then every material withdrawal, then every silver purchase, then every upgrade, then every junk clear, all in this turn.
+A message can contain more than one of these blocks. Send every fleet first, then every junk registration, then every artifact find, then every artifact use, then every silver withdrawal, then every material withdrawal, then every silver purchase, then every upgrade, then every junk clear, all in this turn.
 
 ## Ask first
 
-After reading this skill, ask whether to start. Do not ask again in this conversation if the owner already answered. A message that contains `DARKFOREST_MOVE`, `DARKFOREST_WITHDRAW_MATERIAL`, `DARKFOREST_WITHDRAW_SILVER`, `DARKFOREST_BUY_SILVER`, `DARKFOREST_UPGRADE`, `DARKFOREST_ADD_JUNK`, or `DARKFOREST_CLEAR_JUNK` is an order, not a new start. Send each order as its pasted section describes, and do not ask this question.
+After reading this skill, ask whether to start. Do not ask again in this conversation if the owner already answered. A message that contains `DARKFOREST_MOVE`, `DARKFOREST_WITHDRAW_MATERIAL`, `DARKFOREST_WITHDRAW_SILVER`, `DARKFOREST_BUY_SILVER`, `DARKFOREST_UPGRADE`, `DARKFOREST_ADD_JUNK`, `DARKFOREST_FIND_ARTIFACT`, `DARKFOREST_USE_ARTIFACT`, or `DARKFOREST_CLEAR_JUNK` is an order, not a new start. Send each order as its pasted section describes, and do not ask this question.
 
 > Start this local simulation? I will read the connected wallet and then decide whether to stake an AIPRO NFT for this season, or initialize a home.
 

@@ -251,6 +251,109 @@ export type ClearJunkOrderInput = {
   entryFeeWei: bigint;
 };
 
+export type FindArtifactOrderInput = {
+  planetId: LocationId;
+  x: number;
+  y: number;
+  biomebase: number;
+  planetHashKey: number;
+  biomebaseKey: number;
+  scale: number;
+  mirrorX: boolean;
+  mirrorY: boolean;
+  // find：窗口还开着，只发现。prospect-then-find：先勘探，上链后再发现。
+  phase: "find" | "prospect-then-find";
+  entryFeeWei: bigint;
+};
+
+// 铸造厂获得神器。agent 按 phase 勘探，再用和登记相同的证明调用 df__findingArtifact。
+export function formatFindArtifactOrder(input: FindArtifactOrderInput): string {
+  const order = {
+    kind: "darkforest-find-artifact",
+    call: "df__findingArtifact",
+    prospectCall: "df__prospectPlanet",
+    phase: input.phase,
+    planetHash: locationIdToDecStr(input.planetId),
+    planetHashHex: locationIdToHexStr(input.planetId).slice(2),
+    biomebase: String(input.biomebase),
+    entryFeeWei: input.entryFeeWei.toString(),
+    circuit: {
+      x: modPBigInt(input.x).toString(),
+      y: modPBigInt(input.y).toString(),
+      PLANETHASH_KEY: String(input.planetHashKey),
+      BIOMEBASE_KEY: String(input.biomebaseKey),
+      SCALE: String(input.scale),
+      xMirror: input.mirrorX ? "1" : "0",
+      yMirror: input.mirrorY ? "1" : "0",
+    },
+  };
+  return `DARKFOREST_FIND_ARTIFACT\n${JSON.stringify(order)}`;
+}
+
+export type UseArtifactAction = "charge" | "activate" | "shutdown" | "land";
+export type UseArtifactDataKind = "empty" | "wormhole" | "reveal";
+
+export type UseArtifactOrderInput = {
+  action: UseArtifactAction;
+  planetId: LocationId;
+  artifactId: ArtifactId;
+  dataKind: UseArtifactDataKind;
+  // reveal 时是被证明的星球。wormhole 时是另一端。land 的目标就是被摧毁的那颗。
+  target?: { id: LocationId; x: number; y: number };
+  planetHashKey: number;
+  spaceTypeKey: number;
+  scale: number;
+  mirrorX: boolean;
+  mirrorY: boolean;
+  entryFeeWei: bigint;
+};
+
+const USE_CALL = {
+  charge: "df__chargeArtifact",
+  activate: "df__activateArtifact",
+  shutdown: "df__shutdownArtifact",
+  land: "destroy",
+} as const;
+
+// 使用神器。充能、激活、关闭走 df__，摧毁走粉红炸弹代理。页面只复制，不签名。
+export function formatUseArtifactOrder(input: UseArtifactOrderInput): string {
+  const order: Record<string, unknown> = {
+    kind: "darkforest-use-artifact",
+    action: input.action,
+    call: USE_CALL[input.action],
+    planetHash: locationIdToDecStr(input.planetId),
+    planetHashHex: locationIdToHexStr(input.planetId).slice(2),
+    artifactId: artifactIdToDecStr(input.artifactId),
+    dataKind: input.dataKind,
+    // 摧毁不收进入费。其余三次调用附上进入费。
+    valueWei: input.action === "land" ? "0" : input.entryFeeWei.toString(),
+  };
+  if (input.action === "land") {
+    order.namespace = "atf.1";
+    order.system = "ProxySystem";
+  }
+  if (
+    input.target &&
+    (input.dataKind === "wormhole" || input.dataKind === "reveal")
+  ) {
+    order.targetHash = locationIdToDecStr(input.target.id);
+    order.targetHashHex = locationIdToHexStr(input.target.id).slice(2);
+  }
+  if (input.dataKind === "reveal" && input.target) {
+    order.revealPlanetHash = locationIdToDecStr(input.target.id);
+    order.circuit = {
+      x: modPBigInt(input.target.x).toString(),
+      y: modPBigInt(input.target.y).toString(),
+      PLANETHASH_KEY: String(input.planetHashKey),
+      SPACETYPE_KEY: String(input.spaceTypeKey),
+      SCALE: String(input.scale),
+      xMirror: input.mirrorX ? "1" : "0",
+      yMirror: input.mirrorY ? "1" : "0",
+    };
+  }
+  return `DARKFOREST_USE_ARTIFACT\n${JSON.stringify(order)}`;
+}
+
 // 清除自己名下的垃圾配额。agent 读到后直接调用 df__clearJunk。
 export function formatClearJunkOrder(input: ClearJunkOrderInput): string {
   const order = {

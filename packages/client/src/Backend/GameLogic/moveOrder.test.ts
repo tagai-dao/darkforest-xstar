@@ -1,4 +1,4 @@
-import type { LocationId } from "@df/types";
+import type { ArtifactId, LocationId } from "@df/types";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,7 +6,9 @@ import {
   formatAddJunkOrder,
   formatBuySilverOrder,
   formatClearJunkOrder,
+  formatFindArtifactOrder,
   formatUpgradeOrder,
+  formatUseArtifactOrder,
   formatWithdrawMaterialOrder,
   formatWithdrawSilverOrder,
 } from "./moveOrder";
@@ -179,6 +181,94 @@ describe("move order", () => {
       BIOMEBASE_KEY: "1731",
       SCALE: "8192",
       xMirror: "0",
+      yMirror: "0",
+    });
+  });
+
+  it("writes an artifact order with the biomebase circuit and the phase", () => {
+    const text = formatFindArtifactOrder({
+      planetId: FROM,
+      x: 3,
+      y: 4,
+      biomebase: 16,
+      planetHashKey: 1729,
+      biomebaseKey: 1731,
+      scale: 8192,
+      mirrorX: false,
+      mirrorY: true,
+      phase: "prospect-then-find",
+      entryFeeWei: 1000000000000n,
+    });
+    const order = JSON.parse(text.slice("DARKFOREST_FIND_ARTIFACT\n".length));
+
+    expect(text.startsWith("DARKFOREST_FIND_ARTIFACT\n")).toBe(true);
+    expect(order.kind).toBe("darkforest-find-artifact");
+    expect(order.call).toBe("df__findingArtifact");
+    expect(order.prospectCall).toBe("df__prospectPlanet");
+    expect(order.phase).toBe("prospect-then-find");
+    expect(order.planetHash).toBe("10");
+    expect(order.biomebase).toBe("16");
+    expect(order.circuit).toMatchObject({
+      x: "3",
+      y: "4",
+      yMirror: "1",
+    });
+  });
+
+  it("writes a wormhole activation and a pink-bomb landing", () => {
+    const artifactId =
+      "0000000000000000000000000000000000000000000000000000000000000009" as ArtifactId;
+    const wormhole = formatUseArtifactOrder({
+      action: "activate",
+      planetId: FROM,
+      artifactId,
+      dataKind: "wormhole",
+      target: { id: TO, x: 6, y: 8 },
+      planetHashKey: 1729,
+      spaceTypeKey: 1730,
+      scale: 8192,
+      mirrorX: false,
+      mirrorY: true,
+      entryFeeWei: 1000000000000n,
+    });
+    const linked = JSON.parse(
+      wormhole.slice("DARKFOREST_USE_ARTIFACT\n".length),
+    );
+
+    expect(wormhole.startsWith("DARKFOREST_USE_ARTIFACT\n")).toBe(true);
+    expect(linked.kind).toBe("darkforest-use-artifact");
+    expect(linked.call).toBe("df__activateArtifact");
+    expect(linked.dataKind).toBe("wormhole");
+    expect(linked.artifactId).toBe("9");
+    expect(linked.targetHash).toBe("11");
+    expect(linked.valueWei).toBe("1000000000000");
+    expect(linked.circuit).toBeUndefined();
+
+    const landing = formatUseArtifactOrder({
+      action: "land",
+      planetId: FROM,
+      artifactId,
+      dataKind: "reveal",
+      target: { id: TO, x: 6, y: 8 },
+      planetHashKey: 1729,
+      spaceTypeKey: 1730,
+      scale: 8192,
+      mirrorX: false,
+      mirrorY: false,
+      entryFeeWei: 1000000000000n,
+    });
+    const bomb = JSON.parse(landing.slice("DARKFOREST_USE_ARTIFACT\n".length));
+
+    expect(bomb.call).toBe("destroy");
+    expect(bomb.namespace).toBe("atf.1");
+    expect(bomb.system).toBe("ProxySystem");
+    expect(bomb.valueWei).toBe("0");
+    expect(bomb.revealPlanetHash).toBe("11");
+    expect(bomb.circuit).toMatchObject({
+      x: "6",
+      y: "8",
+      PLANETHASH_KEY: "1729",
+      SPACETYPE_KEY: "1730",
       yMirror: "0",
     });
   });

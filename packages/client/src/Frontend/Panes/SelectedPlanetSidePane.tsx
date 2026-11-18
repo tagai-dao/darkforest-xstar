@@ -15,14 +15,17 @@ import {
   formatAddJunkOrder,
   formatBuySilverOrder,
   formatClearJunkOrder,
+  formatFindArtifactOrder,
   formatUpgradeOrder,
   formatWithdrawMaterialOrder,
   formatWithdrawSilverOrder,
 } from "../../Backend/GameLogic/moveOrder";
 import { getPlanetMaxRank } from "../../Backend/Utils/Utils";
+import { PlanetArtifactUse } from "../Components/ArtifactUseActions";
 import { MATERIAL_NAME } from "../Components/OwnedPlanetsPanel";
 import { useAccount, useSelectedPlanet, useUIManager } from "../Utils/AppHooks";
 import { DFZIndex } from "../Utils/constants";
+import { useEmitterValue } from "../Utils/EmitterHooks";
 import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 import { PlanetCard } from "../Views/PlanetCard";
 import { getMaterialColor } from "./PlanetMaterialsPane";
@@ -531,6 +534,96 @@ function JunkCopy({ planet }: { planet: LocatablePlanet }) {
   );
 }
 
+function artifactCopyHint(
+  junkIsMine: boolean,
+  phase: "found" | "find" | "prospect-then-find",
+): string {
+  if (!junkIsMine) return "先登记垃圾配额";
+  if (phase === "find") return "勘探窗口还开着，这次只发现";
+  return "先勘探，上链后立刻发现";
+}
+
+// 合约的发现窗口是勘探区块到其后 256 个区块，两端都算。过了才能重新勘探。
+function artifactPhase(
+  planet: LocatablePlanet,
+  blockNumber: number | undefined,
+): "found" | "find" | "prospect-then-find" {
+  if (planet.hasTriedFindingArtifact) {
+    return "found";
+  }
+  const prospectedAt = planet.prospectedBlockNumber;
+  if (
+    prospectedAt &&
+    blockNumber !== undefined &&
+    blockNumber <= prospectedAt + 256
+  ) {
+    return "find";
+  }
+  return "prospect-then-find";
+}
+
+/**
+ * 自己的铸造厂复制获得神器。页面不签名，agent 先勘探再发现。
+ */
+function ArtifactCopy({ planet }: { planet: LocatablePlanet }) {
+  const uiManager = useUIManager();
+  const account = useAccount(uiManager);
+  const blockNumber = useEmitterValue(
+    uiManager.getEthConnection().blockNumber$,
+    undefined,
+  );
+  if (planet.planetType !== PlanetType.RUINS) return null;
+  if (!sameAddress(planet.owner, account)) return null;
+  if (planet.destroyed || planet.frozen) return null;
+
+  const junkIsMine = sameAddress(planet.junkOwner, account);
+  const phase = artifactPhase(planet, blockNumber);
+  const copyArtifact = () => {
+    if (!junkIsMine || phase === "found") return;
+    const hashConfig = uiManager.getHashConfig();
+    const text = formatFindArtifactOrder({
+      planetId: planet.locationId,
+      x: planet.location.coords.x,
+      y: planet.location.coords.y,
+      biomebase: planet.location.biomebase,
+      planetHashKey: hashConfig.planetHashKey,
+      biomebaseKey: hashConfig.biomebaseKey,
+      scale: hashConfig.perlinLengthScale,
+      mirrorX: hashConfig.perlinMirrorX,
+      mirrorY: hashConfig.perlinMirrorY,
+      phase,
+      entryFeeWei: uiManager.getGameManager().getTransactionFee(),
+    });
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label: "已复制神器单，直接粘贴给 agent",
+      });
+    });
+  };
+
+  return (
+    <BuyBox>
+      <SectionTitle>神器</SectionTitle>
+      {phase === "found" ? (
+        <Amount>已经发现过神器</Amount>
+      ) : (
+        <TierLine>
+          <TierPrice>{artifactCopyHint(junkIsMine, phase)}</TierPrice>
+          <CopyScore
+            type="button"
+            disabled={!junkIsMine}
+            onClick={copyArtifact}
+          >
+            复制获得神器
+          </CopyScore>
+        </TierLine>
+      )}
+    </BuyBox>
+  );
+}
+
 /**
  * 星球本身可以买银时，列出 4 档价格。点击只复制，agent 再去授权和购买。
  */
@@ -653,10 +746,30 @@ export function SelectedPlanetSidePane() {
     <Side $top={top}>
       <Name>{getPlanetName(selected)}</Name>
       <Coords>
-        坐标 {formatCoord(x)}, {formatCoord(y)}
+        <span>
+          坐标 {formatCoord(x)}, {formatCoord(y)}
+        </span>
+        <CopyCoordButton
+          type="button"
+          title="复制坐标"
+          onClick={() => {
+            const text = `${formatCoord(x)}, ${formatCoord(y)}`;
+            void copyText(text).then((copied) => {
+              UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+                text,
+                copied,
+                label: "已复制坐标",
+              });
+            });
+          }}
+        >
+          <CopyCoordIcon />
+        </CopyCoordButton>
       </Coords>
       <DepartureSliders planet={selected} />
       <JunkCopy planet={selected} />
+      <ArtifactCopy planet={selected} />
+      <PlanetArtifactUse planet={selected} />
       <SilverBuyCopy planet={selected} />
       <UpgradeCopy planet={selected} />
       <PlanetCard planetWrapper={planet} />
@@ -687,11 +800,46 @@ const Name = styled.div`
 `;
 
 const Coords = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
   color: #9be7ff;
 `;
+
+const CopyCoordButton = styled.button`
+  display: inline-flex;
+  padding: 0;
+  color: #9be7ff;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+`;
+
+function CopyCoordIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <rect
+        x="4.5"
+        y="4.5"
+        width="7"
+        height="7"
+        fill="none"
+        stroke="currentColor"
+      />
+      <rect
+        x="2.5"
+        y="2.5"
+        width="7"
+        height="7"
+        fill="#101820"
+        stroke="currentColor"
+      />
+    </svg>
+  );
+}
 
 const Sliders = styled.div`
   display: flex;

@@ -46,7 +46,7 @@ Do not call these. They are closed or limited to the namespace owner: `Initializ
 
 World `df__move` takes the Groth16 proof, the 11 public signals in this order, then population, silver, artifact id, and a materials array: from hash, to hash, perlin at the destination, world radius, distMax, `1729`, `1730`, `8192`, `0`, `0`, destination radius square. It reverts with `PlanetOwnershipMismatch` when the source owner and junk owner differ. The destination's junk owner is not checked.
 
-**Pasted order.** The page copies a `DARKFOREST_MOVE` block when the owner drags from one planet to another. That block is the move to send. Follow [SKILL.md](SKILL.md) under Pasted fleet and send it in the same turn it is read. Use its `circuit` as the prover input, its `population`, `silver`, `artifactId`, and `materials` as the call arguments, and its `entryFeeWei` as the transaction value. `population` is the departure energy. Do not ask for another amount. Do not choose another planet. Record `to` as `toHashHex`.
+**Pasted order.** The page copies a `DARKFOREST_MOVE` block when the owner drags from one planet to another. That block is the move to send. Follow [SKILL.md](SKILL.md) under Pasted fleet and send it in the same turn it is read. Use its `circuit` as the prover input, its `population`, `silver`, `artifactId`, and `materials` as the call arguments, and its `entryFeeWei` as the transaction value. `population` is the departure energy. Do not ask for another amount. Do not choose another planet. When `artifactId` is not `0`, the owner selected that artifact and dragged it with the fleet. Do not clear it. Record `to` as `toHashHex`.
 
 **Effect.** The source energy, silver, and materials fall by the amounts sent. Silver and materials arrive in full. Energy arrives after the distance loss in [rules.md](rules.md). The fleet stays in flight until the arrival tick. A paused ticker does not advance that tick, so the fleet does not arrive. On arrival, a capture of an unowned planet leaves the arrived energy there and sets the owner to this wallet. A reinforce adds that energy to a planet this wallet or the same guild already owns, and adds the silver and materials up to the destination cap. An attack reduces the destination, and a successful attack sets the owner to this wallet. Silver and materials do not increase the damage.
 
@@ -154,13 +154,15 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 ## Prospect and find an artifact
 
-These are two calls. Prospect does not create an artifact. Find does. The client button "Prospect Artifact" sends prospect, waits until it is mined, then sends find. Send them as two transactions when calling the world directly. Both pay the entry fee. The contract does not require a gear ship on the foundry.
+These are two calls. Prospect does not create an artifact. Find does. Send them as two transactions. Both pay the entry fee. The contract does not require a gear ship on the foundry.
 
 **Send.** `df__prospectPlanet(uint256 planetHash)` takes only the planet hash. The caller must own the foundry and be its junk owner. A foundry is contract type 3. The client calls that type ruins. The explored flag must be unset. If this foundry was prospected before and `prospect block + 256` is still at least the current block, prospect reverts. `df__findingArtifact` uses the same biomebase proof as `df__addJunk`: the Groth16 proof plus the 7 public signals, with the planet hash inside that input. Find reverts unless a prospect block is stored and `prospect block + 256` is still at least the current block. It also reverts when the explored flag is set.
 
 **Effect.** Prospect writes `ProspectedPlanet` to the current block number. Energy, silver, and materials stay as they are. Find builds one artifact and pushes it into a free slot on that foundry. A foundry holds at most 8. The seed is `keccak256(planetHash, block.timestamp, blockhash(prospect block))`. The chain returns a block hash only for the last 256 blocks, so the find has to land in that window for the prospect block's hash to be part of the seed. Rarity follows the foundry level: level 0–1 common, 2–3 rare, 4–5 epic, 6–7 legendary, 8–9 mythic. The seed gives about a 1/16 chance of treating the level as one higher and about a 1/64 chance of two higher. The type is drawn from that rarity's probability table. The biome comes from the space type and the biomebase in the proof. Dead space is always corrupted. The same call sets the explored flag. Find does not charge or activate the artifact.
 
 **Impact.** After a successful find, prospect and find both revert on this foundry. If the 256-block window ends before find, the explored flag is still unset, so prospect can be sent again and opens a new window. Charge, activate, shutdown, and moving the artifact are separate calls below. Record `prospect`, then `find-artifact`.
+
+**Pasted order.** The page copies a `DARKFOREST_FIND_ARTIFACT` block from an owned, registered foundry. That block is the artifact to take. Follow [SKILL.md](SKILL.md) under Pasted artifact and send it in the same turn it is read. `phase` `prospect-then-find` sends `df__prospectPlanet` with `planetHash`, waits for that receipt, then proves from `circuit` and sends `df__findingArtifact`. `phase` `find` sends only the find. Attach `entryFeeWei` to each call. Do not ask which foundry. Do not change `planetHash`, `biomebase`, `phase`, or `circuit`.
 
 ## Charge, activate, shut down
 
@@ -170,6 +172,8 @@ These are two calls. Prospect does not create an artifact. Find does. The client
 
 **Impact.** A wormhole shortens later moves between that pair. A bloom filter makes the planet a full energy source for the next move. A charged cannon changes the planet's combat effect until shutdown. An activated pink bomb can be landed only inside its arrival window. Record `charge-artifact`, `activate-artifact`, or `shutdown-artifact`.
 
+**Pasted order.** The page copies a `DARKFOREST_USE_ARTIFACT` block when the owner copies charge, activate, or shutdown. Follow [SKILL.md](SKILL.md) under Pasted artifact use and send it in the same turn it is read. `action` selects the call. `dataKind` `empty` sends bytes `0x`, and shutdown sends no bytes. `wormhole` encodes `targetHash` as one `bytes32`. `reveal` is proved from `circuit` with the reveal circuit, and the first public signal must equal `revealPlanetHash`. Attach `valueWei`. Do not ask which artifact. Do not change `planetHash`, `artifactId`, `action`, or `circuit`.
+
 ## Land a pink bomb
 
 **Send.** After activation, call `destroy(uint256 bombId, Proof, RevealInput)` on the pink-bomb proxy in namespace `atf.1`, system name `ProxySystem`. Read the world ABI and use the function name written there. Do not invent the selector. The proof reveals the planet being hit. The stored tick must be at least the arrival tick and less than 300 ticks after it. The squared distance from the bomb target must be within 500², 1000², 1500², 2000², or 2500² for rarity 1 through 5.
@@ -177,6 +181,8 @@ These are two calls. Prospect does not create an artifact. Find does. The client
 **Effect.** The destroyed flag is set on that planet. A planet that already has the flag reverts.
 
 **Impact.** A destroyed planet is no longer a normal capture target. The reveal also publishes the hit coordinates. Record `land-bomb`.
+
+**Pasted order.** A `DARKFOREST_USE_ARTIFACT` block with `"action": "land"` is this call. Follow [SKILL.md](SKILL.md) under Pasted artifact use and send it in the same turn it is read. Prove `circuit` with the reveal circuit. The first public signal must equal `revealPlanetHash`. Call `destroy` on namespace `atf.1`, system `ProxySystem`, with `artifactId`, that proof, and that reveal input. Attach `valueWei`, which is 0. The bomb may already have left its planet. Do not change the target.
 
 ## Withdraw or deposit an artifact NFT
 
