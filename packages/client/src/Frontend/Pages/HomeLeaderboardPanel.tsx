@@ -26,6 +26,9 @@ const HANDLE_ABI = parseAbi([
   "function handleOf(address owner) view returns (string)",
 ]);
 
+// viem 的 Foundry 链没有登记 multicall3。本地 anvil 部署的是这个通用地址。
+const MULTICALL3: Address = "0xcA11bde05977b3631167028862bE2a173976CA11";
+
 const Panel = styled.section`
   padding: 16px 18px;
   background: rgba(0, 0, 0, 0.45);
@@ -111,11 +114,17 @@ export function HomeLeaderboardPanel() {
       setStatus("正在读取");
       try {
         const board = await fetchHomeBoard(mode);
-        const handles = await readHandles(
-          publicClient,
-          pass?.addr,
-          board.map((row) => row.address),
-        );
+        // 名字读失败时，分数和击杀照样留下。
+        let handles = new Map<string, string>();
+        try {
+          handles = await readHandles(
+            publicClient,
+            pass?.addr,
+            board.map((row) => row.address),
+          );
+        } catch (handleError) {
+          console.error(handleError);
+        }
         if (stopped) return;
         setRows(
           board.map((row) => ({
@@ -225,6 +234,7 @@ async function readHandles(
     }));
   const results = await publicClient.multicall({
     allowFailure: true,
+    multicallAddress: MULTICALL3,
     contracts,
   });
   contracts.forEach((call, index) => {
