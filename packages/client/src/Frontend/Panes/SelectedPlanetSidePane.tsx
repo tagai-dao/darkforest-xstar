@@ -12,7 +12,9 @@ import styled from "styled-components";
 
 import {
   copyText,
+  formatAddJunkOrder,
   formatBuySilverOrder,
+  formatClearJunkOrder,
   formatUpgradeOrder,
   formatWithdrawMaterialOrder,
   formatWithdrawSilverOrder,
@@ -461,6 +463,75 @@ function UpgradeCopy({ planet }: { planet: LocatablePlanet }) {
 }
 
 /**
+ * 自己占领的星球可以复制登记和清除。清除自己的星球会把它放弃。
+ */
+function JunkCopy({ planet }: { planet: LocatablePlanet }) {
+  const uiManager = useUIManager();
+  const account = useAccount(uiManager);
+  const owned = sameAddress(planet.owner, account);
+  if (!owned) return null;
+
+  const junkIsMine = sameAddress(planet.junkOwner, account);
+  const copyAdd = () => {
+    const hashConfig = uiManager.getHashConfig();
+    const text = formatAddJunkOrder({
+      planetId: planet.locationId,
+      x: planet.location.coords.x,
+      y: planet.location.coords.y,
+      biomebase: planet.location.biomebase,
+      planetHashKey: hashConfig.planetHashKey,
+      biomebaseKey: hashConfig.biomebaseKey,
+      scale: hashConfig.perlinLengthScale,
+      mirrorX: hashConfig.perlinMirrorX,
+      mirrorY: hashConfig.perlinMirrorY,
+      entryFeeWei: uiManager.getGameManager().getTransactionFee(),
+    });
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label: "已复制登记单，直接粘贴给 agent",
+      });
+    });
+  };
+  const copyClear = () => {
+    if (!junkIsMine) return;
+    const text = formatClearJunkOrder({
+      planetId: planet.locationId,
+      ownsPlanet: true,
+      entryFeeWei: uiManager.getGameManager().getTransactionFee(),
+    });
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label: "已复制清除单，直接粘贴给 agent",
+      });
+    });
+  };
+
+  return (
+    <BuyBox>
+      <SectionTitle>垃圾配额</SectionTitle>
+      <TierLine>
+        <TierPrice>{junkIsMine ? "已经登记" : "占领后还没登记"}</TierPrice>
+        <CopyScore type="button" onClick={copyAdd}>
+          复制 addJunk
+        </CopyScore>
+      </TierLine>
+      <TierLine>
+        <TierPrice>
+          {junkIsMine ? "清除后会放弃这颗星球" : "垃圾不在自己名下"}
+        </TierPrice>
+        <CopyScore type="button" disabled={!junkIsMine} onClick={copyClear}>
+          复制 removeJunk
+        </CopyScore>
+      </TierLine>
+    </BuyBox>
+  );
+}
+
+/**
  * 星球本身可以买银时，列出 4 档价格。点击只复制，agent 再去授权和购买。
  */
 function SilverBuyCopy({ planet }: { planet: LocatablePlanet }) {
@@ -585,6 +656,7 @@ export function SelectedPlanetSidePane() {
         坐标 {formatCoord(x)}, {formatCoord(y)}
       </Coords>
       <DepartureSliders planet={selected} />
+      <JunkCopy planet={selected} />
       <SilverBuyCopy planet={selected} />
       <UpgradeCopy planet={selected} />
       <PlanetCard planetWrapper={planet} />

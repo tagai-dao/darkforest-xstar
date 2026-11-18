@@ -90,6 +90,8 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Impact.** Move, upgrade, withdraw, buy silver, and artifact calls on this planet stay closed until the owner and the junk owner match. Energy and silver grow on later ticks only after they match, and they do not grow while the ticker is paused. Registering at stored tick 0 writes `addJunkTick` 0, which still blocks buy silver. Record `add-junk` with the planet and the used and limit numbers.
 
+**Pasted order.** The page copies a `DARKFOREST_ADD_JUNK` block when the owner copies a registration. Follow [SKILL.md](SKILL.md) under Pasted junk registration and send it in the same turn it is read. Use its `circuit` as the prover input, its `biomebase` as the second argument, and its `entryFeeWei` as the transaction value. Do not ask which planet.
+
 ## Clear junk
 
 **Send.** World `df__clearJunk(uint256 planetHash)`. No proof. The caller must be the junk owner. The planet owner does not have to be this wallet.
@@ -97,6 +99,8 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 **Effect.** Used junk falls by that planet's level cost and the junk owner becomes the zero address. When this wallet also owns the planet, the owner becomes the zero address too. Energy and silver stay on the planet.
 
 **Impact.** Clearing a planet this wallet still owns abandons it. Anyone can capture what is left. Clearing a planet someone else owns only returns the quota; they keep the planet and still cannot launch until they register. Record `clear-junk` and say whether the planet was abandoned.
+
+**Pasted order.** The page copies a `DARKFOREST_CLEAR_JUNK` block when the owner copies a clear. Follow [SKILL.md](SKILL.md) under Pasted junk clear and send it in the same turn it is read. Call `df__clearJunk` with `planetHash` and attach `entryFeeWei`. There is no proof. When `ownsPlanet` is true, the planet was abandoned.
 
 ## Buy a higher junk limit
 

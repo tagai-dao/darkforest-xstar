@@ -1,13 +1,20 @@
 import { EMPTY_ADDRESS } from "@df/constants";
+import { isLocatable } from "@df/gamelogic";
 import { isUnconfirmedAddJunkTx, isUnconfirmedClearJunkTx } from "@df/serde";
-import type { Planet, LocatablePlanet } from "@df/types";
+import type { Planet } from "@df/types";
 import { useCallback, useMemo } from "react";
 import styled from "styled-components";
 
+import {
+  copyText,
+  formatAddJunkOrder,
+  formatClearJunkOrder,
+} from "../../Backend/GameLogic/moveOrder";
 import type { Wrapper } from "../../Backend/Utils/Wrapper";
 import { LoadingSpinner } from "../Components/LoadingSpinner";
 import { MaybeShortcutButton } from "../Components/MaybeShortcutButton";
 import { useUIManager } from "../Utils/AppHooks";
+import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 import { TOGGLE_MANAGE_JUNK } from "../Utils/ShortcutConstants";
 
 const TextWrapper = styled.span`
@@ -44,13 +51,31 @@ export function ManageJunkButton({
     else return false;
   }, [planet, account]);
 
+  // 页面不登记。复制登记单，agent 读到后证明并调用 df__addJunk。
   const addJunk = useCallback(() => {
-    if (!planet) {
+    if (!planet || !isLocatable(planet)) {
       return;
     }
-    // Get biomeBase from planet location if available (for LocatablePlanet), otherwise use 0
-    const biomeBase = (planet as LocatablePlanet).location?.biomebase || 0;
-    uiManager.addJunk(planet.locationId, biomeBase);
+    const hashConfig = uiManager.getHashConfig();
+    const text = formatAddJunkOrder({
+      planetId: planet.locationId,
+      x: planet.location.coords.x,
+      y: planet.location.coords.y,
+      biomebase: planet.location.biomebase,
+      planetHashKey: hashConfig.planetHashKey,
+      biomebaseKey: hashConfig.biomebaseKey,
+      scale: hashConfig.perlinLengthScale,
+      mirrorX: hashConfig.perlinMirrorX,
+      mirrorY: hashConfig.perlinMirrorY,
+      entryFeeWei: uiManager.getGameManager().getTransactionFee(),
+    });
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label: "已复制登记单，直接粘贴给 agent",
+      });
+    });
   }, [planet, uiManager]);
 
   const adding = useMemo(
@@ -65,17 +90,24 @@ export function ManageJunkButton({
     return planet.junkOwner === account;
   }, [planet]);
 
+  // 页面不清除。复制清除单，agent 读到后直接调用 df__clearJunk。
   const clearJunk = useCallback(() => {
     if (!planet) {
       return;
     }
-    const confirmed = confirm(
-      "If you are the owner of this planet, clearing junk will cause you to lose ownership. Are you sure you want to clear the junk?",
-    );
-    if (confirmed) {
-      uiManager.clearJunk(planet.locationId);
-    }
-  }, [planet, uiManager]);
+    const text = formatClearJunkOrder({
+      planetId: planet.locationId,
+      ownsPlanet: planet.owner.toLowerCase() === account?.toLowerCase(),
+      entryFeeWei: uiManager.getGameManager().getTransactionFee(),
+    });
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label: "已复制清除单，直接粘贴给 agent",
+      });
+    });
+  }, [planet, uiManager, account]);
 
   const clearing = useMemo(
     () =>
@@ -109,7 +141,7 @@ export function ManageJunkButton({
               {adding ? (
                 <LoadingSpinner initialText="Adding Junk..." />
               ) : (
-                "Add Junk"
+                "复制 addJunk"
               )}
             </TextWrapper>
           )}
@@ -119,7 +151,7 @@ export function ManageJunkButton({
               {clearing ? (
                 <LoadingSpinner initialText="Clearing Junk..." />
               ) : (
-                "Clear Junk"
+                "复制 removeJunk"
               )}
             </TextWrapper>
           )}

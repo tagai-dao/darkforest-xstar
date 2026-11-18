@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildMoveOrder,
+  formatAddJunkOrder,
   formatBuySilverOrder,
+  formatClearJunkOrder,
   formatUpgradeOrder,
   formatWithdrawMaterialOrder,
   formatWithdrawSilverOrder,
@@ -147,6 +149,53 @@ describe("move order", () => {
     expect(order.rangeTimes).toBe(1);
     expect(order.speedTimes).toBe(0);
     expect(order.defenseTimes).toBe(0);
+    expect(order.entryFeeWei).toBe("1000000000000");
+  });
+
+  it("writes a junk registration with the biomebase circuit", () => {
+    const text = formatAddJunkOrder({
+      planetId: FROM,
+      x: 3,
+      y: 4,
+      biomebase: 16,
+      planetHashKey: 1729,
+      biomebaseKey: 1731,
+      scale: 8192,
+      mirrorX: false,
+      mirrorY: false,
+      entryFeeWei: 1000000000000n,
+    });
+    const order = JSON.parse(text.slice("DARKFOREST_ADD_JUNK\n".length));
+
+    expect(text.startsWith("DARKFOREST_ADD_JUNK\n")).toBe(true);
+    expect(order.kind).toBe("darkforest-add-junk");
+    expect(order.call).toBe("df__addJunk");
+    expect(order.planetHash).toBe("10");
+    expect(order.biomebase).toBe("16");
+    expect(order.circuit).toMatchObject({
+      x: "3",
+      y: "4",
+      PLANETHASH_KEY: "1729",
+      BIOMEBASE_KEY: "1731",
+      SCALE: "8192",
+      xMirror: "0",
+      yMirror: "0",
+    });
+  });
+
+  it("writes a junk clear and whether the planet is also owned", () => {
+    const text = formatClearJunkOrder({
+      planetId: FROM,
+      ownsPlanet: true,
+      entryFeeWei: 1000000000000n,
+    });
+    const order = JSON.parse(text.slice("DARKFOREST_CLEAR_JUNK\n".length));
+
+    expect(text.startsWith("DARKFOREST_CLEAR_JUNK\n")).toBe(true);
+    expect(order.kind).toBe("darkforest-clear-junk");
+    expect(order.call).toBe("df__clearJunk");
+    expect(order.planetHash).toBe("10");
+    expect(order.ownsPlanet).toBe(true);
     expect(order.entryFeeWei).toBe("1000000000000");
   });
 });

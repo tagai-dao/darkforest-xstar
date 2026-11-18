@@ -1,6 +1,6 @@
 ---
 name: darkforest-local-session
-description: Join the local Dark Forest simulation, initialize a home planet, mine outward from that home, and play with a named strategy file. Use when the owner wants an agent to start this local game, stake an AIPRO NFT, spawn a home, mine, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, or DARKFOREST_UPGRADE.
+description: Join the local Dark Forest simulation, initialize a home planet, mine outward from that home, and play with a named strategy file. Use when the owner wants an agent to start this local game, stake an AIPRO NFT, spawn a home, mine, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, or DARKFOREST_CLEAR_JUNK.
 ---
 
 # Local simulation
@@ -81,11 +81,27 @@ That JSON is the whole upgrade. The moment it is recognized, send it in this tur
 
 Call World `df__upgradePlanet` with `planetHash`, `rangeTimes`, `speedTimes`, and `defenseTimes`. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Then record `upgrade` as [actions.md](actions.md) describes. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
 
-A message can contain more than one of these blocks. Send every fleet first, then every silver withdrawal, then every material withdrawal, then every silver purchase, then every upgrade, all in this turn.
+## Pasted junk registration
+
+The game page does not register junk. On a planet this wallet owns, it copies a block. The first line is `DARKFOREST_ADD_JUNK`. The next line is one JSON object with `"kind": "darkforest-add-junk"`.
+
+That JSON is the whole registration. The moment it is recognized, prove and send it in this turn. Do not wait for another message. Do not ask to start, and do not ask which planet. Do not change `planetHash`, `biomebase`, or any field inside `circuit`. Do not mine and do not open the map.
+
+Prove from `packages/client`, with `packages/client/public/snarkjs.min.js`, `packages/client/src/Shared/snarks/biomebase.wasm`, and `packages/client/src/Shared/snarks/biomebase.zkey`. Pass `circuit` to `groth16.fullProve` as the input. Turn the snarkjs proof into the World proof the same way Pasted fleet describes. This proof has 7 public signals, in the order the prover returned them. The first must equal `planetHash`. The second must equal `biomebase`. If either differs, stop and do not send.
+
+Call World `df__addJunk` with `planetHash`, `biomebase`, and that proof. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Then record `add-junk` as [actions.md](actions.md) describes. If the proof fails or the receipt reverts, tell the owner and do not write `actions.ndjson`.
+
+## Pasted junk clear
+
+The game page does not clear junk. It copies a block. The first line is `DARKFOREST_CLEAR_JUNK`. The next line is one JSON object with `"kind": "darkforest-clear-junk"`.
+
+That JSON is the whole clear. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start, and do not ask which planet. Do not change `planetHash`. There is no proof. Call World `df__clearJunk` with `planetHash`. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Then record `clear-junk` as [actions.md](actions.md) describes. When `ownsPlanet` is true, the planet was abandoned. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
+
+A message can contain more than one of these blocks. Send every fleet first, then every junk registration, then every silver withdrawal, then every material withdrawal, then every silver purchase, then every upgrade, then every junk clear, all in this turn.
 
 ## Ask first
 
-After reading this skill, ask whether to start. Do not ask again in this conversation if the owner already answered. A message that contains `DARKFOREST_MOVE`, `DARKFOREST_WITHDRAW_MATERIAL`, `DARKFOREST_WITHDRAW_SILVER`, `DARKFOREST_BUY_SILVER`, or `DARKFOREST_UPGRADE` is an order, not a new start. Send each order as its pasted section describes, and do not ask this question.
+After reading this skill, ask whether to start. Do not ask again in this conversation if the owner already answered. A message that contains `DARKFOREST_MOVE`, `DARKFOREST_WITHDRAW_MATERIAL`, `DARKFOREST_WITHDRAW_SILVER`, `DARKFOREST_BUY_SILVER`, `DARKFOREST_UPGRADE`, `DARKFOREST_ADD_JUNK`, or `DARKFOREST_CLEAR_JUNK` is an order, not a new start. Send each order as its pasted section describes, and do not ask this question.
 
 > Start this local simulation? I will read the connected wallet and then decide whether to stake an AIPRO NFT for this season, or initialize a home.
 

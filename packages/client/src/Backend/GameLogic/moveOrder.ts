@@ -208,6 +208,62 @@ export function formatUpgradeOrder(input: UpgradeOrderInput): string {
   return `DARKFOREST_UPGRADE\n${JSON.stringify(order)}`;
 }
 
+export type AddJunkOrderInput = {
+  planetId: LocationId;
+  x: number;
+  y: number;
+  // 这颗星球坐标上的 biomebase。证明的第二个公开信号必须等于它。
+  biomebase: number;
+  planetHashKey: number;
+  biomebaseKey: number;
+  scale: number;
+  mirrorX: boolean;
+  mirrorY: boolean;
+  entryFeeWei: bigint;
+};
+
+// 占领后登记垃圾配额。agent 读到后证明，再调用 df__addJunk。
+export function formatAddJunkOrder(input: AddJunkOrderInput): string {
+  const order = {
+    kind: "darkforest-add-junk",
+    call: "df__addJunk",
+    planetHash: locationIdToDecStr(input.planetId),
+    planetHashHex: locationIdToHexStr(input.planetId).slice(2),
+    biomebase: String(input.biomebase),
+    entryFeeWei: input.entryFeeWei.toString(),
+    circuit: {
+      x: modPBigInt(input.x).toString(),
+      y: modPBigInt(input.y).toString(),
+      PLANETHASH_KEY: String(input.planetHashKey),
+      BIOMEBASE_KEY: String(input.biomebaseKey),
+      SCALE: String(input.scale),
+      xMirror: input.mirrorX ? "1" : "0",
+      yMirror: input.mirrorY ? "1" : "0",
+    },
+  };
+  return `DARKFOREST_ADD_JUNK\n${JSON.stringify(order)}`;
+}
+
+export type ClearJunkOrderInput = {
+  planetId: LocationId;
+  // 调用者同时是星球主人时，清除会把星球放弃。
+  ownsPlanet: boolean;
+  entryFeeWei: bigint;
+};
+
+// 清除自己名下的垃圾配额。agent 读到后直接调用 df__clearJunk。
+export function formatClearJunkOrder(input: ClearJunkOrderInput): string {
+  const order = {
+    kind: "darkforest-clear-junk",
+    call: "df__clearJunk",
+    planetHash: locationIdToDecStr(input.planetId),
+    planetHashHex: locationIdToHexStr(input.planetId).slice(2),
+    ownsPlanet: input.ownsPlanet,
+    entryFeeWei: input.entryFeeWei.toString(),
+  };
+  return `DARKFOREST_CLEAR_JUNK\n${JSON.stringify(order)}`;
+}
+
 export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
