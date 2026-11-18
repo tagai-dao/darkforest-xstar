@@ -1,10 +1,24 @@
+import { MaterialType } from "@df/types";
+
+import { getMaterialColor } from "../../Utils/materialColor";
+
+/** 一段普通文字，或一段带游戏内颜色的材料名。 */
+export type DocRun = string | { text: string; color: string };
+
 export type DocBlock =
   | { kind: "p"; text: string }
+  | { kind: "rich"; parts: DocRun[] }
   | { kind: "h2"; id: string; title: string }
   | { kind: "ul"; items: string[] }
-  | { kind: "table"; headers: string[]; rows: string[][] }
+  | { kind: "table"; headers: string[]; rows: DocRun[][] }
   | { kind: "energy-figure" }
-  | { kind: "space-figure" };
+  | { kind: "space-figure" }
+  | { kind: "biome-figure" };
+
+/** 材料名用星球上同一种颜色。 */
+function materialLabel(id: MaterialType, name: string): DocRun {
+  return { text: name, color: getMaterialColor(id) };
+}
 
 export type DocChapter = {
   id: string;
@@ -248,6 +262,16 @@ export const gameDocs: DocChapter[] = [
           ["死空", "5.7%", "6.3%"],
         ],
       },
+      { kind: "h2", id: "biomes", title: "生态" },
+      {
+        kind: "p",
+        text: "生态是这个坐标的地形，和星球类型分开。行星、小行星带、铸造厂都可以落在同一种生态上。空间类型先圈定三种地形，再用生态噪声 biomebase 取一种。低于 15 是第一种，低于 17 是第二种，否则是第三种。死空固定是腐化。",
+      },
+      {
+        kind: "p",
+        text: "同一空间里的三种生态，等级上限、升级合计、射程、速度、防御、能量和银都相同。这些数字跟着空间变，写在表里的空间属性。生态再决定画面、小行星带第一次登记时的材料，以及铸造厂神器上的标记。表的第一列只画这个空间里会出现的类型。星云没有铸造厂。小行星带、时空裂隙和类星体还会按类型改防御、银或速度，那不跟着生态变。",
+      },
+      { kind: "biome-figure" },
       { kind: "h2", id: "home", title: "家和内圈" },
       {
         kind: "p",
@@ -580,23 +604,103 @@ export const gameDocs: DocChapter[] = [
         kind: "table",
         headers: ["编号", "材料", "倍率"],
         rows: [
-          ["0", "未知（Unknown）", "100"],
-          ["1", "水晶体（Water Crystals）", "105"],
-          ["2", "活木（Living Wood）", "110"],
-          ["3", "风钢（Wind Steel）", "120"],
-          ["4", "极光金（Aurorium）", "130"],
-          ["5", "菌胶（Mycelium）", "150"],
-          ["6", "沙玻璃（Sand Glass）", "180"],
-          ["7", "冰晶石（Cryostone）", "200"],
-          ["8", "废金（Scrapium）", "250"],
-          ["9", "火钢（Pyrosteel）", "300"],
-          ["10", "黑合金（Blackalloy）", "400"],
-          ["11", "腐化水晶（Corrupted Crystal）", "600"],
+          ["0", materialLabel(MaterialType.UNKNOWN, "未知（Unknown）"), "100"],
+          [
+            "1",
+            materialLabel(
+              MaterialType.WATER_CRYSTALS,
+              "水晶体（Water Crystals）",
+            ),
+            "105",
+          ],
+          [
+            "2",
+            materialLabel(MaterialType.LIVING_WOOD, "活木（Living Wood）"),
+            "110",
+          ],
+          [
+            "3",
+            materialLabel(MaterialType.WINDSTEEL, "风钢（Wind Steel）"),
+            "120",
+          ],
+          [
+            "4",
+            materialLabel(MaterialType.AURORIUM, "极光金（Aurorium）"),
+            "130",
+          ],
+          [
+            "5",
+            materialLabel(MaterialType.MYCELIUM, "菌胶（Mycelium）"),
+            "150",
+          ],
+          [
+            "6",
+            materialLabel(MaterialType.SANDGLASS, "沙玻璃（Sand Glass）"),
+            "180",
+          ],
+          [
+            "7",
+            materialLabel(MaterialType.CRYOSTONE, "冰晶石（Cryostone）"),
+            "200",
+          ],
+          [
+            "8",
+            materialLabel(MaterialType.SCRAPIUM, "废金（Scrapium）"),
+            "250",
+          ],
+          [
+            "9",
+            materialLabel(MaterialType.PYROSTEEL, "火钢（Pyrosteel）"),
+            "300",
+          ],
+          [
+            "10",
+            materialLabel(MaterialType.BLACKALLOY, "黑合金（Blackalloy）"),
+            "400",
+          ],
+          [
+            "11",
+            materialLabel(
+              MaterialType.CORRUPTED_CRYSTAL,
+              "腐化水晶（Corrupted Crystal）",
+            ),
+            "600",
+          ],
         ],
       },
       {
-        kind: "p",
-        text: "死空是腐化生态，长黑合金（Blackalloy）和腐化水晶（Corrupted Crystal）。其他空间类型长一种材料。星云是水晶体（Water Crystals）、活木（Living Wood）或风钢（Wind Steel）。太空是极光金（Aurorium）、菌胶（Mycelium）或沙玻璃（Sand Glass）。深空是冰晶石（Cryostone）、废金（Scrapium）或火钢（Pyrosteel）。三种里取哪一种，看生态基数：低于 15 是第一种，低于 17 是第二种，否则是第三种。",
+        kind: "rich",
+        parts: [
+          "死空是腐化生态，长",
+          materialLabel(MaterialType.BLACKALLOY, "黑合金（Blackalloy）"),
+          "和",
+          materialLabel(
+            MaterialType.CORRUPTED_CRYSTAL,
+            "腐化水晶（Corrupted Crystal）",
+          ),
+          "。其他空间类型长一种材料。星云是",
+          materialLabel(
+            MaterialType.WATER_CRYSTALS,
+            "水晶体（Water Crystals）",
+          ),
+          "、",
+          materialLabel(MaterialType.LIVING_WOOD, "活木（Living Wood）"),
+          "或",
+          materialLabel(MaterialType.WINDSTEEL, "风钢（Wind Steel）"),
+          "。太空是",
+          materialLabel(MaterialType.AURORIUM, "极光金（Aurorium）"),
+          "、",
+          materialLabel(MaterialType.MYCELIUM, "菌胶（Mycelium）"),
+          "或",
+          materialLabel(MaterialType.SANDGLASS, "沙玻璃（Sand Glass）"),
+          "。深空是",
+          materialLabel(MaterialType.CRYOSTONE, "冰晶石（Cryostone）"),
+          "、",
+          materialLabel(MaterialType.SCRAPIUM, "废金（Scrapium）"),
+          "或",
+          materialLabel(MaterialType.PYROSTEEL, "火钢（Pyrosteel）"),
+          "。三种里取哪一种，看生态基数：低于 15 是第一种，低于 17 是第二种，否则是第三种。每种生态的画面见地图一章。",
+        ],
       },
     ],
   },

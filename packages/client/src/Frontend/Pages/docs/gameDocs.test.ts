@@ -1,5 +1,7 @@
+import { MaterialType } from "@df/types";
 import { describe, expect, it } from "vitest";
 
+import { getMaterialColor } from "../../Utils/materialColor";
 import { chapterHeadings, findChapter, gameDocs } from "./gameDocs";
 
 describe("game docs", () => {
@@ -19,6 +21,12 @@ describe("game docs", () => {
       "space",
     );
     expect(map.blocks.some((block) => block.kind === "space-figure")).toBe(
+      true,
+    );
+    expect(chapterHeadings(map).map((heading) => heading.id)).toContain(
+      "biomes",
+    );
+    expect(map.blocks.some((block) => block.kind === "biome-figure")).toBe(
       true,
     );
     const shares = map.blocks.find(
@@ -79,6 +87,39 @@ describe("game docs", () => {
       .join("\n");
     expect(text).toContain("其后第 256 个区块");
     expect(text).toContain("可以重新勘探");
+  });
+
+  it("colors material names with the in-game colors", () => {
+    const resources = findChapter("resources");
+    const table = resources.blocks.find(
+      (block) => block.kind === "table" && block.headers[1] === "材料",
+    );
+    expect(table && table.kind === "table" ? table.rows[1][1] : null).toEqual({
+      text: "水晶体（Water Crystals）",
+      color: getMaterialColor(MaterialType.WATER_CRYSTALS),
+    });
+    expect(table && table.kind === "table" ? table.rows[11][1] : null).toEqual({
+      text: "腐化水晶（Corrupted Crystal）",
+      color: getMaterialColor(MaterialType.CORRUPTED_CRYSTAL),
+    });
+    const note = resources.blocks.find((block) => block.kind === "rich");
+    const names =
+      note && note.kind === "rich"
+        ? note.parts.flatMap((part) => (typeof part === "string" ? [] : [part]))
+        : [];
+    expect(names.map((part) => part.color)).toEqual([
+      getMaterialColor(MaterialType.BLACKALLOY),
+      getMaterialColor(MaterialType.CORRUPTED_CRYSTAL),
+      getMaterialColor(MaterialType.WATER_CRYSTALS),
+      getMaterialColor(MaterialType.LIVING_WOOD),
+      getMaterialColor(MaterialType.WINDSTEEL),
+      getMaterialColor(MaterialType.AURORIUM),
+      getMaterialColor(MaterialType.MYCELIUM),
+      getMaterialColor(MaterialType.SANDGLASS),
+      getMaterialColor(MaterialType.CRYOSTONE),
+      getMaterialColor(MaterialType.SCRAPIUM),
+      getMaterialColor(MaterialType.PYROSTEEL),
+    ]);
   });
 
   it("shows the energy growth formulas in resources", () => {

@@ -1,14 +1,15 @@
 import { formatNumber } from "@df/gamelogic";
-import {
-  copyText,
-  formatWithdrawMaterialOrder,
-} from "../../Backend/GameLogic/moveOrder";
 import type { LocationId, Materials, MaterialType } from "@df/types";
 import { ModalName } from "@df/types";
+import { MaterialSprite } from "@frontend/Components/MaterialSprite";
 import { getMaterialTooltipName } from "@frontend/Panes/Tooltip";
 import { useState } from "react";
 import styled from "styled-components";
 
+import {
+  copyText,
+  formatWithdrawMaterialOrder,
+} from "../../Backend/GameLogic/moveOrder";
 import { Btn } from "../Components/Btn";
 import {
   CenterBackgroundSubtext,
@@ -19,12 +20,12 @@ import { NumberInput } from "../Components/Input";
 // import { Sub, Text } from "../Components/Text";
 import dfstyles from "../Styles/dfstyles";
 import { usePlanet, useUIManager } from "../Utils/AppHooks";
-import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 import { useEmitterValue } from "../Utils/EmitterHooks";
+import { getMaterialColor } from "../Utils/materialColor";
+import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 import type { ModalHandle } from "../Views/ModalPane";
 import { ModalPane } from "../Views/ModalPane";
 import { TooltipTrigger } from "./Tooltip";
-import { MaterialSprite } from "@frontend/Components/MaterialSprite";
 
 const PlanetMaterialsWrapper = styled.div`
   display: flex;
@@ -367,34 +368,7 @@ export function getMaterialScoreMultiplier(materialId: MaterialType): number {
   }
 }
 
-export function getMaterialColor(materialId: MaterialType): string {
-  switch (materialId) {
-    case 1:
-      return "#4A90E2"; // Blue for water
-    case 2:
-      return "#8B4513"; // Brown for wood
-    case 3:
-      return "#87CEEB"; // Light blue for windsteel
-    case 4:
-      return "#C0C0C0"; // Glacium
-    case 5:
-      return "#8b55c1ff"; // Violet for mycelium
-    case 6:
-      return "#FFD700"; // Gold for sunstone
-    case 7:
-      return "#80e5f3ff"; // Light blue for glacite
-    case 8:
-      return "#696969"; // Gray for scrapium
-    case 9:
-      return "#FF4500"; // Orange for pyrosteel
-    case 10:
-      return "#2F4F4F"; // Dark gray for blackalloy
-    case 11:
-      return "#0df000df"; // Dark Green for Currapted Crystals
-    default:
-      return dfstyles.colors.subtext;
-  }
-}
+export { getMaterialColor } from "../Utils/materialColor";
 
 export function getMaterialDescription(id: number): string {
   switch (id) {

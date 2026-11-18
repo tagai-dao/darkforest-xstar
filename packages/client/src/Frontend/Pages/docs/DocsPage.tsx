@@ -3,14 +3,16 @@ import { Link, useParams } from "react-router-dom";
 import styled from "styled-components";
 
 import dfstyles from "../../Styles/dfstyles";
+import { BiomeTable } from "./BiomeTable";
 import { EnergyCurveFigure } from "./EnergyCurve";
-import { SpaceTypeMapFigure } from "./SpaceTypeMap";
 import {
   chapterHeadings,
+  type DocBlock,
+  type DocRun,
   findChapter,
   gameDocs,
-  type DocBlock,
 } from "./gameDocs";
+import { SpaceTypeMapFigure } from "./SpaceTypeMap";
 
 const Shell = styled.div`
   display: grid;
@@ -150,6 +152,17 @@ const TocLink = styled.a.withConfig({
   text-decoration: none;
 `;
 
+function runText(run: DocRun): string {
+  return typeof run === "string" ? run : run.text;
+}
+
+function DocRunView({ run }: { run: DocRun }) {
+  if (typeof run === "string") {
+    return <>{run}</>;
+  }
+  return <span style={{ color: run.color }}>{run.text}</span>;
+}
+
 function Blocks({ blocks }: { blocks: DocBlock[] }) {
   return (
     <>
@@ -176,6 +189,9 @@ function Blocks({ blocks }: { blocks: DocBlock[] }) {
         if (block.kind === "space-figure") {
           return <SpaceTypeMapFigure key={index} />;
         }
+        if (block.kind === "biome-figure") {
+          return <BiomeTable key={index} />;
+        }
         if (block.kind === "table") {
           return (
             <TableWrap key={index}>
@@ -189,15 +205,26 @@ function Blocks({ blocks }: { blocks: DocBlock[] }) {
                 </thead>
                 <tbody>
                   {block.rows.map((row) => (
-                    <tr key={row.join("|")}>
+                    <tr key={row.map(runText).join("|")}>
                       {row.map((cell, cellIndex) => (
-                        <td key={cellIndex}>{cell}</td>
+                        <td key={cellIndex}>
+                          <DocRunView run={cell} />
+                        </td>
                       ))}
                     </tr>
                   ))}
                 </tbody>
               </Table>
             </TableWrap>
+          );
+        }
+        if (block.kind === "rich") {
+          return (
+            <Paragraph key={index}>
+              {block.parts.map((part, partIndex) => (
+                <DocRunView key={partIndex} run={part} />
+              ))}
+            </Paragraph>
           );
         }
         return <Paragraph key={index}>{block.text}</Paragraph>;
