@@ -27,6 +27,7 @@ import type {
   Planet,
   PlanetRenderInfo,
   PlanetRenderManagerType,
+  RGBAVec,
   WorldCoords,
   MaterialType,
 } from "@df/types";
@@ -48,7 +49,18 @@ import type { Renderer } from "../Renderer";
 import type { GameGLManager } from "../WebGL/GameGLManager";
 import { getMaterialColor } from "@frontend/Panes/PlanetMaterialsPane";
 
-const { whiteA, barbsA, gold } = engineConsts.colors;
+const { whiteA, barbsA, gold, pendingJunkA } = engineConsts.colors;
+
+/** 能量数字和能量环同一套颜色。自己占领但还没 addJunk 时用琥珀色。 */
+function energyMarkColor(planet: Planet, mine: boolean): RGBAVec {
+  if (mine && planet.addJunkTick === 0) {
+    return pendingJunkA;
+  }
+  if (mine) {
+    return whiteA;
+  }
+  return hasOwner(planet) ? getOwnerColorVec(planet) : barbsA;
+}
 const { maxRadius } = engineConsts.planet;
 
 /**
@@ -167,9 +179,7 @@ export class PlanetRenderManager implements PlanetRenderManagerType {
     const artifacts = uiManager
       .getArtifactsWithIds(planet.heldArtifactIds)
       .filter((a) => !!a) as Artifact[];
-    const color = uiManager.isOwnedByMe(planet)
-      ? whiteA
-      : getOwnerColorVec(planet);
+    const color = energyMarkColor(planet, uiManager.isOwnedByMe(planet));
 
     // draw planet body
     this.queuePlanetBody(
@@ -817,8 +827,7 @@ export class PlanetRenderManager implements PlanetRenderManagerType {
       energyString += ` (-${formatNumber(lockedEnergy)})`;
     }
 
-    const playerColor = hasOwner(planet) ? getOwnerColorVec(planet) : barbsA;
-    const color = uiManager.isOwnedByMe(planet) ? whiteA : playerColor;
+    const color = energyMarkColor(planet, uiManager.isOwnedByMe(planet));
     color[3] = alpha;
 
     const textLoc: WorldCoords = {

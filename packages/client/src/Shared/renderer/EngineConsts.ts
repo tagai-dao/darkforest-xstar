@@ -26,6 +26,8 @@ export const engineConsts = {
     barbsA: [153, 102, 102, 255] as RGBAVec,
     white: [255, 255, 255] as RGBVec,
     whiteA: [255, 255, 255, 255] as RGBAVec,
+    // 已占领、还没 addJunk。和粉色（无人）以及白色（已登记）分开。
+    pendingJunkA: [255, 168, 48, 255] as RGBAVec,
     purpleA: [255, 0, 255, 255] as RGBAVec,
     purple: [255, 0, 255] as RGBVec,
     blueA: [0, 255, 255, 255] as RGBAVec,
