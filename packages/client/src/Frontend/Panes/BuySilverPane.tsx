@@ -1,5 +1,5 @@
 import { EMPTY_ADDRESS } from "@df/constants";
-import { quoteSilverPurchase, SILVER_TIER_PERCENTS } from "@df/silverMarket";
+import { quoteSilverPurchase } from "@df/silverMarket";
 import type { Planet } from "@df/types";
 import { PlanetType } from "@df/types";
 import { useComponentValue } from "@latticexyz/react";
@@ -15,7 +15,6 @@ import {
   formatBuySilverOrder,
 } from "../../Backend/GameLogic/moveOrder";
 import type { Wrapper } from "../../Backend/Utils/Wrapper";
-import { Btn } from "../Components/Btn";
 import { Red, Text } from "../Components/Text";
 import dfstyles from "../Styles/dfstyles";
 import { useAccount, useUIManager } from "../Utils/AppHooks";
@@ -38,12 +37,50 @@ const Container = styled.div`
   background: ${dfstyles.colors.backgrounddark};
 `;
 
-const TierRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+const SilverTiers = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  font-size: ${dfstyles.fontSizeS};
+`;
+
+const SilverTierButton = styled.button`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px;
+  color: ${dfstyles.colors.text};
+  background: transparent;
+  border: 1px solid ${dfstyles.colors.border};
+  border-radius: ${dfstyles.borderRadius};
+  cursor: pointer;
+  text-align: left;
+
+  &:hover:not(:disabled) {
+    border-color: ${dfstyles.colors.dfblue};
+  }
+
+  &:disabled {
+    color: ${dfstyles.colors.subtext};
+    cursor: default;
+  }
+`;
+
+const SilverTierAmount = styled.span`
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+`;
+
+const SilverTierCost = styled.span`
+  font-size: 11px;
+  line-height: 1.3;
+  color: ${dfstyles.colors.dfblue};
+
+  ${SilverTierButton}:disabled & {
+    color: ${dfstyles.colors.subtext};
+  }
 `;
 
 type Props = {
@@ -193,24 +230,27 @@ export function BuySilverPane({
       {!stakingActive ? (
         <Red>暂无全局质押：请先在时空裂隙 withdraw 提银/矿后再购银</Red>
       ) : null}
-      {tiers.map(({ tier, price, silver, priceLabel }) => {
-        const overCap = planet.silver + silver > planet.silverCap;
-        const disabled = !stakingActive || !configReady || overCap;
-        return (
-          <TierRow key={tier}>
-            <span>
-              {SILVER_TIER_PERCENTS[tier]}%：{priceLabel} {tokenSymbol} →{" "}
-              {silver.toLocaleString()} 银{overCap ? "（容量不足）" : ""}
-            </span>
-            <Btn
+      {/* 四档直接是按钮。主标题是银，副标题是要付的代币。点下去仍只复制购银单。 */}
+      <SilverTiers>
+        {tiers.map(({ tier, price, silver, priceLabel }) => {
+          const overCap = planet.silver + silver > planet.silverCap;
+          const disabled = !stakingActive || !configReady || overCap;
+          return (
+            <SilverTierButton
+              key={tier}
+              type="button"
               disabled={disabled}
+              title={overCap ? "容量不足" : "复制购买"}
               onClick={() => copyTier(tier, price, silver)}
             >
-              复制购买
-            </Btn>
-          </TierRow>
-        );
-      })}
+              <SilverTierAmount>{silver.toLocaleString()} 银</SilverTierAmount>
+              <SilverTierCost>
+                {priceLabel} {tokenSymbol}
+              </SilverTierCost>
+            </SilverTierButton>
+          );
+        })}
+      </SilverTiers>
     </Container>
   );
 }

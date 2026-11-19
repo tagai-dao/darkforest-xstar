@@ -1,7 +1,7 @@
 import { EMPTY_ADDRESS } from "@df/constants";
 import { isLocatable } from "@df/gamelogic";
 import { getPlanetName } from "@df/procedural";
-import { quoteSilverPurchase, SILVER_TIER_PERCENTS } from "@df/silverMarket";
+import { quoteSilverPurchase } from "@df/silverMarket";
 import type { LocatablePlanet, Materials } from "@df/types";
 import { PlanetType } from "@df/types";
 import { useComponentValue } from "@latticexyz/react";
@@ -689,26 +689,29 @@ function SilverBuyCopy({ planet }: { planet: LocatablePlanet }) {
           进度 {frontier} 级，本星按 {quotes[0].quote.percent}% 计价
         </Amount>
       )}
-      {quotes.map(({ tier, quote }) => {
-        const overCap = planet.silver + quote.silverDisplay > planet.silverCap;
-        return (
-          <TierLine key={tier}>
-            <TierPrice>
-              {SILVER_TIER_PERCENTS[tier]}%：
-              {quote.priceWhole.toLocaleString("zh-CN")} AIPRO →{" "}
-              {quote.silverDisplay.toLocaleString("zh-CN")} 银
-              {overCap ? "，容量不足" : ""}
-            </TierPrice>
-            <CopyScore
+      {/* 四档直接是按钮。主标题是银，副标题是要付的 AIPRO。点下去仍只复制购银单。 */}
+      <SilverTiers>
+        {quotes.map(({ tier, quote }) => {
+          const overCap =
+            planet.silver + quote.silverDisplay > planet.silverCap;
+          return (
+            <SilverTierButton
+              key={tier}
               type="button"
               disabled={overCap}
+              title={overCap ? "容量不足" : "复制购买"}
               onClick={() => copyTier(tier)}
             >
-              复制购买
-            </CopyScore>
-          </TierLine>
-        );
-      })}
+              <SilverTierAmount>
+                {quote.silverDisplay.toLocaleString("zh-CN")} 银
+              </SilverTierAmount>
+              <SilverTierCost>
+                {quote.priceWhole.toLocaleString("zh-CN")} AIPRO
+              </SilverTierCost>
+            </SilverTierButton>
+          );
+        })}
+      </SilverTiers>
     </BuyBox>
   );
 }
@@ -906,6 +909,51 @@ const TierLine = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+`;
+
+const SilverTiers = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+`;
+
+const SilverTierButton = styled.button`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px;
+  color: #e8eef7;
+  background: transparent;
+  border: 1px solid #3d4d63;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover:not(:disabled) {
+    border-color: #9be7ff;
+  }
+
+  &:disabled {
+    color: #6d7b8c;
+    cursor: default;
+  }
+`;
+
+const SilverTierAmount = styled.span`
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+`;
+
+const SilverTierCost = styled.span`
+  font-size: 11px;
+  line-height: 1.3;
+  color: #9be7ff;
+
+  ${SilverTierButton}:disabled & {
+    color: #6d7b8c;
+  }
 `;
 
 const TierPrice = styled.div`
