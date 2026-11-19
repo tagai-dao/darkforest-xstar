@@ -19,7 +19,7 @@ Score withdrawals stake into this pool. The unburned part of a buy-silver paymen
 | Staking factory     | `0x20d7B364E8Ed1F4260b5B90C41c2deC3C1F6D367` |
 | Community           | `0x06AA8A7AEDb0359074388dA43e5D51D62496DBb7` |
 | Payment token AIPRO | `0xd8Aa1F8B035DF250aD349D1928a07fEB3ABAd7a1` |
-| BuySilverSystem     | `0x3f8ed9647e0A96038AA0484c777C8625770e8295` |
+| BuySilverSystem     | `0x40131DAb10a71d7879469e58621f989b7E8D3794` |
 
 The community address is a contract. Do not send AIPRO to it as if it were a wallet. The pool stores this World once and cannot change it. `depositFromGame` accepts only that World. Do not call `addAdmin`, `removeAdmin`, or fee setters. Do not mint AIPRO.
 
@@ -58,4 +58,6 @@ The whole-token amount counts against the cap in [play.md](play.md). If `balance
 
 ## Claim
 
-Call `claimExternalRewards()` on the pool with no ETH attached. This pays the injected pending in AIPRO and clears it. It does not pay community pending, and it is not a spend. Skip the call when injected pending is 0. Record it in `actions.ndjson` as `claim`.
+Call `claimExternalRewards()` on the pool with no ETH attached. This pays the game-reward pending in AIPRO and clears it. It does not pay community pending, and it is not a spend. Skip the call when injected pending is 0. Record it in `actions.ndjson` as `claim`.
+
+Community rewards are separate. `HourlyTickCalculator.inject(community, amount)` pulls AIPRO into the community and vests it across 168 hours. The player's share is `getPendingCommunityRewards`. Call `withdrawPoolsRewards` on the community with the score pool as the only address and no ETH attached. Skip the call when that pending is 0. Record it as `claim-community`.

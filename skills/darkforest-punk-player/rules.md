@@ -41,9 +41,9 @@ Send the call when the off-chain result of step 2 passes step 3. This wallet sen
 
 While `paused` is true, step 1 writes nothing. The call settles only up to the stored tick. A fleet whose arrival tick is still ahead of that stored tick stays in the queue.
 
-The inner circle starts at radius 75000. While the ticker advances, the radius falls by 0.087 each tick. At 0 it stops. Reaching 0 does not end the season, does not zero score, and does not pay anyone. The snapshot field `innerRadius` is the wall for this round.
+The inner circle starts at radius 75000. While the ticker advances, the radius falls by 0.087 each tick. At 0 it stops. The center can be entered again. Score stays, and nobody is paid because the radius reached 0. The snapshot field `innerRadius` is the wall for this round.
 
-A season is open while the locker has a world and a non-zero season number. The locker owner sets that pair, or clears it. A player enters by staking one AIPRO NFT, and only a wallet with a non-empty Binance handle can stake. The NFT stays in the locker until that season is no longer the active one. A later season requires staking again. No score, no radius, and no clock closes the season by itself.
+A wallet with a Binance handle enters by staking one AIPRO NFT. It can withdraw that NFT at any time. While the NFT is in the locker, `isPlayerInActiveSeason(player)` is true, and state-changing player calls are allowed. After withdrawal those calls revert. Planets, score, and pool stake stay with the wallet. Staking again restores play. Reads and reward claims do not check the NFT. Fleets already sent still arrive. One wallet stakes one NFT.
 
 ## 3. Map
 
@@ -206,11 +206,11 @@ A zero delta does not call the pool. The pool receives the increment, not the cu
 
 ## 9. The pool
 
-`depositFromGame` adds the increment to this wallet's stake and to the total. There is no decrease, no expiry, and no season argument. Pending injected AIPRO is this wallet's share of what has been injected since its last update. Pending community AIPRO is its share of the community release. Read both from the pool. Do not invent an emission rate. `claimExternalRewards` pays the injected pending and leaves the stake in place. Community rewards are claimed from the community contract.
+`depositFromGame` adds the increment to this wallet's stake and to the total. Stake only increases. Pending injected AIPRO is this wallet's share of what has been injected since its last update. Pending community AIPRO is its share of the community release. Both are 0 when nothing has been injected. Read both from the pool. Do not invent an emission rate. `claimExternalRewards` pays the injected pending and leaves the stake in place. Community rewards are claimed from the community contract. Claiming does not require the NFT to be in the locker.
 
 Buying silver burns `burnBps` of the payment and injects the remainder. The injected part is split by the stake already in the pool, including this wallet's own stake. The burned part does not come back on claim.
 
-A new season does not change the pool. Stake and unclaimed rewards stay where they are. A new world starts its own `PlayerScore` at 0. If that world still points at this pool, the next withdraw adds a new increment on top of the old stake. One claim pays the whole pending balance. The pool does not keep a separate balance per season. Read `getUserStakedAmount`. Do not treat a new season number as a wiped stake.
+One game is one world and the pool bound to that world. `PlayerScore` starts at 0. The pool accepts score deposits from that world. One claim pays this wallet's pending balance in that pool. Closing the community pool leaves rewards already credited claimable and stops later hourly releases from entering it. Buy-silver injection does not look at whether the community pool is closed. `burnBps` of 10000 burns the whole payment. Read `getUserStakedAmount`.
 
 ## 10. Where the other rules are
 

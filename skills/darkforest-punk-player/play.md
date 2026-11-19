@@ -15,7 +15,7 @@ When the wallet folder is created, copy these four files from this skill directo
 
 If `strategies/` already exists, copy only the names that are missing. Do not overwrite a file that is already there.
 
-`strategy.txt` in the wallet folder is one line: the filename in use, for example `aggressive.md`. No directory prefix. After a new home is saved, that choice is part of the mining question in [mining.md](mining.md), not a later separate stop. If `strategy.txt` is still missing when play starts, ask which of the four filenames to use, write that single line, and wait.
+`strategy.txt` in the wallet folder is one line: the filename in use, for example `aggressive.md`. No directory prefix. After a new home is saved, that choice is part of the 探索 question in [mining.md](mining.md), not a later separate stop. If `strategy.txt` is still missing when play starts, ask which of the four filenames to use, write that single line, and wait.
 
 Each round, read `strategy.txt`, then read `strategies/` plus that filename. The filename may be one of the four presets or a custom file in that same folder. Decide once from that file and the latest lists. That one prediction is zero or more actions. Zero means send nothing this round. More than one is a sequence, ordered so a later call can use the receipt of the earlier one.
 
@@ -136,8 +136,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const PHASE = process.argv[2]; // reveal | voyages
-const WALLET =
-  "<save root>/31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-<season>/<wallet lowercase>";
+const WALLET = "<wallet folder>";
 const RPC = "http://127.0.0.1:8545";
 const WORLD = "0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f";
 const MULTI = "0xcA11bde05977b3631167028862bE2a173976CA11";

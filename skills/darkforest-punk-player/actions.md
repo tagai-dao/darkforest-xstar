@@ -42,9 +42,9 @@ Do not call these. They are closed or limited to the namespace owner: `Initializ
 
 ## Move
 
-**Send.** Capture, reinforce, and attack are one World call. Prove with `packages/client/src/Shared/snarks/move.wasm` and `move.zkey`, from `packages/client`, using the browser bundle `packages/client/public/snarkjs.min.js`. Circuit inputs are strings: `x1`, `y1`, `x2`, `y2`, `r` (world radius `100000`), `distMax` (ceil of the distance), `PLANETHASH_KEY` `1729`, `SPACETYPE_KEY` `1730`, `SCALE` `8192`, `xMirror` `0`, `yMirror` `0`, `targetDistFromOriginSquare` (`x2^2 + y2^2`).
+**Send.** Capture, reinforce, and attack are one World call. Prove with `packages/client/src/Shared/snarks/move.wasm` and `move.zkey`, from `packages/client`, using the browser bundle `packages/client/public/snarkjs.min.js`. Circuit inputs are strings: `x1`, `y1`, `x2`, `y2`, `r` (world radius `100000`), `distMax` (ceil of the distance), `PLANETHASH_KEY` `20261119`, `SPACETYPE_KEY` `20261120`, `SCALE` `8192`, `xMirror` `0`, `yMirror` `0`, `targetDistFromOriginSquare` (`x2^2 + y2^2`).
 
-World `df__move` takes the Groth16 proof, the 11 public signals in this order, then population, silver, artifact id, and a materials array: from hash, to hash, perlin at the destination, world radius, distMax, `1729`, `1730`, `8192`, `0`, `0`, destination radius square. It reverts with `PlanetOwnershipMismatch` when the source owner and junk owner differ. The destination's junk owner is not checked.
+World `df__move` takes the Groth16 proof, the 11 public signals in this order, then population, silver, artifact id, and a materials array: from hash, to hash, perlin at the destination, world radius, distMax, `20261119`, `20261120`, `8192`, `0`, `0`, destination radius square. It reverts with `PlanetOwnershipMismatch` when the source owner and junk owner differ. The destination's junk owner is not checked.
 
 **Pasted order.** The page copies a `DARKFOREST_MOVE` block when the owner drags from one planet to another. That block is the move to send. Follow [SKILL.md](SKILL.md) under Pasted fleet and send it in the same turn it is read. Use its `circuit` as the prover input, its `population`, `silver`, `artifactId`, and `materials` as the call arguments, and its `entryFeeWei` as the transaction value. `population` is the departure energy. Do not ask for another amount. Do not choose another planet. When `artifactId` is not `0`, the owner selected that artifact and dragged it with the fleet. Do not clear it. Record `to` as `toHashHex`.
 
@@ -84,7 +84,7 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 ## Add junk
 
-**Send.** World `df__addJunk(uint256 planetHash, uint256 biomebase, Proof proof)`. The caller must own the planet after the call settles, as [rules.md](rules.md) describes. The call ticks, applies a due inbound fleet, then checks the owner. A table read that still shows the zero address is the last write, not that check. Compute the settlement off chain and send this call when it leaves this wallet as the owner. Prove with `packages/client/src/Shared/snarks/biomebase.wasm` and `biomebase.zkey`, from `packages/client`, using `packages/client/public/snarkjs.min.js`. Circuit inputs are strings: `x`, `y`, `PLANETHASH_KEY` `1729`, `BIOMEBASE_KEY` `1731`, `SCALE` `8192`, `xMirror` `0`, `yMirror` `0`. `biomebase` is the perlin value at that coordinate with key `1731`. The proof's public signals are the planet hash, that biomebase, `1729`, `1731`, `8192`, `0`, `0`. Pass that same biomebase as the second argument. A value of 0 is valid only when the perlin value is 0.
+**Send.** World `df__addJunk(uint256 planetHash, uint256 biomebase, Proof proof)`. The caller must own the planet after the call settles, as [rules.md](rules.md) describes. The call ticks, applies a due inbound fleet, then checks the owner. A table read that still shows the zero address is the last write, not that check. Compute the settlement off chain and send this call when it leaves this wallet as the owner. Prove with `packages/client/src/Shared/snarks/biomebase.wasm` and `biomebase.zkey`, from `packages/client`, using `packages/client/public/snarkjs.min.js`. Circuit inputs are strings: `x`, `y`, `PLANETHASH_KEY` `20261119`, `BIOMEBASE_KEY` `20261121`, `SCALE` `8192`, `xMirror` `0`, `yMirror` `0`. `biomebase` is the perlin value at that coordinate with key `20261121`. The proof's public signals are the planet hash, that biomebase, `20261119`, `20261121`, `8192`, `0`, `0`. Pass that same biomebase as the second argument. A value of 0 is valid only when the perlin value is 0.
 
 **Effect.** The level cost is `50, 55, 60, 65, 75, 100, 200, 250, 300, 500` for levels 0 through 9. The call reverts when used junk plus that cost is above the limit. On success this wallet's used junk rises by the cost, this wallet becomes the junk owner, and `addJunkTick` becomes the current tick. A previous junk owner's used junk falls by the same cost. The first registration of an asteroid field initializes its materials. No AIPRO moves.
 
@@ -118,6 +118,18 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Impact.** This is income, not a spend. It does not change stake or score. Record `claim`.
 
+**Pasted order.** The page copies a `DARKFOREST_CLAIM_REWARDS` block from the 游戏奖励 line. Follow [SKILL.md](SKILL.md) under Pasted game reward claim and send it in the same turn it is read. Call `claimExternalRewards()` on `pool` with value 0. Skip it when `pendingWei` is `0`.
+
+## Claim community rewards
+
+**Send.** On the community from [nutbox.md](nutbox.md), call `withdrawPoolsRewards` with the score pool as the only address and value 0. Skip it when community pending is 0.
+
+**Effect.** The pending community balance is paid in AIPRO and then cleared. Game-reward pending stays unclaimed. Stake and score stay as they are.
+
+**Impact.** This is income, not a spend. The release is the part of the community injection that has vested, split by stake. Record `claim-community`.
+
+**Pasted order.** The page copies a `DARKFOREST_CLAIM_COMMUNITY` block from the 社区奖励 line. Follow [SKILL.md](SKILL.md) under Pasted community reward claim and send it in the same turn it is read. Call `withdrawPoolsRewards` on `community` with `[pool]` and value 0. Skip it when `pendingWei` is `0`.
+
 ## Rename and burner
 
 **Send.** `df__changePlayerName(string newName)` requires a registered player and a name hash nobody owns. `df__changeBurnerWallet(address newBurner)` requires a burner that is not already mapped. Neither spends a token.
@@ -134,9 +146,11 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Impact.** The other half of the energy and silver is gone. The destination no longer has this inbound fleet. Record `revert-move` and set `to` to the source hash the fleet is now returning to.
 
+**Pasted order.** The page copies a `DARKFOREST_REVERT_MOVE` block from an in-flight fleet. Follow [SKILL.md](SKILL.md) under Pasted fleet recall and send it in the same turn it is read. Call `df__revertMove` with `moveId` and `toPlanetHash`. Attach `entryFeeWei`. Do not choose another fleet.
+
 ## Reveal coordinates
 
-**Send.** Prove with `packages/client/src/Shared/snarks/reveal.wasm` and `reveal.zkey`, from `packages/client`, using `packages/client/public/snarkjs.min.js`. Circuit inputs are strings: `x`, `y`, `PLANETHASH_KEY` `1729`, `SPACETYPE_KEY` `1730`, `SCALE` `8192`, `xMirror` `0`, `yMirror` `0`. World `df__revealLocation` takes the Groth16 proof and these 9 public signals, in order: planet hash, perlin, x, y, `1729`, `1730`, `8192`, `0`, `0`. x and y are the field elements the circuit uses, including the wrapped form of a negative coordinate.
+**Send.** Prove with `packages/client/src/Shared/snarks/reveal.wasm` and `reveal.zkey`, from `packages/client`, using `packages/client/public/snarkjs.min.js`. Circuit inputs are strings: `x`, `y`, `PLANETHASH_KEY` `20261119`, `SPACETYPE_KEY` `20261120`, `SCALE` `8192`, `xMirror` `0`, `yMirror` `0`. World `df__revealLocation` takes the Groth16 proof and these 9 public signals, in order: planet hash, perlin, x, y, `20261119`, `20261120`, `8192`, `0`, `0`. x and y are the field elements the circuit uses, including the wrapped form of a negative coordinate.
 
 **Effect.** `RevealedPlanet` stores those coordinates and this wallet as the revealer. The configured cooldown is 14400 stored ticks. A stored last-reveal of 0 counts as never revealed. A reveal while the stored tick is 0 writes 0 again, so the cooldown does not start until a reveal is recorded at a non-zero tick.
 

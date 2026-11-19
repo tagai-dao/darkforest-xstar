@@ -1,5 +1,7 @@
 # Mining
 
+跟主人说这件事时只用「探索」。探索是从家向外把一片片坐标算出来，星球出现在星图上，坐标留在钱包目录里。不要对主人说挖矿，也不要把这件事说成 mining。
+
 Mine only after the wallet has joined and a home planet is saved in `homeLocations.json`. The center is that planet. Finding the home is [home.md](home.md). Moving fleets is not part of this file.
 
 The repository does not contain a mining script. Write the example below to a temporary file, fill in the owner's choices, and run it. Do not commit that temporary file.
@@ -8,19 +10,19 @@ The repository does not contain a mining script. Write the example below to a te
 
 The home chunk is the side-16 square that contains the home. Its bottom-left corner is `floor(x / 16) * 16`, `floor(y / 16) * 16`. The first ring is that chunk plus the eight side-16 chunks that touch it by a side or a corner. Offsets from the home chunk are `-16`, `0`, and `16` on each axis, except `0, 0`, which is the home chunk itself.
 
-Do not start the first ring merely because the home files appear. [home.md](home.md) asks, in the same reply as the new coordinates, whether to mine and which strategy starts the game. Wait for that answer. Once they say to mine, skip a chunk inside the inner circle or outside the world, using the nearest-corner test later in this file. Skip a side-16 square already inside a chunk in `knownBoard.ndjson`, including every square the home search finished and wrote. Do not hash those squares again. A finished square updates the in-memory map and waits in a buffer. Do not write the log between squares.
+Do not start the first ring merely because the home files appear. [home.md](home.md) asks, in the same reply as the new coordinates, whether to start 探索 and which strategy starts the game. Wait for that answer. Once they agree to start 探索, skip a chunk inside the inner circle or outside the world, using the nearest-corner test later in this file. Skip a side-16 square already inside a chunk in `knownBoard.ndjson`, including every square the home search finished and wrote. Do not hash those squares again. A finished square updates the in-memory map and waits in a buffer. Do not write the log between squares.
 
-When that reply is sent, tell the owner three things in their language, inside the mining and strategy question:
+When that reply is sent, tell the owner three things, inside the 探索 and strategy question. The sentence they read uses 探索:
 
 1. Open `http://localhost:3000/redpill/0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`.
-2. The folder to import is this wallet's folder: `<save root>/31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-<season>/<wallet lowercase>`.
-3. On the page, click `打开钱包目录` and select that wallet folder. It must contain `agent.json` directly. The season folder above it is the wrong folder. The owner does not select the folder a second time.
+2. The folder to import is this agent's wallet folder, `<root>/<chainId>-<world>/<player lowercase>/`, inside the root the owner chose. Another agent has another root.
+3. On the page, click `打开钱包目录` and select that folder. It must contain `agent.json` directly. The owner does not select the folder a second time.
 
 Example:
 
-> The home is at the coordinates in homeLocations.json, registered as the name you chose. Open http://localhost:3000/redpill/0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f and click 打开钱包目录. Select the wallet folder. Start mining from that home? The default is one core, spiraling outward, until you say stop. You can instead pick a pattern (swiss, center, or center2), a core count (2, 4, 8, 16, or 32), another center outside the inner circle, a fixed number of chunks, or a duration such as 60 minutes. Which strategy should play: aggressive, conservative, offensive, or profit?
+> 家已经建好。打开 http://localhost:3000/redpill/0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f ，点「打开钱包目录」，选中这个钱包文件夹。要从这颗家开始探索吗？默认 1 个核心，一圈圈向外，直到你说停。也可以改图案、核心数、中心、块数或时长。用哪套策略：aggressive、conservative、offensive，还是 profit？
 
-Ask that once, in the owner's language, as soon as the home files exist. Wait. Then mine from the home with their mining choices, write `strategy.txt` with the strategy filename, and continue play. Do not ask the owner to confirm the home. If they have not opened the page yet, the address and the folder path are already in the question. Do not send a second copy unless they ask where to look.
+Ask that once, as soon as the home files exist. The sentence the owner reads uses 探索. Do not say 挖矿 or mining in it. Wait. Then run from the home with their choices, write `strategy.txt` with the strategy filename, and continue play. Do not ask the owner to confirm the home. If they have not opened the page yet, the address and the folder path are already in the question. Do not send a second copy unless they ask where to look.
 
 Default:
 
@@ -44,7 +46,7 @@ Other choices, offered in the same question:
 
 Chunks and minutes can both be set. Stop at whichever limit is reached first. `0` on either one means that limit is unused. The default leaves both at `0` and runs until the owner says stop.
 
-The question above is that ask. Do not ask it a second time after the ring is written. A yes that also names a strategy writes `strategy.txt` and, after mining has started, play uses that file. If the reply agrees to mine but names no strategy, ask only for the strategy and wait. If it names a strategy but not mining, write `strategy.txt` and ask only whether to mine.
+The question above is that ask. Do not ask it a second time after the ring is written. A yes that also names a strategy writes `strategy.txt` and, after the run has started, play uses that file. If the reply agrees to start 探索 but names no strategy, ask only for the strategy and wait. If it names a strategy but not 探索, write `strategy.txt` and ask only whether to start 探索.
 
 A yes, or words such as "default" or "start", means the default row. If the owner names some of the other choices, use those and keep the default for anything they left out. "One hour" means `MINUTES = 60`. If the center they name is inside the inner circle, say so and wait for another center. Do not start with an illegal center.
 
@@ -57,9 +59,9 @@ Each core hashes one whole 16 by 16 square with MiMC. A coordinate is a planet w
 The chain uses these universe constants:
 
 - Planet rarity `16384` (`[universe] a_sparsity`)
-- Planet hash key `1729`
-- Biome base key `1731`
-- Space type key `1730`
+- Planet hash key `20261119`
+- Biome base key `20261121`
+- Space type key `20261120`
 - Perlin scale `8192`, with neither axis mirrored
 - Chunk side `16`
 
@@ -75,7 +77,7 @@ Hold those side-16 lines in a buffer. Append the buffer with one write when it h
 
 The log is one file in the wallet folder:
 
-`<save root>/31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-<season>/<wallet lowercase>/knownBoard.ndjson`
+`<wallet folder>/knownBoard.ndjson`
 
 Do not write a directory of chunk files, and do not write under `~/Library`. The owner does not select the folder again.
 
@@ -99,7 +101,7 @@ When running under Node, `BigInteger` in `packages/client/src/Shared/hashing/fra
 
 ## Example
 
-Save the example as `packages/client/darkforest-mine.ts` and run it from `packages/client`, so the `./src` imports and the workers resolve. Delete that file when the run ends. Do not commit it. Replace `PATTERN`, `CORES`, `CHUNKS`, `MINUTES`, `CENTER_X`, `CENTER_Y`, and `WALLET` with the owner's choices. For one hour, set `MINUTES` to `60` and leave `CHUNKS` at `0`.
+Save the example as `packages/client/darkforest-mine.ts` and run it from `packages/client`, so the `./src` imports and the workers resolve. Delete that file when the run ends. Do not commit it. Replace `PATTERN`, `CORES`, `CHUNKS`, `MINUTES`, `CENTER_X`, `CENTER_Y`, and `WALLET` with the owner's choices. `WALLET` is this agent's wallet folder from [SKILL.md](SKILL.md). For one hour, set `MINUTES` to `60` and leave `CHUNKS` at `0`.
 
 ```bash
 cd packages/client
@@ -128,9 +130,7 @@ const CHUNKS = 0; // 0 means no chunk limit. Stop earlier when MINUTES is also s
 const MINUTES = 0; // 0 means no time limit. 60 means stop after one hour.
 const CENTER_X = 0; // Replace with the home planet x from homeLocations.json.
 const CENTER_Y = 0; // Replace with the home planet y. Do not leave these at 0.
-const SAVE_ROOT = "<folder the owner named>";
-const SEASON = 1; // Replace with activeSeason() from the locker.
-const WALLET = "<connected wallet, lowercase>";
+const WALLET = "<wallet folder>";
 
 const PLANET_RARITY = 16384;
 const CHUNK_SIZE = 16;
@@ -141,13 +141,13 @@ const LOCATION_ID_UB = bigInt(
   "21888242871839275222246405745257275088548364400416034343698204186575808495617",
 );
 const spaceFloor = {
-  key: 1730,
+  key: 20261120,
   scale: 8192,
   mirrorX: false,
   mirrorY: false,
   floor: true,
 };
-const biomeFloor = { ...spaceFloor, key: 1731 };
+const biomeFloor = { ...spaceFloor, key: 20261121 };
 
 const patterns = {
   spiral: SpiralPattern,
@@ -170,7 +170,7 @@ function exploreChunk(
   bottomLeftY: number,
   sideLength: number,
 ): Hit[] {
-  const planetHash = mimcHash(1729);
+  const planetHash = mimcHash(20261119);
   const rarity = bigInt(PLANET_RARITY);
   const hits: Hit[] = [];
   for (let x = bottomLeftX; x < bottomLeftX + sideLength; x += 1) {
@@ -212,20 +212,14 @@ if (!isMainThread) {
 async function main(): Promise<void> {
   if (CORES < 1) throw new Error("CORES must be at least 1");
 
-  const wallet = WALLET.toLowerCase();
-  const boardLog = path.join(
-    SAVE_ROOT,
-    `31337-0xfdf868ea710ffd8cd33b829c5aff79edd15ecd5f-${SEASON}`,
-    wallet,
-    "knownBoard.ndjson",
-  );
+  const boardLog = path.join(WALLET, "knownBoard.ndjson");
   const board = new Map<string, BoardChunk>();
 
   function boardKey(chunk: { x: number; y: number; s: number }): string {
     return `${chunk.x},${chunk.y},${chunk.s}`;
   }
 
-  // 已挖过的方块只查内存。父块盖住的 16 边方块也算挖过。
+  // 已探索过的方块只查内存。父块盖住的 16 边方块也算探索过。
   function covered(x: number, y: number, s: number): boolean {
     let side = s;
     while (side <= MAX_SIDE) {
@@ -237,7 +231,7 @@ async function main(): Promise<void> {
     return false;
   }
 
-  // 四个对齐方块合成更大的一块，只为了后面不再重复挖。这里不写文件。
+  // 四个对齐方块合成更大的一块，只为了后面不再重复探索。这里不写文件。
   function addMined(chunk: BoardChunk): void {
     if (covered(chunk.x, chunk.y, chunk.s)) return;
     let current = chunk;
@@ -333,7 +327,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // 凑满 FLUSH_LINES，或由定时器每 FLUSH_MS 强制追加。挖矿循环不在这里等待。
+  // 凑满 FLUSH_LINES，或由定时器每 FLUSH_MS 强制追加。探索循环不在这里等待。
   function flush(force: boolean): Promise<void> {
     writeChain = writeChain
       .then(async () => {
@@ -420,7 +414,7 @@ async function main(): Promise<void> {
           clearInterval(timer);
           await flush(true);
           await handle.close();
-          // 停的时候才把内存里合并过的地图写回一次。没挖到新块就不重写。
+          // 停的时候才把内存里合并过的地图写回一次。没探索到新块就不重写。
           if (written > 0) await writeMerged();
           await Promise.all(workers.map((worker) => worker.terminate()));
           const elapsedMinutes = (Date.now() - startedAt) / 60_000;
