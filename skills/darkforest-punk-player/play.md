@@ -453,4 +453,4 @@ Append one JSON line to `actions.ndjson` after each receipt:
 }
 ```
 
-A move line also has `"to":"<64 hex>"`. `strategy` is always the filename from `strategy.txt` for that action. The time key is `time`. A line that uses `at` instead is the same moment, and the page shows it, but new lines use `time`. `df__tick` is not the way to wait out a voyage. The rule for that call is in [actions.md](actions.md).
+A move line also has `"to":"<64 hex>"`. `strategy` is the filename from `strategy.txt` for an action the strategy chose. An order the owner pasted has no `strategy` key and is recorded as [actions.md](actions.md) describes under Recording a pasted order. The time key is `time`. A line that uses `at` instead is the same moment, and the page shows it, but new lines use `time`. `df__tick` is not the way to wait out a voyage. The rule for that call is in [actions.md](actions.md).

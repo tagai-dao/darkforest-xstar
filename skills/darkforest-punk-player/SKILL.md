@@ -30,6 +30,10 @@ Use the World from `packages/contracts/worlds.json` for chain 31337, and verify 
 
 Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost` before calling the RPC. If the RPC cannot be reached, stop.
 
+## Pasted orders
+
+Every pasted order below is recorded after its receipt as [actions.md](actions.md) describes under Recording a pasted order. The line has no `strategy` key. `detail` carries the parameters the block carried, in display units and with planet coordinates, so the owner can read what was sent.
+
 ## Pasted fleet
 
 The game page does not send a fleet when the owner drags from one planet to another. It copies a block. The first line is `DARKFOREST_MOVE`. The next line is one JSON object with `"kind": "darkforest-move"`.

@@ -6,7 +6,42 @@ Population and silver amounts on chain are display amounts times 1000. Hashes in
 
 A World call that charges the entry fee needs `value` of at least `1000000000000` wei. `df__buyJunk` does not charge that fee. Its `value` is only the junk-limit price below.
 
-The `strategy` field is the current filename, such as `aggressive.md`.
+The `strategy` field is the current filename, such as `aggressive.md`. An order the owner pasted is not a strategy decision, so its line has no `strategy` key.
+
+## Recording a pasted order
+
+A pasted order is the owner's own call. Write its line after the receipt with `time`, `action`, `detail`, and `tx`, and `to` on a move. `detail` carries every parameter the block carried, so the owner can read what was sent without opening the block. Write amounts in display units: a chain amount in the block divided by 1000, and `pendingWei` or a price in wei divided by 10^18 as AIPRO. Do not write `circuit`, a proof, or `entryFeeWei`.
+
+Write a planet as `(x, y)` so the page can jump to it. A block that carries coordinates in `circuit` gives them as field elements. A value above half of `21888242871839275222246405745257275088548364400416034343698204186575808495617` is a negative coordinate: subtract that number. When the block has no coordinates, use them from a planet file this turn already read, such as `owned.json` or `homeLocations.json`. If none has that planet, write its `planetHashHex`.
+
+| Order                          | `action`                                                                    | `detail`                                                                                                                                                                                   |
+| ------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DARKFOREST_MOVE`              | `move`                                                                      | `<population> energy, <silver> silver from (x1, y1) to (x2, y2)`. Add `, artifact #<artifactId>` when it is not `0`. Add `, material <resourceId> x <amount>` for each material. Set `to`. |
+| `DARKFOREST_REVERT_MOVE`       | `revert-move`                                                               | `move <moveId> heading to <planet>`. Set `to` to the source hash.                                                                                                                          |
+| `DARKFOREST_WITHDRAW_MATERIAL` | `withdraw-material`                                                         | `<amount> of material <materialType> from <planet>`                                                                                                                                        |
+| `DARKFOREST_WITHDRAW_SILVER`   | `withdraw-silver`                                                           | `<amount> silver from <planet>`                                                                                                                                                            |
+| `DARKFOREST_BUY_SILVER`        | `buy-silver`                                                                | `tier <tier>, <silverDisplay> silver for <priceWhole> AIPRO on <planet>`                                                                                                                   |
+| `DARKFOREST_UPGRADE`           | `upgrade`                                                                   | `range +<rangeTimes>, speed +<speedTimes>, defense +<defenseTimes> on <planet>`                                                                                                            |
+| `DARKFOREST_ADD_JUNK`          | `add-junk`                                                                  | `<planet>, biomebase <biomebase>, junk <used> of <limit>`                                                                                                                                  |
+| `DARKFOREST_CLEAR_JUNK`        | `clear-junk`                                                                | `<planet>, abandoned` when `ownsPlanet` is true, otherwise `<planet>, quota returned`                                                                                                      |
+| `DARKFOREST_FIND_ARTIFACT`     | `prospect` when `phase` is `prospect-then-find`, then `find-artifact`       | `<planet>, biomebase <biomebase>`                                                                                                                                                          |
+| `DARKFOREST_USE_ARTIFACT`      | `charge-artifact`, `activate-artifact`, `shutdown-artifact`, or `land-bomb` | `artifact #<artifactId> on <planet>, <dataKind>`. For `wormhole` add `, to <targetPlanet>`. For `reveal` add `, reveals <targetPlanet>`. For `land-bomb` the planet is the hit target.     |
+| `DARKFOREST_CLAIM_REWARDS`     | `claim`                                                                     | `<pendingWei as AIPRO> AIPRO game reward from pool <pool>`                                                                                                                                 |
+| `DARKFOREST_CLAIM_COMMUNITY`   | `claim-community`                                                           | `<pendingWei as AIPRO> AIPRO community reward from pool <pool>`                                                                                                                            |
+
+Example of a pasted move:
+
+```json
+{
+  "time": "2026-11-19T09:30:00Z",
+  "action": "move",
+  "detail": "12500 energy, 300 silver from (80233, 400) to (79954, -137)",
+  "tx": "0x",
+  "to": "<64 hex>"
+}
+```
+
+A message with several orders writes one line per receipt, in the order the calls were sent. A buy also appends its `spends.ndjson` line as before.
 
 ## Catalog
 
