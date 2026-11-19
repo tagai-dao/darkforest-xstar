@@ -3817,12 +3817,14 @@ export class GameManager extends EventEmitter {
       //   spawnInnerRadius = 0;
       // }
 
-      const requireRadiusMin = this.contractConstants.MAX_LEVEL_DIST[1];
-      // const requireRadiusMax = this.contractConstants.MAX_LEVEL_DIST[0];
+      // 家只在倒数第二区：75000 到 87500。最后一档边界是这圈的外沿，再往外不是家。
+      const borders = this.contractConstants.MAX_LEVEL_DIST;
+      const spawnInner = borders[borders.length - 2];
+      const spawnOuter = borders[borders.length - 1];
       const checkCoords = () => {
         console.log(d);
-        console.log("[" + requireRadiusMin + ",+)");
-        return d >= requireRadiusMin;
+        console.log("[" + spawnInner + "," + spawnOuter + ")");
+        return d >= spawnInner && d < spawnOuter;
       };
 
       //NOTE: check coords
@@ -3858,11 +3860,12 @@ export class GameManager extends EventEmitter {
         initPerlinMax,
         this.hashConfig,
       );
+      // 搜索外沿停在星云环，不扫到世界半径 100000。
       const homePlanetFinder = MinerManager.create(
         chunkStore,
         pattern,
-        this.worldRadius,
-        this.getInnerRadius(),
+        spawnOuter,
+        Math.max(this.getInnerRadius(), spawnInner),
         this.planetRarity,
         this.hashConfig,
         this.useMockHash,
@@ -3966,11 +3969,8 @@ export class GameManager extends EventEmitter {
               spaceType === SpaceType.NEBULA && //only NEBULA
               planetPerlin < initPerlinMax &&
               planetPerlin >= initPerlinMin &&
-              distFromOrigin < this.worldRadius &&
-              distFromOrigin >= this.getInnerRadius() &&
-              // distFromOrigin >= spawnInnerRadius &&
-              distFromOrigin >= requireRadiusMin &&
-              // distFromOrigin < requireRadiusMax &&
+              distFromOrigin < spawnOuter &&
+              distFromOrigin >= Math.max(this.getInnerRadius(), spawnInner) &&
               planetLevel === MIN_PLANET_LEVEL &&
               planetType === PlanetType.PLANET &&
               (!planet || !planet.isInContract) // init will fail if planet has been initialized in contract already

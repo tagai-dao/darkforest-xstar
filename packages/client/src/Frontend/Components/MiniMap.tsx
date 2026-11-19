@@ -139,11 +139,13 @@ function getSpawnAreas({
   squares,
   radius,
   rimRadius,
+  outerRadius,
   scaleFactor,
 }: {
   squares: Square[];
   radius: number;
   rimRadius: number;
+  outerRadius: number;
   scaleFactor: number;
 }): SpawnArea[] {
   const areas: SpawnArea[] = [];
@@ -160,8 +162,8 @@ function getSpawnAreas({
       y: radius - point.y,
     };
 
-    // skip points outside circle
-    if (!point_on_circle(normdPoint, radius)) {
+    // 只保留 75000 到 87500 的星云环。世界圆的外面，以及 87500 以外，都不是家。
+    if (!point_on_circle(normdPoint, outerRadius)) {
       continue;
     }
 
@@ -377,11 +379,14 @@ function MiniMapImpl({}, ref: React.Ref<MiniMapHandle>) {
   const infoOptionsRef = useRef(null);
   const overlayRef = useRef(null);
 
-  const MAX_LEVEL_DIST = df.getContractConstants().MAX_LEVEL_DIST[3];
+  const borders = df.getContractConstants().MAX_LEVEL_DIST;
+  const spawnInner = borders[borders.length - 2];
+  const spawnOuter = borders[borders.length - 1];
 
   const worldRadius = df.getWorldRadius();
-  const rimRadius = canvasRadius * (MAX_LEVEL_DIST / worldRadius);
   const radius = canvasRadius;
+  const rimRadius = radius * (spawnInner / worldRadius);
+  const outerRadius = radius * (spawnOuter / worldRadius);
   const scaleFactor = worldRadius / radius;
 
   const squares = makeSquares();
@@ -389,6 +394,7 @@ function MiniMapImpl({}, ref: React.Ref<MiniMapHandle>) {
     squares,
     radius,
     rimRadius,
+    outerRadius,
     scaleFactor,
   });
   const blueZones = getBlueZones({

@@ -50,13 +50,13 @@ The three results are SpawnPlanet, Player, then InnerCircle. Each `returnData` i
 The contract, not the map center, decides. A coordinate is a legal home only when every line below is true.
 
 - It is a planet: its MiMC hash, key `1729`, is below `LOCATION_ID_UB / 16384`.
-- Let `distanceSquare` be `x * x + y * y`. It is at least `75000 * 75000`, and at least `innerRadius * innerRadius`. It is below `100000 * 100000`.
-- Zone comes from the borders `[37500, 50000, 62500, 75000, 87500]`. Walk them in order and take the first border whose square is strictly greater than `distanceSquare`. If none matches, the zone is `5`. Zone `4` is the band above `75000` through `87500`.
-- Space Perlin uses key `1730`, scale `8192`, neither axis mirrored, `floor` true. Spawn Perlin must be at least `1` and below `31`. Zone `4` is always nebula. Zone `5` is nebula only when that Perlin is below `14`. Any other zone is not a home, even when the inner circle has shrunk.
+- Let `distanceSquare` be `x * x + y * y`. It is at least `75000 * 75000`, and at least `innerRadius * innerRadius`. It is below `87500 * 87500`. A distance of `87500` or more is outside the spawn ring. The world still extends to `100000`, but that outer band is not a home.
+- Zone comes from the borders `[37500, 50000, 62500, 75000, 87500]`. Walk them in order and take the first border whose square is strictly greater than `distanceSquare`. If none matches, the zone is `5`. Zone `4` is the band from `75000` up to, but not including, `87500`. Only zone `4` is a home.
+- Space Perlin uses key `1730`, scale `8192`, neither axis mirrored, `floor` true. Spawn Perlin must be at least `1` and below `31`. Zone `4` is always nebula. Zone `5` is not a home, even when its Perlin is below `14`. Any other zone is not a home, even when the inner circle has shrunk.
 - Level is the lowest 24 bits of the planet hash. The level thresholds are `[100, 500, 4000, 8000, 30000, 65520, 262128, 1048561, 4194292]`. When the 24-bit value is below one of them, the level is not zero. A home needs that value to be at least `4194292`, so the level stays `0`. Zone `4` and zone `5` add no level bonus.
 - A level-0 nebula planet is type planet. The type byte does not need a separate test.
 
-Start the spiral inside the legal home band: distance at least the live inner radius, which starts at `75000`, and below `100000`, and only zone `4` or zone `5`. Pick one center in that band and spiral from there. Generate a bounded set of legal candidates, then read their `PlanetOwner` records through verified Multicall3 `aggregate3` at one fixed block. Keep the result in candidate order and reject the whole batch if a required subcall fails. Select the first unowned candidate. Ownership is this read. Do not skip a coordinate because another wallet once owned a neighbor. If the current batch has no unowned candidate, continue the spiral with another bounded batch and a new fixed-block snapshot.
+Start inside the legal home ring: distance at least the live inner radius, which starts at `75000`, and below `87500`, and only zone `4`. Do not start on the positive x-axis, and do not reuse a center near `(80000, 0)`. Draw a new point for every attempt. Take an angle uniformly from the whole circle, and a radius whose square is uniform between the inner edge and `87500 * 87500`, so the area of the ring is covered evenly. The center is `(round(r·cos θ), round(r·sin θ))`. It may lie on the left, the right, the top, or the bottom. Spiral from that center, and drop any coordinate whose distance is below the inner edge or at least `87500`. Generate a bounded set of legal candidates, then read their `PlanetOwner` records through verified Multicall3 `aggregate3` at one fixed block. Keep the result in candidate order and reject the whole batch if a required subcall fails. Select the first unowned candidate. Ownership is this read. Do not skip a coordinate because another wallet once owned a neighbor. If the current batch has no unowned candidate, discard that center and draw a new angle and radius. Do not keep walking the same spiral.
 
 Do not send a loop of individual `eth_call`, a JSON-RPC batch, or `Promise.all` of contract reads for ownership. If the node limits the batch, split it into smaller Multicall3 calls pinned to the same block. Prove only after ownership has been checked. Stop active workers immediately when the owner says stop; clean up temporary scripts and do not submit a spawn transaction.
 
@@ -81,7 +81,7 @@ After the spawn receipt succeeds, write the wallet folder's `homeLocations.json`
 ```json
 [
   {
-    "coords": { "x": 80012, "y": 3 },
+    "coords": { "x": -51000, "y": 64000 },
     "hash": "<64 hex characters>",
     "perlin": 12,
     "biomebase": 9

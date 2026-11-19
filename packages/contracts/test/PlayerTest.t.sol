@@ -102,7 +102,8 @@ contract PlayerTest is BaseTest {
     SpawnInput memory input;
     input.planetHash = 4194292 + 1; // in order to get a planet of lvl 0
     input.perlin = 1;
-    input.radiusSquare = (112500 + 1) ** 2;
+    // 80000 落在 75000 到 87500 的星云环里。112500 已经出了这圈，不能再当家。
+    input.radiusSquare = 80000 ** 2;
 
     vm.expectRevert(Errors.NotRegistered.selector);
     IWorld(worldAddress).df__spawnPlayer(proof, input);
@@ -116,6 +117,14 @@ contract PlayerTest is BaseTest {
     assertEq(uint8(planet.spaceType), uint8(SpaceType.NEBULA));
     vm.expectRevert(Errors.AlreadySpawned.selector);
     IWorld(worldAddress).df__spawnPlayer(proof, input);
+
+    vm.prank(address(3));
+    IWorld(worldAddress).df__registerPlayer("outer", address(4));
+    input.planetHash = 4194292 + 2;
+    input.radiusSquare = 90000 ** 2;
+    vm.prank(address(3));
+    vm.expectRevert(Errors.InvalidSpawnPlanet.selector);
+    IWorld(worldAddress).df__spawnPlayer(proof, input);
   }
 
   function testSpawnPlayerFromBurner() public {
@@ -127,7 +136,7 @@ contract PlayerTest is BaseTest {
     SpawnInput memory input;
     input.planetHash = 4194292 + 1; // in order to get a planet of lvl 0
     input.perlin = 1;
-    input.radiusSquare = (112500 + 1) ** 2;
+    input.radiusSquare = 80000 ** 2;
 
     vm.prank(address(2));
     vm.expectRevert();

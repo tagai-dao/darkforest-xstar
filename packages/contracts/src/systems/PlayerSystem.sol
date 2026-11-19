@@ -127,9 +127,10 @@ contract PlayerSystem is BaseSystem {
     planet.changeOwner(player);
     planet.population = 50000; // initial population for player's home planet
 
-    // valid spawn planet
+    // 家只在 75000 到 87500 的星云环上。这一圈是倒数第二区，空间类型固定为星云。
+    // 87500 以外的第五区不是家，哪怕那里的 perlin 也落成星云。
     if (
-      planet.universeZone + 1 < UniverseZoneConfig.lengthBorders() ||
+      planet.universeZone + 1 != UniverseZoneConfig.lengthBorders() ||
       planet.spaceType != SpaceType.NEBULA ||
       planet.level > 0 ||
       planet.planetType != PlanetType.PLANET
