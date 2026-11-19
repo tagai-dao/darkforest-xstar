@@ -62,6 +62,7 @@ import ModalManager from "../../Frontend/Game/ModalManager";
 import NotificationManager from "../../Frontend/Game/NotificationManager";
 import Viewport from "../../Frontend/Game/Viewport";
 import { getObjectWithIdFromMap } from "../../Frontend/Utils/EmitterUtils";
+import { MIN_CHUNK_SIZE } from "../../Frontend/Utils/constants";
 import {
   listenForKeyboardEvents,
   unlinkKeyboardEvents,
@@ -75,6 +76,7 @@ import {
 } from "../../Frontend/Utils/SettingsHooks";
 import UIEmitter, { UIEmitterEvent } from "../../Frontend/Utils/UIEmitter";
 import type { TerminalHandle } from "../../Frontend/Views/Terminal";
+import { getChunkOfSideLengthContainingPoint } from "../Miner/ChunkUtils";
 import type { MiningPattern } from "../Miner/MiningPatterns";
 import { coordsEqual } from "../Utils/Coordinates";
 import type { GameManager } from "./GameManager";
@@ -879,7 +881,27 @@ export class GameUIManager extends EventEmitter {
       this.setSelectedVoyage(undefined);
       this.setMultipleMoves(undefined);
       this.setShowMultiMoveSelector(false);
+      // 挖过的空白只取消选中。没挖过的地方把点击位置的整数坐标放进剪贴板。
+      this.copyUnexploredPoint(coords);
     }
+  }
+
+  private copyUnexploredPoint(coords: WorldCoords): void {
+    const footprint = getChunkOfSideLengthContainingPoint(
+      coords,
+      MIN_CHUNK_SIZE,
+    );
+    if (this.hasMinedChunk(footprint)) {
+      return;
+    }
+    const text = `${Math.round(coords.x)}, ${Math.round(coords.y)}`;
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label: `已复制坐标 ${text}`,
+      });
+    });
   }
 
   public onMouseMove(coords: WorldCoords) {
