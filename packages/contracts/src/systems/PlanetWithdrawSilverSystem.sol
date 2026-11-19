@@ -22,7 +22,7 @@ contract PlanetWithdrawSilverSystem is BaseSystem {
   function withdrawSilver(
     uint256 planetHash,
     uint256 silverToWithdraw
-  ) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
     GlobalStats.setWithdrawSilverCount(GlobalStats.getWithdrawSilverCount() + 1);
     PlayerStats.setWithdrawSilverCount(_msgSender(), PlayerStats.getWithdrawSilverCount(_msgSender()) + 1);
 
@@ -42,7 +42,7 @@ contract PlanetWithdrawSilverSystem is BaseSystem {
     planet.silver -= silverToWithdraw;
     playerWithdrawSilverAmount += silverToWithdraw;
 
-    uint playerScore = PlayerScore.get(executor);
+    uint256 playerScore = PlayerScore.get(executor);
     PlayerScore.set(executor, playerScore + silverToWithdraw);
     DFXStarStakingLib.stakeScoreDelta(executor, silverToWithdraw);
 

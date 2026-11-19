@@ -56,7 +56,7 @@ contract MoveSystem is BaseSystem {
     uint256 _silver,
     uint256 _artifact,
     MaterialMove[] calldata _materials
-  ) public entryFee {
+  ) public requireGamePass entryFee {
     GlobalStats.setMoveCount(GlobalStats.getMoveCount() + 1);
     PlayerStats.setMoveCount(_msgSender(), PlayerStats.getMoveCount(_msgSender()) + 1);
 
@@ -133,7 +133,7 @@ contract MoveSystem is BaseSystem {
     uint256 movedArtifactId,
     uint256, // isAbandoning
     bytes calldata movedMaterials
-  ) public {
+  ) public requireGamePass {
     Proof memory proof;
     proof.genFrom(_a, _b, _c);
     MoveInput memory input;
@@ -149,7 +149,7 @@ contract MoveSystem is BaseSystem {
    * @param moveId The ID of the move to revert
    * @param toPlanetHash The destination planet hash of the move
    */
-  function revertMove(uint64 moveId, bytes32 toPlanetHash) public entryFee {
+  function revertMove(uint64 moveId, bytes32 toPlanetHash) public requireGamePass entryFee {
     address w = _world();
     DFUtils.tick(w);
 

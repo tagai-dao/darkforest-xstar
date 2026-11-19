@@ -12,7 +12,7 @@ import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
 
 contract ArtifactCreateSystem is BaseSystem {
-  function prospectPlanet(uint256 planetHash) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  function prospectPlanet(uint256 planetHash) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
     GlobalStats.setProspectPlanetCount(GlobalStats.getProspectPlanetCount() + 1);
     PlayerStats.setProspectPlanetCount(_msgSender(), PlayerStats.getProspectPlanetCount(_msgSender()) + 1);
 
@@ -27,7 +27,7 @@ contract ArtifactCreateSystem is BaseSystem {
   function findingArtifact(
     Proof memory proof,
     BiomebaseInput memory input
-  ) public entryFee requireSameOwnerAndJunkOwner(input.planetHash) {
+  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(input.planetHash) {
     GlobalStats.setFindArtifactCount(GlobalStats.getFindArtifactCount() + 1);
     PlayerStats.setFindArtifactCount(_msgSender(), PlayerStats.getFindArtifactCount(_msgSender()) + 1);
 
@@ -52,7 +52,7 @@ contract ArtifactCreateSystem is BaseSystem {
     uint256[2][2] memory _b,
     uint256[2] memory _c,
     uint256[7] memory _input
-  ) public {
+  ) public requireGamePass {
     Proof memory proof;
     proof.genFrom(_a, _b, _c);
     BiomebaseInput memory input;

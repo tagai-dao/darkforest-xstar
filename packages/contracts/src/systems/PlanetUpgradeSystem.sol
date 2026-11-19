@@ -15,13 +15,12 @@ contract PlanetUpgradeSystem is BaseSystem {
    * @param speedUpgrades Times of speed upgrades
    * @param defenseUpgrades Times of defense upgrades
    */
-
   function upgradePlanet(
     uint256 planetHash,
     uint256 rangeUpgrades,
     uint256 speedUpgrades,
     uint256 defenseUpgrades
-  ) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
     GlobalStats.setUpgradePlanetCount(GlobalStats.getUpgradePlanetCount() + 1);
     PlayerStats.setUpgradePlanetCount(_msgSender(), PlayerStats.getUpgradePlanetCount(_msgSender()) + 1);
 
@@ -40,7 +39,7 @@ contract PlanetUpgradeSystem is BaseSystem {
    * @param _location Planet location
    * @param _branch Branch to upgrade. 0 for defense, 1 for range, 2 for speed
    */
-  function legacyUpgradePlanet(uint256 _location, uint256 _branch) public {
+  function legacyUpgradePlanet(uint256 _location, uint256 _branch) public requireGamePass {
     assert(_branch < 3);
     if (_branch == 0) {
       upgradePlanet(_location, 0, 0, 1);

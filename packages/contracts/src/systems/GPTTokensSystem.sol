@@ -19,7 +19,7 @@ contract GPTTokensSystem is BaseSystem {
    * @notice Allows users to buy GPT tokens for 0.00001 ETH per token.
    * @param amount Number of GPT tokens to buy
    */
-  function buyGPTTokens(uint256 amount) public payable {
+  function buyGPTTokens(uint256 amount) public payable requireGamePass {
     GlobalStats.setBuyGPTTokensCount(GlobalStats.getBuyGPTTokensCount() + 1);
     PlayerStats.setBuyGPTTokensCount(_msgSender(), PlayerStats.getBuyGPTTokensCount(_msgSender()) + 1);
 
@@ -39,7 +39,7 @@ contract GPTTokensSystem is BaseSystem {
   /**
    * @notice Allows users to spend 1 GPT token.
    */
-  function spendGPTTokens(uint256 amount) public {
+  function spendGPTTokens(uint256 amount) public requireGamePass {
     GlobalStats.setSpendGPTTokensCount(GlobalStats.getSpendGPTTokensCount() + 1);
     PlayerStats.setSpendGPTTokensCount(_msgSender(), PlayerStats.getSpendGPTTokensCount(_msgSender()) + 1);
 
@@ -60,7 +60,7 @@ contract GPTTokensSystem is BaseSystem {
    * @param player Address of the recipient
    * @param amount Number of GPT tokens to send
    */
-  function sendGPTTokens(address player, uint256 amount) public {
+  function sendGPTTokens(address player, uint256 amount) public requireGamePass {
     GlobalStats.setSendGPTTokensCount(GlobalStats.getSendGPTTokensCount() + 1);
     PlayerStats.setSendGPTTokensCount(_msgSender(), PlayerStats.getSendGPTTokensCount(_msgSender()) + 1);
 

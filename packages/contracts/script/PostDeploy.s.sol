@@ -108,7 +108,7 @@ contract PostDeploy is Script {
     _setSilverPurchaseConfig(toml);
     // 付费铸造要扣本地 AIPRO，所以先建社区代币，再部署 NFT。
     _setDFXStarConfig(toml, worldAddress);
-    _setGamePassConfig(toml, worldAddress);
+    _setGamePassConfig(toml);
 
     // set entry fee
     uint256 entryFee = toml.readUint(".entry_fee.value");
@@ -388,7 +388,7 @@ contract PostDeploy is Script {
     SilverPurchaseConfig.setTierSilverAmounts(tierSilverAmounts);
   }
 
-  function _setGamePassConfig(string memory toml, address worldAddress) internal {
+  function _setGamePassConfig(string memory toml) internal {
     address nftAddress = toml.readAddress(".game_pass.nft_address");
     address handleRegistry = toml.readAddress(".game_pass.handle_registry");
 
@@ -406,8 +406,6 @@ contract PostDeploy is Script {
 
     AiproNftStake locker = new AiproNftStake(nftAddress, handleRegistry);
     GamePassNFTTable.set(address(locker));
-    uint8 roundNum = abi.decode(toml.parseRaw(".round.number"), (uint8));
-    locker.setActiveSeason(worldAddress, roundNum);
     console.log("Game pass locker:", address(locker));
   }
 

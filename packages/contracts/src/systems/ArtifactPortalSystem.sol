@@ -17,7 +17,10 @@ import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
 
 contract ArtifactPortalSystem is BaseSystem {
-  function withdrawArtifact(uint256 planetHash, uint256 artifactId) public requireSameOwnerAndJunkOwner(planetHash) {
+  function withdrawArtifact(
+    uint256 planetHash,
+    uint256 artifactId
+  ) public requireGamePass requireSameOwnerAndJunkOwner(planetHash) {
     GlobalStats.setWithdrawArtifactCount(GlobalStats.getWithdrawArtifactCount() + 1);
     PlayerStats.setWithdrawArtifactCount(_msgSender(), PlayerStats.getWithdrawArtifactCount(_msgSender()) + 1);
 
@@ -59,7 +62,10 @@ contract ArtifactPortalSystem is BaseSystem {
     }
   }
 
-  function depositArtifact(uint256 planetHash, uint256 artifactId) public requireSameOwnerAndJunkOwner(planetHash) {
+  function depositArtifact(
+    uint256 planetHash,
+    uint256 artifactId
+  ) public requireGamePass requireSameOwnerAndJunkOwner(planetHash) {
     GlobalStats.setDepositArtifactCount(GlobalStats.getDepositArtifactCount() + 1);
     PlayerStats.setDepositArtifactCount(_msgSender(), PlayerStats.getDepositArtifactCount(_msgSender()) + 1);
 

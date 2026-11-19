@@ -114,9 +114,9 @@ g_max_total_level = 0x05050403         # [5, 5, 4, 3]
 h_silver_cost = 0x000000000064503c2814 # [100, 80, 60, 40, 20]
 
 [snark]
-a_planet_hash_key = 1729
-b_biome_base_key = 1731
-c_space_type_key = 1730
+a_planet_hash_key = 20261119
+b_biome_base_key = 20261121
+c_space_type_key = 20261120
 d_perlin_length_scale = 8192
 e_perlin_mirror_x = 0
 f_perlin_mirror_y = 0

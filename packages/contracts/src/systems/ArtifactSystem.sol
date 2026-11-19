@@ -10,6 +10,7 @@ import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
 
 contract ArtifactSystem is BaseSystem {
+  // 安装模块登记神器，调用方不是玩家。入场检查在玩家发起的充能、激活和关闭上。
   function registerArtifact(uint256 artifactId) public {
     if (_msgSender() != AtfInstallModule.get()) {
       revert OnlyCallableByArtifactInstallModule();
@@ -24,7 +25,7 @@ contract ArtifactSystem is BaseSystem {
     uint256 planetHash,
     uint256 artifactId,
     bytes memory data
-  ) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
     GlobalStats.setChargeArtifactCount(GlobalStats.getChargeArtifactCount() + 1);
     PlayerStats.setChargeArtifactCount(_msgSender(), PlayerStats.getChargeArtifactCount(_msgSender()) + 1);
 
@@ -45,7 +46,7 @@ contract ArtifactSystem is BaseSystem {
   function shutdownArtifact(
     uint256 planetHash,
     uint256 artifactId
-  ) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
     GlobalStats.setShutdownArtifactCount(GlobalStats.getShutdownArtifactCount() + 1);
     PlayerStats.setShutdownArtifactCount(_msgSender(), PlayerStats.getShutdownArtifactCount(_msgSender()) + 1);
 
@@ -67,7 +68,7 @@ contract ArtifactSystem is BaseSystem {
     uint256 planetHash,
     uint256 artifactId,
     bytes memory data
-  ) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
     GlobalStats.setActivateArtifactCount(GlobalStats.getActivateArtifactCount() + 1);
     PlayerStats.setActivateArtifactCount(_msgSender(), PlayerStats.getActivateArtifactCount(_msgSender()) + 1);
 

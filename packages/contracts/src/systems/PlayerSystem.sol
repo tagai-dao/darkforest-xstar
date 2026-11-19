@@ -17,8 +17,6 @@ import { DFUtils } from "libraries/DFUtils.sol";
 import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerJunkLimit } from "codegen/tables/PlayerJunkLimit.sol";
 import { JunkConfig } from "codegen/tables/JunkConfig.sol";
-import { GamePassNFT } from "../codegen/tables/GamePassNFT.sol";
-import { IGamePassNFT } from "../tokens/IGamePassNFT.sol";
 
 contract PlayerSystem is BaseSystem {
   // TODO: will move errors to each system that uses them. just like this one.
@@ -29,7 +27,7 @@ contract PlayerSystem is BaseSystem {
    * @param name Player name.
    * @param burner Burner wallet address.
    */
-  function registerPlayer(string memory name, address burner) public {
+  function registerPlayer(string memory name, address burner) public requireGamePass {
     GlobalStats.setRegisterPlayerCount(GlobalStats.getRegisterPlayerCount() + 1);
 
     address player = _msgSender();
@@ -51,8 +49,6 @@ contract PlayerSystem is BaseSystem {
     if (index > TempConfigSet.getPlayerLimit()) {
       revert PlayerLimitReached();
     }
-    _requireGamePass(player);
-
     Counter.setPlayer(uint32(index));
     Player.set(player, burner, uint32(index), uint64(block.timestamp), name);
     NameToPlayer.set(nameHash, player);
@@ -63,7 +59,7 @@ contract PlayerSystem is BaseSystem {
    * @notice Change player name.
    * @param newName New player name.
    */
-  function changePlayerName(string memory newName) public {
+  function changePlayerName(string memory newName) public requireGamePass {
     address player = _msgSender();
     if (Player.getIndex(player) == 0) {
       revert NotRegistered();
@@ -81,7 +77,7 @@ contract PlayerSystem is BaseSystem {
    * @notice Change burner wallet address.
    * @param newBurner New burner wallet address.
    */
-  function changeBurnerWallet(address newBurner) public {
+  function changeBurnerWallet(address newBurner) public requireGamePass {
     address player = _msgSender();
     if (Player.getIndex(player) == 0) {
       revert NotRegistered();
@@ -99,7 +95,7 @@ contract PlayerSystem is BaseSystem {
    * @param _proof Snark proof.
    * @param _input SpawnInput.
    */
-  function spawnPlayer(Proof memory _proof, SpawnInput memory _input) public returns (uint256) {
+  function spawnPlayer(Proof memory _proof, SpawnInput memory _input) public requireGamePass returns (uint256) {
     GlobalStats.setSpawnPlayerCount(GlobalStats.getSpawnPlayerCount() + 1);
 
     address worldAddress = _world();
@@ -155,7 +151,7 @@ contract PlayerSystem is BaseSystem {
     uint256[2][2] memory _b,
     uint256[2] memory _c,
     uint256[9] memory _input
-  ) public returns (uint256) {
+  ) public requireGamePass returns (uint256) {
     Proof memory proof;
     proof.genFrom(_a, _b, _c);
     SpawnInput memory input;
@@ -165,18 +161,5 @@ contract PlayerSystem is BaseSystem {
 
   function getMsgSender() public view returns (address) {
     return _msgSender();
-  }
-
-  /// @dev 表里是 NFT 保管合约。地址为 0 时不检查入场，测试会写成 0。本地部署和正式部署都会写入保管合约。
-  function _requireGamePass(address player) internal view {
-    address pass = GamePassNFT.get();
-    if (pass == address(0)) {
-      return;
-    }
-
-    IGamePassNFT gamePass = IGamePassNFT(pass);
-    if (!gamePass.isPlayerInActiveSeason(player) || gamePass.activeWorld() != _world()) {
-      revert GamePassRequired();
-    }
   }
 }

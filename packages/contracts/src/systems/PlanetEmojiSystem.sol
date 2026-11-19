@@ -14,8 +14,10 @@ contract PlanetEmojiSystem is BaseSystem {
    * @param planetHash Planet hash
    * @param emoji Emoji you like
    */
-
-  function setPlanetEmoji(uint256 planetHash, string memory emoji) public requireSameOwnerAndJunkOwner(planetHash) {
+  function setPlanetEmoji(
+    uint256 planetHash,
+    string memory emoji
+  ) public requireGamePass requireSameOwnerAndJunkOwner(planetHash) {
     GlobalStats.setSetPlanetEmojiCount(GlobalStats.getSetPlanetEmojiCount() + 1);
     PlayerStats.setSetPlanetEmojiCount(_msgSender(), PlayerStats.getSetPlanetEmojiCount(_msgSender()) + 1);
 

@@ -11,6 +11,8 @@ import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
 import { JunkConfig } from "codegen/tables/JunkConfig.sol";
 import { PlanetOwner } from "codegen/tables/PlanetOwner.sol";
 import { PlanetJunkOwner } from "codegen/tables/PlanetJunkOwner.sol";
+import { GamePassNFT } from "codegen/tables/GamePassNFT.sol";
+import { IGamePassNFT } from "tokens/IGamePassNFT.sol";
 
 contract BaseSystem is System, Errors {
   /**
@@ -45,6 +47,25 @@ contract BaseSystem is System, Errors {
   modifier hasAccess() {
     AccessControl.requireAccess(SystemRegistry.get(address(this)), _msgSender());
     _;
+  }
+
+  /// @dev 保管合约地址为 0 时不检查，测试靠这个跳过入场。系统互调时调用方是系统合约，玩家那一笔已经查过。
+  modifier requireGamePass() {
+    _requireGamePass(_msgSender());
+    _;
+  }
+
+  function _requireGamePass(address player) internal view {
+    address pass = GamePassNFT.get();
+    if (pass == address(0)) {
+      return;
+    }
+    if (ResourceId.unwrap(SystemRegistry.get(player)) != bytes32(0)) {
+      return;
+    }
+    if (!IGamePassNFT(pass).isPlayerInActiveSeason(player)) {
+      revert GamePassRequired();
+    }
   }
 
   modifier requireSameOwnerAndJunkOwner(uint256 planetHash) {

@@ -81,6 +81,8 @@ contract PlanetReadSystem is BaseSystem {
   }
 
   function _syncWithKillStats(Planet memory planet) internal returns (Planet memory) {
+    // 两个公开入口都从这里走。系统互调会在检查里放行。
+    _requireGamePass(_msgSender());
     uint256 untilTick = Ticker.getTickNumber();
     return _syncToWithKillStats(planet, untilTick);
   }

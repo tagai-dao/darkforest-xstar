@@ -20,7 +20,7 @@ contract TickSystem is BaseSystem {
    * there are at least 10 operations from all players within one block, then we save gas
    * by updating it in storage once per block.
    */
-  function tick() public {
+  function tick() public requireGamePass {
     TickerData memory ticker = Ticker.get();
     if (ticker.paused) {
       revert Paused();

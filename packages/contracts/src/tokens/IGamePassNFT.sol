@@ -2,11 +2,6 @@
 pragma solidity >=0.8.24;
 
 interface IGamePassNFT {
-  function activeWorld() external view returns (address);
-
-  function activeSeason() external view returns (uint8);
-
-  function isSeasonOpen() external view returns (bool);
-
+  /// @dev 这只钱包当前是否把入场 NFT 放在保管合约里。
   function isPlayerInActiveSeason(address player) external view returns (bool);
 }

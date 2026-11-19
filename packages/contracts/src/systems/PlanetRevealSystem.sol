@@ -14,7 +14,7 @@ import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
 
 contract PlanetRevealSystem is BaseSystem {
-  function revealLocation(Proof memory proof, RevealInput memory input) public entryFee {
+  function revealLocation(Proof memory proof, RevealInput memory input) public requireGamePass entryFee {
     GlobalStats.setRevealLocationCount(GlobalStats.getRevealLocationCount() + 1);
     PlayerStats.setRevealLocationCount(_msgSender(), PlayerStats.getRevealLocationCount(_msgSender()) + 1);
 
@@ -45,7 +45,7 @@ contract PlanetRevealSystem is BaseSystem {
     uint256[2][2] memory _b,
     uint256[2] memory _c,
     uint256[9] memory _input
-  ) public {
+  ) public requireGamePass {
     Proof memory proof;
     proof.genFrom(_a, _b, _c);
     RevealInput memory input;

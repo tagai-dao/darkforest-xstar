@@ -26,7 +26,10 @@ contract BuySilverSystem is BaseSystem {
    * @param planetHash 目标星球。等级决定档位，种类和空间加成不改价格和数量。
    * @param tier 0=20%，1=50%，2=80%，3=150% 的星云行星基础银上限
    */
-  function buySilver(uint256 planetHash, uint8 tier) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  function buySilver(
+    uint256 planetHash,
+    uint8 tier
+  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
     address pool = DFXStarConfig.getScoreStakingPool();
     if (pool == address(0)) revert DFXStarPoolNotConfigured();
 

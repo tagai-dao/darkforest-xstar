@@ -25,7 +25,7 @@ contract WithdrawMaterialSystem is BaseSystem {
     uint256 planetHash,
     MaterialType materialType,
     uint256 materialToWithdraw
-  ) public entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
     _updateStats();
     _processWithdrawal(planetHash, materialType, materialToWithdraw);
   }

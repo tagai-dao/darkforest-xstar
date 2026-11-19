@@ -112,7 +112,7 @@ contract GuildSystem is BaseSystem {
   function _createGuild(uint256 guildId, address owner) internal returns (uint256 memberId) {
     memberId = (guildId << 16) | 1;
 
-    uint playerSilver = PlayerWithdrawSilver.get(owner);
+    uint256 playerSilver = PlayerWithdrawSilver.get(owner);
 
     GuildData memory guild = GuildData({
       status: GuildStatus.ACTIVE,
@@ -154,8 +154,8 @@ contract GuildSystem is BaseSystem {
       revert GuildMemberLimitReached();
     }
 
-    uint playerSilver = PlayerWithdrawSilver.get(player);
-    uint guildSilver = guild.silver + playerSilver;
+    uint256 playerSilver = PlayerWithdrawSilver.get(player);
+    uint256 guildSilver = guild.silver + playerSilver;
     guild.silver = guildSilver;
 
     memberId = (guildId << 16) | ++guild.registry;
@@ -181,8 +181,8 @@ contract GuildSystem is BaseSystem {
   }
 
   function _leaveGuild(uint256 guildId, uint256 memberId, address player) internal {
-    uint guildSilver = Guild.getSilver(uint8(guildId));
-    uint playerSilver = PlayerWithdrawSilver.get(player);
+    uint256 guildSilver = Guild.getSilver(uint8(guildId));
+    uint256 playerSilver = PlayerWithdrawSilver.get(player);
     Guild.setSilver(uint8(guildId), guildSilver - playerSilver);
 
     Guild.setNumber(uint8(guildId), Guild.getNumber(uint8(guildId)) - 1);
@@ -202,7 +202,7 @@ contract GuildSystem is BaseSystem {
     GuildMember.setRole(uint24(newOwnerMemberId), GuildRole.LEADER);
   }
 
-  function createGuild(string memory name) public payable {
+  function createGuild(string memory name) public payable requireGamePass {
     address owner = _msgSender();
 
     GlobalStats.setCreateGuildCount(GlobalStats.getCreateGuildCount() + 1);
@@ -240,7 +240,7 @@ contract GuildSystem is BaseSystem {
     RevenueStats.set(key, amount);
   }
 
-  function inviteToGuild(address invitee) public {
+  function inviteToGuild(address invitee) public requireGamePass {
     address inviter = _msgSender();
 
     // Check if the inviter is registered
@@ -269,7 +269,7 @@ contract GuildSystem is BaseSystem {
     GuildCandidate.pushInvitations(invitee, uint8(inviterMemberId >> 16));
   }
 
-  function acceptInvitation(uint8 guildId) public {
+  function acceptInvitation(uint8 guildId) public requireGamePass {
     address player = _msgSender();
 
     // Check if the player is registered
@@ -303,7 +303,7 @@ contract GuildSystem is BaseSystem {
     _joinGuild(guildId, player);
   }
 
-  function applyToGuild(uint8 guildId) public {
+  function applyToGuild(uint8 guildId) public requireGamePass {
     address player = _msgSender();
 
     // Check if the player is registered
@@ -327,7 +327,7 @@ contract GuildSystem is BaseSystem {
     GuildCandidate.pushApplications(player, guildId);
   }
 
-  function approveApplication(address player) public {
+  function approveApplication(address player) public requireGamePass {
     address operator = _msgSender();
 
     if (!_isPlayerRegistered(operator)) {
@@ -371,7 +371,7 @@ contract GuildSystem is BaseSystem {
     _joinGuild(guildId, player);
   }
 
-  function leaveGuild() public {
+  function leaveGuild() public requireGamePass {
     address player = _msgSender();
 
     if (!_isPlayerRegistered(player)) {
@@ -388,7 +388,7 @@ contract GuildSystem is BaseSystem {
     _leaveGuild(uint8(memberId >> 16), memberId, player);
   }
 
-  function transferGuildLeadership(address newOwner) public {
+  function transferGuildLeadership(address newOwner) public requireGamePass {
     address player = _msgSender();
 
     if (!_isPlayerRegistered(player)) {
@@ -419,7 +419,7 @@ contract GuildSystem is BaseSystem {
     _transferOwnership(guildId, newOwnerMemberId);
   }
 
-  function disbandGuild() public {
+  function disbandGuild() public requireGamePass {
     address player = _msgSender();
 
     if (!_isPlayerRegistered(player)) {
@@ -445,7 +445,7 @@ contract GuildSystem is BaseSystem {
     _leaveGuild(uint8(memberId >> 16), memberId, player);
   }
 
-  function setGrant(GuildRole newGrant) public {
+  function setGrant(GuildRole newGrant) public requireGamePass {
     address player = _msgSender();
 
     // Check if player is registered
@@ -472,7 +472,7 @@ contract GuildSystem is BaseSystem {
     }
   }
 
-  function setMemberRole(address member, GuildRole newRole) public {
+  function setMemberRole(address member, GuildRole newRole) public requireGamePass {
     address operator = _msgSender();
 
     // Check if operator is registered
@@ -516,7 +516,7 @@ contract GuildSystem is BaseSystem {
     GuildMember.setRole(uint24(memberMemberId), newRole);
   }
 
-  function kickMember(address member) public {
+  function kickMember(address member) public requireGamePass {
     address operator = _msgSender();
 
     // Check if operator is registered

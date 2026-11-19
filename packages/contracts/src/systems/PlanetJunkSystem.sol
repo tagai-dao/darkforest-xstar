@@ -29,7 +29,11 @@ contract PlanetJunkSystem is BaseSystem {
    * @param biomeBase Biome base value for verification
    * @param proof ZK proof for biome base verification
    */
-  function addJunk(uint256 planetHash, uint256 biomeBase, Proof memory proof) public entryFee requireSpaceJunkEnabled {
+  function addJunk(
+    uint256 planetHash,
+    uint256 biomeBase,
+    Proof memory proof
+  ) public requireGamePass entryFee requireSpaceJunkEnabled {
     _updateStats();
     _processAddJunk(planetHash, biomeBase, proof);
   }
@@ -115,7 +119,7 @@ contract PlanetJunkSystem is BaseSystem {
    * @notice clear junk
    * @param planetHash Planet hash
    */
-  function clearJunk(uint256 planetHash) public entryFee requireSpaceJunkEnabled {
+  function clearJunk(uint256 planetHash) public requireGamePass entryFee requireSpaceJunkEnabled {
     GlobalStats.setClearJunkCount(GlobalStats.getClearJunkCount() + 1);
     PlayerStats.setClearJunkCount(_msgSender(), PlayerStats.getClearJunkCount(_msgSender()) + 1);
 
@@ -142,32 +146,33 @@ contract PlanetJunkSystem is BaseSystem {
     planet.writeToStore();
   }
 
-  function getBuyJunkFee(uint amount) internal returns (uint) {
-    uint SPACE_JUNK_FREE_ALLOCATION = JunkConfig.getSPACE_JUNK_FREE_ALLOCATION();
+  function getBuyJunkFee(uint256 amount) internal returns (uint256) {
+    uint256 SPACE_JUNK_FREE_ALLOCATION = JunkConfig.getSPACE_JUNK_FREE_ALLOCATION();
 
-    uint SPACE_JUNK_LINEAR_MIN_PURCHASE = JunkConfig.getSPACE_JUNK_LINEAR_MIN_PURCHASE();
+    uint256 SPACE_JUNK_LINEAR_MIN_PURCHASE = JunkConfig.getSPACE_JUNK_LINEAR_MIN_PURCHASE();
 
-    uint SPACE_JUNK_LINEAR_MAX_PURCHASE = JunkConfig.getSPACE_JUNK_LINEAR_MAX_PURCHASE();
+    uint256 SPACE_JUNK_LINEAR_MAX_PURCHASE = JunkConfig.getSPACE_JUNK_LINEAR_MAX_PURCHASE();
 
-    uint SPACE_JUNK_LINEAR_BASE_PRICE = JunkConfig.getSPACE_JUNK_LINEAR_BASE_PRICE();
+    uint256 SPACE_JUNK_LINEAR_BASE_PRICE = JunkConfig.getSPACE_JUNK_LINEAR_BASE_PRICE();
 
-    uint SPACE_JUNK_QUADRATIC_MIN_PURCHASE = JunkConfig.getSPACE_JUNK_QUADRATIC_MIN_PURCHASE();
+    uint256 SPACE_JUNK_QUADRATIC_MIN_PURCHASE = JunkConfig.getSPACE_JUNK_QUADRATIC_MIN_PURCHASE();
 
-    uint SPACE_JUNK_QUADRATIC_BASE_PRICE = JunkConfig.getSPACE_JUNK_QUADRATIC_BASE_PRICE();
+    uint256 SPACE_JUNK_QUADRATIC_BASE_PRICE = JunkConfig.getSPACE_JUNK_QUADRATIC_BASE_PRICE();
 
-    uint fee = 0;
-    if (amount <= SPACE_JUNK_FREE_ALLOCATION) fee = 0;
-    else if (amount <= SPACE_JUNK_LINEAR_MAX_PURCHASE) {
+    uint256 fee = 0;
+    if (amount <= SPACE_JUNK_FREE_ALLOCATION) {
+      fee = 0;
+    } else if (amount <= SPACE_JUNK_LINEAR_MAX_PURCHASE) {
       fee += (amount - SPACE_JUNK_LINEAR_MIN_PURCHASE + 1) * SPACE_JUNK_LINEAR_BASE_PRICE;
     } else if (amount >= SPACE_JUNK_QUADRATIC_MIN_PURCHASE) {
       fee += (SPACE_JUNK_LINEAR_MAX_PURCHASE - SPACE_JUNK_LINEAR_MIN_PURCHASE + 1) * SPACE_JUNK_LINEAR_BASE_PRICE;
-      uint t = (amount - SPACE_JUNK_QUADRATIC_MIN_PURCHASE + 1);
+      uint256 t = (amount - SPACE_JUNK_QUADRATIC_MIN_PURCHASE + 1);
       fee += t * t * SPACE_JUNK_QUADRATIC_BASE_PRICE;
     }
     return fee;
   }
 
-  function buyJunk(uint amount) public payable requireSpaceJunkEnabled {
+  function buyJunk(uint256 amount) public payable requireGamePass requireSpaceJunkEnabled {
     address worldAddress = _world();
     DFUtils.tick(worldAddress);
     address executor = _msgSender();
@@ -176,19 +181,19 @@ contract PlanetJunkSystem is BaseSystem {
       revert NotRegistered();
     }
 
-    uint playerJunkLimit = PlayerJunkLimit.get(executor);
-    uint preAmount = playerJunkLimit / 1000;
+    uint256 playerJunkLimit = PlayerJunkLimit.get(executor);
+    uint256 preAmount = playerJunkLimit / 1000;
     if (amount < preAmount) {
       revert NeedBuyMore();
     }
 
-    uint SPACE_JUNK_QUADRATIC_MAX_PURCHASE = JunkConfig.getSPACE_JUNK_QUADRATIC_MAX_PURCHASE();
+    uint256 SPACE_JUNK_QUADRATIC_MAX_PURCHASE = JunkConfig.getSPACE_JUNK_QUADRATIC_MAX_PURCHASE();
 
     if (amount > SPACE_JUNK_QUADRATIC_MAX_PURCHASE) {
       revert NeedBuyLess();
     }
 
-    uint fee = getBuyJunkFee(amount) - getBuyJunkFee(preAmount);
+    uint256 fee = getBuyJunkFee(amount) - getBuyJunkFee(preAmount);
 
     if (_msgValue() < fee) {
       revert NeedFundsToBuySpaceJunk();
