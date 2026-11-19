@@ -59,7 +59,7 @@ class PlanetHasher {
   }
 
   void mix(bool finalInput) {
-    for (int i = 0; i < 219; ++i) {
+    for (int i = 0; i < 999; ++i) {
       mpz_add(t_, l_, constants_[i]);
       if (mpz_cmp(t_, p_) >= 0) mpz_sub(t_, t_, p_);
       power5(); mpz_add(next_, next_, r_);
@@ -75,7 +75,7 @@ class PlanetHasher {
   }
 
   mpz_t p_, limit_, l_, r_, firstL_, firstR_, t_, square_, fourth_, next_;
-  std::array<mpz_t, 220> constants_;
+  std::array<mpz_t, 999> constants_;
 };
 
 int main(int argc, char** argv) {
