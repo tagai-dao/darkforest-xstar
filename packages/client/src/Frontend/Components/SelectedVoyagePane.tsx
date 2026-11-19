@@ -5,7 +5,11 @@ import { TooltipName } from "@df/types";
 import React, { useCallback, useRef, useState } from "react";
 import styled from "styled-components";
 
-import { useMoveRevert } from "../../hooks/useMoveRevert";
+import {
+  copyText,
+  formatRevertMoveOrder,
+  revertStillInFirstHalf,
+} from "../../Backend/GameLogic/moveOrder";
 import { ArtifactImage } from "../Components/ArtifactImage";
 import { Icon, IconType } from "../Components/Icons";
 import {
@@ -18,6 +22,7 @@ import { BiomeTextColors } from "../Styles/Colors";
 import dfstyles from "../Styles/dfstyles";
 import { snips } from "../Styles/dfstyles";
 import { useUIManager } from "../Utils/AppHooks";
+import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 
 const VoyageCardContainer = styled.div<{
   isDragging?: boolean;
@@ -265,66 +270,12 @@ const RevertButton = styled.button`
   }
 `;
 
-const ConfirmDialog = styled.div`
-  background-color: ${dfstyles.colors.backgrounddark};
-  border: 1px solid ${dfstyles.colors.dfred};
-  border-radius: 4px;
-  padding: 12px;
-  margin-top: 8px;
-`;
-
-const ConfirmTitle = styled.div`
-  color: ${dfstyles.colors.dfred};
-  font-size: 14px;
-  font-weight: bold;
-  text-align: center;
-  margin-bottom: 8px;
-`;
-
 const ConfirmMessage = styled.div`
   color: ${dfstyles.colors.text};
   font-size: 11px;
   text-align: center;
   margin-bottom: 12px;
   line-height: 1.4;
-`;
-
-const ConfirmButtons = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const ConfirmButton = styled.button<{ variant: "confirm" | "cancel" }>`
-  flex: 1;
-  padding: 6px 12px;
-  border: none;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  ${(props) =>
-    props.variant === "confirm"
-      ? `
-        background-color: ${dfstyles.colors.dfred};
-        color: white;
-        &:hover:not(:disabled) {
-          opacity: 0.8;
-        }
-      `
-      : `
-        background-color: ${dfstyles.colors.borderDarker};
-        color: ${dfstyles.colors.text};
-        &:hover:not(:disabled) {
-          background-color: ${dfstyles.colors.borderDark};
-        }
-      `}
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
 `;
 
 interface SelectedVoyagePaneProps {
@@ -347,9 +298,6 @@ export function SelectedVoyagePane({
   onPositionChange,
 }: SelectedVoyagePaneProps) {
   const uiManager = useUIManager();
-  const { canRevertMove, revertMove } = useMoveRevert();
-  const [isReverting, setIsReverting] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   // Drag and drop state
   const [position, setPosition] = useState<{ x: number; y: number }>(() => {
@@ -410,38 +358,37 @@ export function SelectedVoyagePane({
     ? BiomeTextColors[toPlanet.biome]
     : undefined;
 
-  // Check if this is the player's voyage
-  const isMyVoyage = voyage.player === uiManager.getAccount();
+  const account = uiManager.getAccount()?.toLowerCase();
+  const isMyVoyage = voyage.player.toLowerCase() === account;
+  const sourcePlanet = uiManager.getPlanetWithId(voyage.fromPlanet);
+  const stillOwnsSource = sourcePlanet?.owner.toLowerCase() === account;
+  const inFirstHalf = revertStillInFirstHalf(
+    voyage.departureTick,
+    voyage.arrivalTick,
+    uiManager.getCurrentTick(),
+  );
+  const canRevert = isMyVoyage && stillOwnsSource && inFirstHalf;
+  let revertNote = "取消后能量和银各剩一半，舰队折返。页面不签名。";
+  if (!stillOwnsSource) {
+    revertNote = "出发星球已经不是你的，不能取消。";
+  } else if (!inFirstHalf) {
+    revertNote = "已经飞过一半，不能取消。";
+  }
 
-  // Check if this voyage can be reverted
-  const canRevert = isMyVoyage && canRevertMove(voyage);
-
-  const handleRevert = async () => {
-    if (!showConfirm) {
-      setShowConfirm(true);
-      return;
-    }
-
-    setIsReverting(true);
-    try {
-      await revertMove(voyage);
-      setShowConfirm(false);
-      onClose?.(); // Close the pane after successful revert
-      // Show success message
-      console.log("Move reverted successfully!");
-    } catch (error: unknown) {
-      console.error("Failed to revert move:", error);
-
-      // Show user-friendly error message
-      const errorMessage = error?.message || "Unknown error occurred";
-      alert(`Failed to revert move: ${errorMessage}`);
-    } finally {
-      setIsReverting(false);
-    }
-  };
-
-  const handleCancelRevert = () => {
-    setShowConfirm(false);
+  const copyRevert = () => {
+    if (!canRevert) return;
+    const text = formatRevertMoveOrder({
+      moveId: voyage.eventId,
+      toPlanetId: voyage.toPlanet,
+      entryFeeWei: uiManager.getGameManager().getTransactionFee(),
+    });
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label: "已复制取消航行单，直接粘贴给 agent",
+      });
+    });
   };
 
   // Drag and drop handlers
@@ -687,40 +634,16 @@ export function SelectedVoyagePane({
               </StatRow>
             </VoyageInfo>
 
-            {/* Revert Button */}
-            {canRevert && (
+            {isMyVoyage && (
               <>
-                {showConfirm ? (
-                  <ConfirmDialog>
-                    <ConfirmTitle>Reverse Move?</ConfirmTitle>
-                    <ConfirmMessage>
-                      Cost 50% resources and 50% energy to revert.
-                    </ConfirmMessage>
-                    <ConfirmButtons>
-                      <ConfirmButton
-                        variant="confirm"
-                        onClick={handleRevert}
-                        disabled={isReverting}
-                      >
-                        {isReverting ? "Reversing..." : "Yes"}
-                      </ConfirmButton>
-                      <ConfirmButton
-                        variant="cancel"
-                        onClick={handleCancelRevert}
-                        disabled={isReverting}
-                      >
-                        No
-                      </ConfirmButton>
-                    </ConfirmButtons>
-                  </ConfirmDialog>
-                ) : (
-                  <RevertButton
-                    onClick={handleRevert}
-                    title="Reverse Move (only available in first half of journey and if source planet is still owned)"
-                  >
-                    ↶ Reverse Move
-                  </RevertButton>
-                )}
+                <RevertButton
+                  onClick={copyRevert}
+                  disabled={!canRevert}
+                  title={revertNote}
+                >
+                  复制取消航行
+                </RevertButton>
+                <ConfirmMessage>{revertNote}</ConfirmMessage>
               </>
             )}
           </>

@@ -354,6 +354,66 @@ export function formatUseArtifactOrder(input: UseArtifactOrderInput): string {
   return `DARKFOREST_USE_ARTIFACT\n${JSON.stringify(order)}`;
 }
 
+// 领取买银注入的游戏奖励。agent 读到后调用池子的 claimExternalRewards，不附带 ETH。
+export function formatClaimRewardsOrder(input: {
+  pool: string;
+  pendingWei: bigint;
+}): string {
+  const order = {
+    kind: "darkforest-claim-rewards",
+    call: "claimExternalRewards",
+    pool: input.pool,
+    pendingWei: input.pendingWei.toString(),
+    valueWei: "0",
+  };
+  return `DARKFOREST_CLAIM_REWARDS\n${JSON.stringify(order)}`;
+}
+
+// 领取社区按小时释放的奖励。agent 读到后调用社区的 withdrawPoolsRewards，不附带 ETH。
+export function formatClaimCommunityOrder(input: {
+  community: string;
+  pool: string;
+  pendingWei: bigint;
+}): string {
+  const order = {
+    kind: "darkforest-claim-community",
+    call: "withdrawPoolsRewards",
+    community: input.community,
+    pool: input.pool,
+    pendingWei: input.pendingWei.toString(),
+    valueWei: "0",
+  };
+  return `DARKFOREST_CLAIM_COMMUNITY\n${JSON.stringify(order)}`;
+}
+
+// 取消还在前半程的舰队。agent 读到后调用 df__revertMove。
+export function formatRevertMoveOrder(input: {
+  moveId: string;
+  toPlanetId: LocationId;
+  entryFeeWei: bigint;
+}): string {
+  const order = {
+    kind: "darkforest-revert-move",
+    call: "df__revertMove",
+    moveId: input.moveId,
+    toPlanetHash: locationIdToDecStr(input.toPlanetId),
+    toPlanetHashHex: locationIdToHexStr(input.toPlanetId).slice(2),
+    entryFeeWei: input.entryFeeWei.toString(),
+  };
+  return `DARKFOREST_REVERT_MOVE\n${JSON.stringify(order)}`;
+}
+
+// 合约用存储的 tick：已飞时间不到全程的一半才能取消。
+export function revertStillInFirstHalf(
+  departureTick: number,
+  arrivalTick: number,
+  nowTick: number,
+): boolean {
+  const span = arrivalTick - departureTick;
+  if (span <= 0) return false;
+  return nowTick - departureTick < span / 2;
+}
+
 // 清除自己名下的垃圾配额。agent 读到后直接调用 df__clearJunk。
 export function formatClearJunkOrder(input: ClearJunkOrderInput): string {
   const order = {

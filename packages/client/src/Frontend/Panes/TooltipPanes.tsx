@@ -136,28 +136,18 @@ export function PlayerSilverTooltipPane() {
 export function MiningPauseTooltipPane() {
   return (
     <>
-      Start / Stop your <White>explorer</White>. Your explorer looks for planets
-      in chunks of <White>16</White> x <White>16</White>.
+      开始或停下探索。每次看一片 <White>16</White> × <White>16</White>{" "}
+      的坐标，把里面的星球找出来。
     </>
   );
 }
 
 export function MiningTargetTooltipPane() {
-  return (
-    <>
-      Change the location of your <White>explorer</White>. Click anywhere on the{" "}
-      <White>Game Screen</White>, and your <White>miner</White> will start
-      hashing around that chunk.
-    </>
-  );
+  return <>点地图上的任意位置。探索会从那一片继续向外找星球。</>;
 }
 
 export function CurrentMiningTooltipPane() {
-  return (
-    <>
-      The current coordinates of your <White>explorer</White>.
-    </>
-  );
+  return <>当前正在探索的坐标。</>;
 }
 
 export function BonusTooltipPane() {

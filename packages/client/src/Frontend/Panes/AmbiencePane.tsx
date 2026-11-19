@@ -165,11 +165,12 @@ export function AmbiencePane() {
   const handleOnEnd = () => {
     setIsActuallyPlaying(false);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    // 主旋律播完后停 5 秒，再从头放。底下的宇宙底噪一直循环。
     timeoutRef.current = setTimeout(() => {
       if (backgroundMusicEnabled) {
         setIsActuallyPlaying(true);
       }
-    }, 30000);
+    }, 5000);
   };
 
   useEffect(() => {

@@ -403,10 +403,12 @@ function UpgradeCopy({ planet }: { planet: LocatablePlanet }) {
 
   const total = planet.upgradeState.reduce((sum, level) => sum + level, 0);
   const maxRank = getPlanetMaxRank(planet);
+  const planetFull = total >= maxRank;
   const silverNeeded = nextUpgradeSilver(planet);
   const enoughSilver = planet.silver >= silverNeeded;
   const copyUpgrade = (branch: (typeof UPGRADE_BRANCHES)[number]) => {
     if (
+      planetFull ||
       !enoughSilver ||
       planet.upgradeState[branch.index] >= MAX_BRANCH_LEVEL
     ) {
@@ -431,36 +433,35 @@ function UpgradeCopy({ planet }: { planet: LocatablePlanet }) {
   return (
     <BuyBox>
       <SectionTitle>升级</SectionTitle>
-      {total >= maxRank ? (
-        <Amount>三项升级已经满了</Amount>
+      {planetFull ? (
+        <Amount>已满级</Amount>
       ) : (
-        <>
-          <Amount>
-            下一档需要 {silverNeeded.toLocaleString("zh-CN")} 银
-            {enoughSilver
-              ? ""
-              : `，还差 ${(silverNeeded - planet.silver).toLocaleString("zh-CN")}`}
-          </Amount>
-          {UPGRADE_BRANCHES.map((branch) => {
-            const level = planet.upgradeState[branch.index] ?? 0;
-            const branchFull = level >= MAX_BRANCH_LEVEL;
-            return (
-              <TierLine key={branch.name}>
-                <TierPrice>
-                  {branch.name} {level}/{MAX_BRANCH_LEVEL}
-                </TierPrice>
-                <CopyScore
-                  type="button"
-                  disabled={!enoughSilver || branchFull}
-                  onClick={() => copyUpgrade(branch)}
-                >
-                  {branchFull ? "已满" : "复制升级"}
-                </CopyScore>
-              </TierLine>
-            );
-          })}
-        </>
+        <Amount>
+          下一档需要 {silverNeeded.toLocaleString("zh-CN")} 银
+          {enoughSilver
+            ? ""
+            : `，还差 ${(silverNeeded - planet.silver).toLocaleString("zh-CN")}`}
+        </Amount>
       )}
+      {/* 升满后仍列出每一项的等级，避免只剩一句“已经满了”。 */}
+      {UPGRADE_BRANCHES.map((branch) => {
+        const level = planet.upgradeState[branch.index] ?? 0;
+        const branchFull = level >= MAX_BRANCH_LEVEL || planetFull;
+        return (
+          <TierLine key={branch.name}>
+            <TierPrice>
+              {branch.name} {level}/{MAX_BRANCH_LEVEL}
+            </TierPrice>
+            <CopyScore
+              type="button"
+              disabled={!enoughSilver || branchFull}
+              onClick={() => copyUpgrade(branch)}
+            >
+              {branchFull ? "已满" : "复制升级"}
+            </CopyScore>
+          </TierLine>
+        );
+      })}
     </BuyBox>
   );
 }

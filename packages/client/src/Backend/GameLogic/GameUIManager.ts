@@ -51,7 +51,6 @@ import {
 import autoBind from "auto-bind";
 import type { BigNumber } from "ethers";
 import EventEmitter from "events";
-import { Howl } from "howler";
 import deferred from "p-defer";
 import type React from "react";
 import type { Hex } from "viem";
@@ -61,8 +60,8 @@ import type { HashConfig } from "../../_types/global/GlobalTypes";
 import ModalManager from "../../Frontend/Game/ModalManager";
 import NotificationManager from "../../Frontend/Game/NotificationManager";
 import Viewport from "../../Frontend/Game/Viewport";
-import { getObjectWithIdFromMap } from "../../Frontend/Utils/EmitterUtils";
 import { MIN_CHUNK_SIZE } from "../../Frontend/Utils/constants";
+import { getObjectWithIdFromMap } from "../../Frontend/Utils/EmitterUtils";
 import {
   listenForKeyboardEvents,
   unlinkKeyboardEvents,
@@ -79,6 +78,8 @@ import type { TerminalHandle } from "../../Frontend/Views/Terminal";
 import { getChunkOfSideLengthContainingPoint } from "../Miner/ChunkUtils";
 import type { MiningPattern } from "../Miner/MiningPatterns";
 import { coordsEqual } from "../Utils/Coordinates";
+import { noteMyArrivals } from "./arrivalSound";
+import { playEffect, preloadEffect } from "./effectSound";
 import type { GameManager } from "./GameManager";
 import { GameManagerEvent } from "./GameManager";
 import type { GameObjects } from "./GameObjects";
@@ -113,8 +114,17 @@ export class GameUIManager extends EventEmitter {
   private selectedPlanetId: LocationId | undefined;
   private selectedCoords: WorldCoords | undefined;
   private mouseDownOverPlanet: LocatablePlanet | undefined;
-  // 松手后仍画着的攻击线。页面不发交易，但这条线要留在两个星球之间。
-  private attackPreview: { from: WorldCoords; to: WorldCoords } | undefined;
+  // 松手后画着的攻击线。对应的舰队一到达就去掉。
+  private attackPreview:
+    | {
+        from: WorldCoords;
+        to: WorldCoords;
+        fromId: LocationId;
+        toId: LocationId;
+        // 拖线时这条航线上已经在飞的舰队，它们落地不能把这条新线清掉。
+        voyageIds: Set<string>;
+      }
+    | undefined;
   private mouseDownOverCoords: WorldCoords | undefined;
   private mouseHoveringOverPlanet: LocatablePlanet | undefined;
   private mouseHoveringOverCoords: WorldCoords | undefined;
@@ -289,6 +299,7 @@ export class GameUIManager extends EventEmitter {
     uiEmitter.on(UIEmitterEvent.SendInitiated, uiManager.onSendInit);
     uiEmitter.on(UIEmitterEvent.SendCancelled, uiManager.onSendCancel);
     uiEmitter.on(UIEmitterEvent.SendCompleted, uiManager.onSendComplete);
+    uiManager.startArrivalWatch();
 
     gameManager.on(GameManagerEvent.PlanetUpdate, uiManager.updatePlanets);
     gameManager.on(
@@ -330,6 +341,7 @@ export class GameUIManager extends EventEmitter {
       this.onDiscoveredChunk,
     );
 
+    window.clearInterval(this.arrivalWatch);
     this.gameManager.destroy();
     this.selectedPlanetId$.clear();
     this.hoverArtifactId$.clear();
@@ -942,6 +954,17 @@ export class GameUIManager extends EventEmitter {
           this.attackPreview = {
             from: { x: from.location.coords.x, y: from.location.coords.y },
             to: { x: to.location.coords.x, y: to.location.coords.y },
+            fromId: from.locationId,
+            toId: to.locationId,
+            voyageIds: new Set(
+              this.getAllVoyages()
+                .filter(
+                  (voyage) =>
+                    voyage.fromPlanet === from.locationId &&
+                    voyage.toPlanet === to.locationId,
+                )
+                .map((voyage) => String(voyage.eventId)),
+            ),
           };
         }
 
@@ -1309,6 +1332,21 @@ export class GameUIManager extends EventEmitter {
     | { from: WorldCoords; to: WorldCoords }
     | undefined {
     return this.attackPreview;
+  }
+
+  // 只清这次拖出来的线。同一航线上更早出发的舰队落地时，线还留着。
+  private clearAttackPreviewIfArrived(arrival: QueuedArrival) {
+    const preview = this.attackPreview;
+    const me = this.getAccount()?.toLowerCase();
+    if (!preview || !me || arrival.player.toLowerCase() !== me) return;
+    if (
+      arrival.fromPlanet !== preview.fromId ||
+      arrival.toPlanet !== preview.toId
+    ) {
+      return;
+    }
+    if (preview.voyageIds.has(String(arrival.eventId))) return;
+    this.attackPreview = undefined;
   }
 
   // 自己的星球，或公会授权可以代发的星球。地址大小写不一致也算自己的。
@@ -1814,8 +1852,11 @@ export class GameUIManager extends EventEmitter {
 
         if (!fromLoc || !toLoc) continue;
 
-        // Check if click is near the voyage line (increased threshold for better detection)
-        if (this.isPointNearLine(coords, fromLoc.coords, toLoc.coords, 20)) {
+        // 命中范围按屏幕像素算。缩得很远时，固定的地图单位会细到点不中。
+        const threshold = Math.max(this.getViewport().canvasToWorldDist(18), 1);
+        if (
+          this.isPointNearLine(coords, fromLoc.coords, toLoc.coords, threshold)
+        ) {
           foundVoyages.push(voyage);
         }
       }
@@ -1887,7 +1928,28 @@ export class GameUIManager extends EventEmitter {
   }
 
   public updateArrival(planetId: LocationId, arrival: QueuedArrival): void {
-    return this.gameManager.updateArrival(planetId, arrival);
+    this.gameManager.updateArrival(planetId, arrival);
+    this.clearAttackPreviewIfArrived(arrival);
+    if (this.selectedVoyage?.eventId === arrival.eventId) {
+      this.setSelectedVoyage(undefined);
+    }
+    if (this.mouseHoveringOverVoyage?.eventId === arrival.eventId) {
+      this.setHoveringOverVoyage(undefined);
+    }
+    if (
+      this.multipleMovesAtCoords?.some(
+        (move) => move.eventId === arrival.eventId,
+      )
+    ) {
+      const currentTick = this.getCurrentTick();
+      const activeMoves = this.multipleMovesAtCoords.filter(
+        (move) => currentTick < move.arrivalTick,
+      );
+      this.setMultipleMoves(activeMoves.length > 1 ? activeMoves : undefined);
+      if (activeMoves.length <= 1) {
+        this.setShowMultiMoveSelector(false);
+      }
+    }
   }
 
   public getMyScore(): number | undefined {
@@ -2471,53 +2533,68 @@ export class GameUIManager extends EventEmitter {
     }
   }
 
-  public playHoverSound() {
-    const backgroundMusicEnabled = this.getBooleanSetting(
-      Setting.BackgroundMusicEnabled,
-    );
+  // 看见过还在飞的自己的舰队。落地只响一次，进页面时已经到了的不响。
+  private readonly arrivalMemory = {
+    flying: new Set<string>(),
+    heard: new Set<string>(),
+  };
+  private arrivalWatch: number | undefined;
 
-    if (!backgroundMusicEnabled) return;
+  // 音量滑块是 0 到 10，和背景音乐同一套设置。
+  // 没有签名钱包时，this.getBooleanSetting 会直接返回 false。
+  // 音乐面板这时用的是默认开，音效必须走同一条，否则点击星球永远没声。
+  private soundConfig() {
+    return {
+      contractAddress: this.getContractAddress(),
+      account: this.getEthConnection().getAddress(),
+    };
+  }
 
-    const backgroundMusicVolume = this.getStringSetting(
+  private effectVolume(): number {
+    const value = getNumberSetting(
+      this.soundConfig(),
       Setting.BackgroundMusicVolume,
     );
+    if (!Number.isFinite(value)) return 0;
+    return Math.min(1, Math.max(0, value / 10));
+  }
 
-    const hoverSound = new Howl({
-      src: ["/sounds/hover.ogg"],
-      volume: Math.round(Number(backgroundMusicVolume) / 10),
-      html5: true,
-      onload: () => {
-        // console.log("Hover sound loaded");
-      },
-      onplay: () => {
-        // console.log("Hover sound playing");
-      },
-    });
-    hoverSound.play();
+  private playUiEffect(src: string) {
+    if (
+      !getBooleanSetting(this.soundConfig(), Setting.BackgroundMusicEnabled)
+    ) {
+      return;
+    }
+    playEffect(src, this.effectVolume());
+  }
+
+  private startArrivalWatch() {
+    preloadEffect("/sounds/hover.ogg");
+    preloadEffect("/sounds/click.ogg");
+    preloadEffect("/sounds/arrive.ogg");
+    this.arrivalWatch = window.setInterval(() => this.noteArrivals(), 400);
+  }
+
+  // 攻击和支援都是自己的舰队落地，用同一声提醒。同一拍到了好几支，只响一次。
+  private noteArrivals() {
+    const landed = noteMyArrivals(
+      this.getAllVoyages().map((voyage) => ({
+        id: String(voyage.eventId),
+        player: voyage.player,
+        arrivalTick: voyage.arrivalTick,
+      })),
+      this.getAccount(),
+      this.getCurrentTick(),
+      this.arrivalMemory,
+    );
+    if (landed) this.playUiEffect("/sounds/arrive.ogg");
+  }
+
+  public playHoverSound() {
+    this.playUiEffect("/sounds/hover.ogg");
   }
 
   public playClickSound() {
-    const backgroundMusicEnabled = this.getBooleanSetting(
-      Setting.BackgroundMusicEnabled,
-    );
-
-    if (!backgroundMusicEnabled) return;
-
-    const backgroundMusicVolume = this.getStringSetting(
-      Setting.BackgroundMusicVolume,
-    );
-
-    const clickSound = new Howl({
-      src: ["/sounds/click.ogg"],
-      volume: Math.round(Number(backgroundMusicVolume) / 10),
-      html5: true,
-      onload: () => {
-        // console.log("Click sound loaded");
-      },
-      onplay: () => {
-        // console.log("Click sound playing");
-      },
-    });
-    clickSound.play();
+    this.playUiEffect("/sounds/click.ogg");
   }
 }

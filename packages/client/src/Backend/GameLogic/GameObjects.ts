@@ -1595,7 +1595,7 @@ export class GameObjects {
 
     for (const arrival of arrivals) {
       try {
-        if (nowTick - arrival.arrivalTick > 0) {
+        if (nowTick >= arrival.arrivalTick) {
           // if arrival happened in the past, run this arrival
           const update = arrive(
             planet,

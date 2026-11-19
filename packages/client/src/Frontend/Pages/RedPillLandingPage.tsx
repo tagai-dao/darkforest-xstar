@@ -222,7 +222,6 @@ export function RedPillLandingPage() {
   const [watchToken, setWatchToken] = useState(0);
   const [homeReady, setHomeReady] = useState(false);
   const [actionLog, setActionLog] = useState<ActionRecord[]>([]);
-  const [priceText, setPriceText] = useState<string | undefined>();
   const [folderLoad, setFolderLoad] = useState<
     | { kind: "idle" }
     | { kind: "busy"; done: number; total: number; label: string }
@@ -1722,21 +1721,15 @@ export function RedPillLandingPage() {
     const watch = async () => {
       while (!stopped) {
         try {
-          const {
-            chunks,
-            replace,
-            homeText,
-            actions,
-            priceText: nextPrice,
-          } = await readWalletTail(handle, boardCursorRef.current);
+          const { chunks, replace, homeText, actions } = await readWalletTail(
+            handle,
+            boardCursorRef.current,
+          );
           if (stopped) {
             return;
           }
           if (actions.length > 0) {
             setActionLog((current) => [...current, ...actions]);
-          }
-          if (nextPrice) {
-            setPriceText(nextPrice);
           }
           const manager = gameManagerRef.current;
           if (manager) {
@@ -1823,7 +1816,6 @@ export function RedPillLandingPage() {
       priceSize: 0,
     };
     setActionLog([]);
-    setPriceText(undefined);
     setWatchToken(0);
     setFolderSave(undefined);
     setHomeReady(false);
@@ -1896,7 +1888,6 @@ export function RedPillLandingPage() {
         priceSize: 0,
       };
       setActionLog([]);
-      setPriceText(undefined);
       setHomeReady(result.homeReady);
       setFolderSave(result.save);
       setWatchToken((token) => token + 1);
@@ -1994,7 +1985,6 @@ export function RedPillLandingPage() {
                     showPublicStatus={spectate}
                     homeReady={homeReady}
                     actions={actionLog}
-                    priceText={priceText}
                     onReturnHome={spectate ? leaveGame : undefined}
                   />
                 </UIManagerProvider>

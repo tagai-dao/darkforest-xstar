@@ -16,9 +16,9 @@ import {
   WindowWrapper,
 } from "../Components/GameWindowComponents";
 import { PublicGameStatus } from "../Components/PublicGameStatus";
-import { DocsCorner } from "../Pages/docs/DocsCorner";
 import { SelectedVoyageDisplay } from "../Components/SelectedVoyageDisplay";
 import ControllableCanvas from "../Game/ControllableCanvas";
+import { DocsCorner } from "../Pages/docs/DocsCorner";
 import { AIChatPane } from "../Panes/AIChatPane";
 import { ArtifactHoverPane } from "../Panes/ArtifactHoverPane";
 import { CoordsPane } from "../Panes/CoordsPane";
@@ -28,15 +28,15 @@ import GuildContextPane from "../Panes/GuildPane";
 import { HelpPane } from "../Panes/HelpPane";
 import { HotkeysArtShipPane, HotkeysMainLinePane } from "../Panes/HotKeyPane";
 import { HoverPlanetPane } from "../Panes/HoverPlanetPane";
-import { MoveOrderNotice } from "../Panes/MoveOrderNotice";
-import { SelectedPlanetSidePane } from "../Panes/SelectedPlanetSidePane";
 import { LeaderboardPane } from "../Panes/LeaderboardPane";
+import { MoveOrderNotice } from "../Panes/MoveOrderNotice";
 import OnboardingPane from "../Panes/OnboardingPane";
 import { PlanetContextPane } from "../Panes/PlanetContextPane";
 import { PlanetDexPane } from "../Panes/PlanetDexPane";
 import { PlayerArtifactsPane } from "../Panes/PlayerArtifactsPane";
 import { PluginLibraryPane } from "../Panes/PluginLibraryPane";
 import { PrivatePane } from "../Panes/PrivatePane";
+import { SelectedPlanetSidePane } from "../Panes/SelectedPlanetSidePane";
 import { SettingsPane } from "../Panes/SettingsPane";
 import { TradePane } from "../Panes/TradePane";
 import { TransactionLogPane } from "../Panes/TransactionLogPane";
@@ -72,7 +72,6 @@ export function GameWindowLayout({
   showPublicStatus = false,
   homeReady = false,
   actions = [],
-  priceText,
   onReturnHome,
 }: {
   terminalVisible: boolean;
@@ -81,7 +80,6 @@ export function GameWindowLayout({
   showPublicStatus?: boolean;
   homeReady?: boolean;
   actions?: ActionRecord[];
-  priceText?: string;
   onReturnHome?: () => void;
 }) {
   const uiManager = useUIManager();
@@ -364,9 +362,7 @@ export function GameWindowLayout({
   return (
     <WindowWrapper>
       <DocsCorner fixed />
-      {showPublicStatus && (
-        <PublicGameStatus homeReady={homeReady} priceText={priceText} />
-      )}
+      {showPublicStatus && <PublicGameStatus homeReady={homeReady} />}
       {showPublicStatus && <ActionHistory actions={actions} />}
       <TopBarPaneContainer>
         {paneVisible && (

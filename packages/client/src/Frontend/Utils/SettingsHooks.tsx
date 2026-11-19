@@ -126,17 +126,12 @@ export function getSetting(
  * Save the given setting to local storage. Publish an event to {@link settingChanged$}.
  */
 export function setSetting(
-  { contractAddress, account }: SettingStorageConfig,
+  config: SettingStorageConfig,
   setting: Setting,
   value: string,
 ): void {
-  const keyInLocalStorage =
-    account && getLocalStorageSettingKey({ contractAddress, account }, setting);
-  if (keyInLocalStorage === undefined || account === undefined) {
-    return;
-  }
-
-  localStorage.setItem(keyInLocalStorage, value);
+  // 没有签名钱包时也要写下来。音量滑杆和静音读的就是这份设置，写不进去就没有任何效果。
+  localStorage.setItem(getLocalStorageSettingKey(config, setting), value);
   settingChanged$.publish(setting);
 }
 

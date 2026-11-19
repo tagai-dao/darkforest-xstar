@@ -1,20 +1,30 @@
+import { EMPTY_ADDRESS } from "@df/constants";
 import type { Planet } from "@df/types";
+import { useComponentValue } from "@latticexyz/react";
+import { singletonEntity } from "@latticexyz/store-sync/recs";
+import { useMUD } from "@mud/MUDContext";
 import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
+import { type Address, parseAbi } from "viem";
 
+import {
+  copyText,
+  formatClaimCommunityOrder,
+  formatClaimRewardsOrder,
+} from "../../Backend/GameLogic/moveOrder";
 import Viewport from "../Game/Viewport";
 import { useUIManager } from "../Utils/AppHooks";
-import { aiproPriceLabel } from "./ActionHistory";
+import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
+import {
+  collectOwnedArtifacts,
+  type OwnedArtifactLine,
+} from "./ownedArtifacts";
 import {
   heldByAccount,
   MATERIAL_NAME,
   OwnedArtifactsPanel,
   OwnedPlanetsPanel,
 } from "./OwnedPlanetsPanel";
-import {
-  collectOwnedArtifacts,
-  type OwnedArtifactLine,
-} from "./ownedArtifacts";
 
 const Panel = styled.div`
   position: fixed;
@@ -47,6 +57,54 @@ const HomeNotice = styled.div`
   text-align: center;
 `;
 
+const TitleRow = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+`;
+
+const Title = styled.div`
+  font-size: 13px;
+`;
+
+const RewardLine = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+`;
+
+const RefreshButton = styled.button`
+  background: none;
+  border: none;
+  padding: 0;
+  color: #9be7ff;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+
+  &:disabled {
+    color: #6d7b8c;
+    cursor: default;
+    text-decoration: none;
+  }
+`;
+
+const ClaimButton = styled.button`
+  background: none;
+  border: none;
+  padding: 0;
+  color: #9be7ff;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+
+  &:disabled {
+    color: #6d7b8c;
+    cursor: default;
+    text-decoration: none;
+  }
+`;
+
 const OpenButton = styled.button`
   display: block;
   width: 100%;
@@ -67,7 +125,6 @@ type MaterialLine = {
 
 type WalletFacts = {
   users?: number;
-  chunks?: number;
   planetCount: number;
   artifacts: OwnedArtifactLine[];
   energy?: number;
@@ -86,29 +143,29 @@ const EMPTY_FACTS: WalletFacts = {
   materials: [],
 };
 
+const REWARD_ABI = parseAbi([
+  "function getPendingExternalRewards(address user) view returns (uint256)",
+  "function getPendingCommunityRewards(address user) view returns (uint256)",
+]);
+
+type RewardRead = {
+  pool: Address;
+  community?: Address;
+  game: bigint;
+  communityPending?: bigint;
+};
+
+// 待领是 18 位的 wei。差不到半枚时按最近的整枚 AIPRO 显示。
+function wholeAipro(wei: bigint): string {
+  const unit = 10n ** 18n;
+  return ((wei + unit / 2n) / unit).toLocaleString("zh-CN");
+}
+
 function whole(value: number | undefined): string {
   if (value === undefined || !Number.isFinite(value)) {
     return "...";
   }
   return Math.round(value).toLocaleString("zh-CN");
-}
-
-function junkRemaining(
-  used: number | undefined,
-  limit: number | undefined,
-): number | undefined {
-  if (used === undefined || limit === undefined) {
-    return undefined;
-  }
-  return Math.max(0, limit - used);
-}
-
-function countChunks(chunks: Iterable<unknown>): number {
-  let count = 0;
-  for (const _chunk of chunks) {
-    count += 1;
-  }
-  return count;
 }
 
 function sumMaterials(planets: Planet[]): MaterialLine[] {
@@ -130,42 +187,121 @@ function sumMaterials(planets: Planet[]): MaterialLine[] {
   }));
 }
 
-export function PublicGameStatus({
-  homeReady,
-  priceText,
-}: {
-  homeReady: boolean;
-  priceText?: string;
-}) {
+export function PublicGameStatus({ homeReady }: { homeReady: boolean }) {
   const uiManager = useUIManager();
   const [innerRadius, setInnerRadius] = useState<number | undefined>();
   const [tick, setTick] = useState<number | undefined>();
-  const [worldRadius, setWorldRadius] = useState<number | undefined>();
   const [facts, setFacts] = useState<WalletFacts>(EMPTY_FACTS);
   const [planetsOpen, setPlanetsOpen] = useState(false);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
+  const [reward, setReward] = useState<RewardRead | undefined>();
+  const [refreshing, setRefreshing] = useState(false);
   const seenFacts = useRef("");
+  const rewardRead = useRef<(() => Promise<void>) | undefined>(undefined);
+  const rewardSeq = useRef(0);
+  const {
+    network: { publicClient },
+    components: { DFXStarConfig },
+  } = useMUD();
+  const star = useComponentValue(DFXStarConfig, singletonEntity);
+  const pool = star?.scoreStakingPool;
+  const community = star?.community;
+
+  // 两种待领都不在星球同步里。平时 30 秒读一次，刷新按钮立刻再读。
+  useEffect(() => {
+    let stopped = false;
+    const read = async () => {
+      const mine = ++rewardSeq.current;
+      const account = uiManager.getAccount();
+      if (!pool || pool === EMPTY_ADDRESS || !account) {
+        if (!stopped && mine === rewardSeq.current) {
+          setReward(undefined);
+        }
+        return;
+      }
+      const poolAddress = pool as Address;
+      const communityAddress =
+        community && community !== EMPTY_ADDRESS
+          ? (community as Address)
+          : undefined;
+      try {
+        const game = await publicClient.readContract({
+          address: poolAddress,
+          abi: REWARD_ABI,
+          functionName: "getPendingExternalRewards",
+          args: [account as Address],
+        });
+        let communityPending: bigint | undefined;
+        if (communityAddress) {
+          communityPending = await publicClient.readContract({
+            address: poolAddress,
+            abi: REWARD_ABI,
+            functionName: "getPendingCommunityRewards",
+            args: [account as Address],
+          });
+        }
+        if (!stopped && mine === rewardSeq.current) {
+          setReward({
+            pool: poolAddress,
+            community: communityAddress,
+            game,
+            communityPending,
+          });
+        }
+      } catch {
+        if (!stopped && mine === rewardSeq.current) {
+          setReward(undefined);
+        }
+      }
+    };
+    rewardRead.current = read;
+    void read();
+    const timer = window.setInterval(() => void read(), 30_000);
+    return () => {
+      stopped = true;
+      rewardRead.current = undefined;
+      window.clearInterval(timer);
+    };
+  }, [community, pool, publicClient, uiManager]);
+
+  const refresh = () => {
+    if (refreshing) {
+      return;
+    }
+    setRefreshing(true);
+    // 清掉签名，下一帧会把半径、tick、分数这些本地数字重写一遍。
+    seenFacts.current = "";
+    void Promise.resolve(rewardRead.current?.()).finally(() => {
+      setRefreshing(false);
+    });
+  };
+
+  const copyOrder = (text: string, label: string) => {
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label,
+      });
+    });
+  };
 
   useEffect(() => {
     let framed = false;
     let stopped = false;
     let keptRadius: number | undefined;
     let keptTick: number | undefined;
-    let keptWorld: number | undefined;
     const read = () => {
       if (stopped) {
         return;
       }
       let nextRadius = keptRadius;
       let nextTick = keptTick;
-      let nextWorld = keptWorld;
       try {
         nextRadius = Math.round(uiManager.getInnerRadius());
         nextTick = uiManager.getCurrentTick();
-        nextWorld = uiManager.getWorldRadius();
         keptRadius = nextRadius;
         keptTick = nextTick;
-        keptWorld = nextWorld;
         if (!homeReady && !framed && nextRadius > 0) {
           Viewport.getInstance().focus({ x: 0, y: 0 }, nextRadius * 2.4);
           framed = true;
@@ -185,7 +321,6 @@ export function PublicGameStatus({
         // GlobalStats 还没同步到。
       }
       try {
-        next.chunks = countChunks(uiManager.getExploredChunks());
         const account = uiManager.getAccount()?.toLowerCase();
         if (account) {
           const held = heldByAccount(uiManager.getAllOwnedPlanets(), account);
@@ -216,9 +351,7 @@ export function PublicGameStatus({
       const signature = [
         nextRadius,
         nextTick,
-        nextWorld,
         next.users,
-        next.chunks,
         next.planetCount,
         next.artifacts
           .map(
@@ -239,7 +372,6 @@ export function PublicGameStatus({
         seenFacts.current = signature;
         setInnerRadius(nextRadius);
         setTick(nextTick);
-        setWorldRadius(nextWorld);
         setFacts(next);
       }
       requestAnimationFrame(read);
@@ -253,14 +385,15 @@ export function PublicGameStatus({
   return (
     <>
       <Panel data-public-status>
-        <div>相关信息</div>
-        <div>AIPRO 价格 {aiproPriceLabel(priceText)}</div>
+        <TitleRow>
+          <Title>相关信息</Title>
+          <RefreshButton type="button" disabled={refreshing} onClick={refresh}>
+            {refreshing ? "刷新中" : "刷新"}
+          </RefreshButton>
+        </TitleRow>
         <div>收缩圈半径 {innerRadius ?? "..."}</div>
-        <div>世界半径 {worldRadius ?? "..."}</div>
         <div>当前 tick {tick ?? "..."}</div>
-        <div>{homeReady ? "家已写入存档" : "家尚未初始化"}</div>
         <div>总用户 {whole(facts.users)}</div>
-        <div>已挖块 {whole(facts.chunks)}</div>
         <OpenButton
           type="button"
           onClick={() => {
@@ -282,10 +415,66 @@ export function PublicGameStatus({
         <div>
           垃圾额度 {whole(facts.junkUsed)} / {whole(facts.junkLimit)}
         </div>
-        <div>
-          可用额度 {whole(junkRemaining(facts.junkUsed, facts.junkLimit))}
-        </div>
         <div>分数 {whole(facts.score)}</div>
+        <RewardLine>
+          <span>
+            游戏奖励：{reward ? wholeAipro(reward.game) : "..."} AIPRO
+          </span>
+          <ClaimButton
+            type="button"
+            disabled={!reward || reward.game === 0n}
+            onClick={() => {
+              if (!reward || reward.game === 0n) {
+                return;
+              }
+              copyOrder(
+                formatClaimRewardsOrder({
+                  pool: reward.pool,
+                  pendingWei: reward.game,
+                }),
+                "已复制游戏奖励领取单，直接粘贴给 agent",
+              );
+            }}
+          >
+            领取
+          </ClaimButton>
+        </RewardLine>
+        <RewardLine>
+          <span>
+            社区奖励：
+            {reward?.communityPending === undefined
+              ? "..."
+              : wholeAipro(reward.communityPending)}{" "}
+            AIPRO
+          </span>
+          <ClaimButton
+            type="button"
+            disabled={
+              !reward?.community ||
+              reward.communityPending === undefined ||
+              reward.communityPending === 0n
+            }
+            onClick={() => {
+              if (
+                !reward?.community ||
+                reward.communityPending === undefined ||
+                reward.communityPending === 0n
+              ) {
+                return;
+              }
+              copyOrder(
+                formatClaimCommunityOrder({
+                  community: reward.community,
+                  pool: reward.pool,
+                  pendingWei: reward.communityPending,
+                }),
+                "已复制社区奖励领取单，直接粘贴给 agent",
+              );
+            }}
+          >
+            领取
+          </ClaimButton>
+        </RewardLine>
         <div>能量 {whole(facts.energy)}</div>
         <div>银 {whole(facts.silver)}</div>
         {facts.materials.length === 0 ? (

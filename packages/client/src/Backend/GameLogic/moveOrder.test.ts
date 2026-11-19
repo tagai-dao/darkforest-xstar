@@ -5,12 +5,16 @@ import {
   buildMoveOrder,
   formatAddJunkOrder,
   formatBuySilverOrder,
+  formatClaimCommunityOrder,
+  formatClaimRewardsOrder,
   formatClearJunkOrder,
   formatFindArtifactOrder,
+  formatRevertMoveOrder,
   formatUpgradeOrder,
   formatUseArtifactOrder,
   formatWithdrawMaterialOrder,
   formatWithdrawSilverOrder,
+  revertStillInFirstHalf,
 } from "./moveOrder";
 
 const FROM =
@@ -103,6 +107,38 @@ describe("move order", () => {
     expect(order.planetHashHex).toBe(FROM);
     expect(order.amount).toBe("4000");
     expect(order.entryFeeWei).toBe("1000000000000");
+  });
+
+  it("writes a claim for the injected AIPRO on the score pool", () => {
+    const text = formatClaimRewardsOrder({
+      pool: "0xaaF713E1F8478318288836FDeACe0AC28d9316D3",
+      pendingWei: 8888n * 10n ** 18n,
+    });
+    const order = JSON.parse(text.slice("DARKFOREST_CLAIM_REWARDS\n".length));
+
+    expect(text.startsWith("DARKFOREST_CLAIM_REWARDS\n")).toBe(true);
+    expect(order.kind).toBe("darkforest-claim-rewards");
+    expect(order.call).toBe("claimExternalRewards");
+    expect(order.pool).toBe("0xaaF713E1F8478318288836FDeACe0AC28d9316D3");
+    expect(order.pendingWei).toBe((8888n * 10n ** 18n).toString());
+    expect(order.valueWei).toBe("0");
+  });
+
+  it("writes a community claim against the score pool", () => {
+    const text = formatClaimCommunityOrder({
+      community: "0x06AA8A7AEDb0359074388dA43e5D51D62496DBb7",
+      pool: "0xaaF713E1F8478318288836FDeACe0AC28d9316D3",
+      pendingWei: 59524n * 10n ** 18n,
+    });
+    const order = JSON.parse(text.slice("DARKFOREST_CLAIM_COMMUNITY\n".length));
+
+    expect(text.startsWith("DARKFOREST_CLAIM_COMMUNITY\n")).toBe(true);
+    expect(order.kind).toBe("darkforest-claim-community");
+    expect(order.call).toBe("withdrawPoolsRewards");
+    expect(order.community).toBe("0x06AA8A7AEDb0359074388dA43e5D51D62496DBb7");
+    expect(order.pool).toBe("0xaaF713E1F8478318288836FDeACe0AC28d9316D3");
+    expect(order.pendingWei).toBe((59524n * 10n ** 18n).toString());
+    expect(order.valueWei).toBe("0");
   });
 
   it("writes a silver purchase with the tier and the token price", () => {
@@ -271,6 +307,24 @@ describe("move order", () => {
       SPACETYPE_KEY: "1730",
       yMirror: "0",
     });
+  });
+
+  it("writes a recall for the destination the fleet is flying toward", () => {
+    const text = formatRevertMoveOrder({
+      moveId: "42",
+      toPlanetId: TO,
+      entryFeeWei: 1000000000000n,
+    });
+    const order = JSON.parse(text.slice("DARKFOREST_REVERT_MOVE\n".length));
+
+    expect(text.startsWith("DARKFOREST_REVERT_MOVE\n")).toBe(true);
+    expect(order.kind).toBe("darkforest-revert-move");
+    expect(order.call).toBe("df__revertMove");
+    expect(order.moveId).toBe("42");
+    expect(order.toPlanetHash).toBe("11");
+    expect(order.entryFeeWei).toBe("1000000000000");
+    expect(revertStillInFirstHalf(0, 100, 49)).toBe(true);
+    expect(revertStillInFirstHalf(0, 100, 50)).toBe(false);
   });
 
   it("writes a junk clear and whether the planet is also owned", () => {

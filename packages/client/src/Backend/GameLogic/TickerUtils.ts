@@ -26,7 +26,12 @@ export class TickerUtils {
     if (tickerData.paused) {
       return preTickNumber;
     } else {
-      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const currentTimestamp = Math.max(
+        preTimestamp,
+        Math.floor(
+          (Date.now() + this.components.getChainClockOffsetMs()) / 1000,
+        ),
+      );
       const newTickNumber =
         preTickNumber + (currentTimestamp - preTimestamp) * rate;
       return newTickNumber;
@@ -39,11 +44,7 @@ export class TickerUtils {
     if (!tickerData) {
       throw new Error("Game not started");
     }
-    const rate = Number(tickerData.tickRate);
-    const preTickNumber = Number(tickerData.tickNumber);
-    const preTimestamp = Number(tickerData.timestamp);
-
-    return rate;
+    return Number(tickerData.tickRate);
   }
 
   public convertTickToMs(tick: number): number {
@@ -60,7 +61,10 @@ export class TickerUtils {
     if (tickerData.paused) {
       return Date.now() + 1000 * ((tick - preTickNumber) / rate);
     } else {
-      return Math.floor(1000 * ((tick - preTickNumber) / rate + preTimestamp));
+      return Math.floor(
+        1000 * ((tick - preTickNumber) / rate + preTimestamp) -
+          this.components.getChainClockOffsetMs(),
+      );
     }
   }
 
@@ -81,7 +85,11 @@ export class TickerUtils {
       );
     } else {
       return (
-        Math.floor((timestampMs / 1000 - preTimestamp) * rate) + preTickNumber
+        Math.floor(
+          ((timestampMs + this.components.getChainClockOffsetMs()) / 1000 -
+            preTimestamp) *
+            rate,
+        ) + preTickNumber
       );
     }
   }

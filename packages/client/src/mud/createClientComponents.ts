@@ -13,9 +13,17 @@ import type { SetupNetworkResult } from "./setupNetwork";
 
 export type ClientComponents = ReturnType<typeof createClientComponents>;
 
-export function createClientComponents({ components }: SetupNetworkResult) {
+export function createClientComponents({
+  components,
+  latestBlock$,
+}: SetupNetworkResult) {
+  let chainClockOffsetMs = 0;
+  latestBlock$.subscribe((block) => {
+    chainClockOffsetMs = Number(block.timestamp) * 1000 - Date.now();
+  });
+
   return {
     ...components,
-    // add your client components or overrides here
+    getChainClockOffsetMs: () => chainClockOffsetMs,
   };
 }
