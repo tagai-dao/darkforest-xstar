@@ -1,13 +1,13 @@
-import actions from "../../../../../skills/darkforest-local-session/actions.md?raw";
-import aggressive from "../../../../../skills/darkforest-local-session/aggressive.md?raw";
-import conservative from "../../../../../skills/darkforest-local-session/conservative.md?raw";
-import home from "../../../../../skills/darkforest-local-session/home.md?raw";
-import mining from "../../../../../skills/darkforest-local-session/mining.md?raw";
-import nutbox from "../../../../../skills/darkforest-local-session/nutbox.md?raw";
-import offensive from "../../../../../skills/darkforest-local-session/offensive.md?raw";
-import play from "../../../../../skills/darkforest-local-session/play.md?raw";
-import profit from "../../../../../skills/darkforest-local-session/profit.md?raw";
-import skill from "../../../../../skills/darkforest-local-session/SKILL.md?raw";
+import actions from "../../../../../skills/darkforest-punk-player/actions.md?raw";
+import aggressive from "../../../../../skills/darkforest-punk-player/aggressive.md?raw";
+import conservative from "../../../../../skills/darkforest-punk-player/conservative.md?raw";
+import home from "../../../../../skills/darkforest-punk-player/home.md?raw";
+import mining from "../../../../../skills/darkforest-punk-player/mining.md?raw";
+import nutbox from "../../../../../skills/darkforest-punk-player/nutbox.md?raw";
+import offensive from "../../../../../skills/darkforest-punk-player/offensive.md?raw";
+import play from "../../../../../skills/darkforest-punk-player/play.md?raw";
+import profit from "../../../../../skills/darkforest-punk-player/profit.md?raw";
+import skill from "../../../../../skills/darkforest-punk-player/SKILL.md?raw";
 
 const files = [
   ["SKILL.md", skill],

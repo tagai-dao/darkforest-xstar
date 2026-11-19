@@ -23,10 +23,10 @@ export type GameSaveFiles = {
   pendingTxs: PendingTxFile[];
 };
 
+// 一局游戏由链 ID 和 World 地址确定。钱包子目录放在这一局下面，同一台电脑可以放多个钱包。
 export type GameId = {
   chainId: number;
   world: string;
-  season: number;
 };
 
 export type WalletSaveRef = {
@@ -42,7 +42,7 @@ function address(value: string): string {
 }
 
 export function gameFolderName(game: GameId): string {
-  return `${game.chainId}-${address(game.world)}-${game.season}`;
+  return `${game.chainId}-${address(game.world)}`;
 }
 
 export function walletFolderName(ref: WalletSaveRef): string {
@@ -50,14 +50,13 @@ export function walletFolderName(ref: WalletSaveRef): string {
 }
 
 export function parseGameFolderName(name: string): GameId | undefined {
-  const match = /^(\d+)-(0x[0-9a-fA-F]{40})-(\d+)$/.exec(name);
+  const match = /^(\d+)-(0x[0-9a-fA-F]{40})$/.exec(name);
   if (!match) {
     return undefined;
   }
   return {
     chainId: Number(match[1]),
     world: address(match[2]),
-    season: Number(match[3]),
   };
 }
 
@@ -67,56 +66,38 @@ export function parseGameFile(text: string): GameId {
     world?: unknown;
     season?: unknown;
   };
-  if (
-    typeof raw.chainId !== "number" ||
-    typeof raw.world !== "string" ||
-    typeof raw.season !== "number"
-  ) {
-    throw new Error("game.json 缺少链、世界或赛季");
+  // 带季号的旧存档属于已经不用的赛季机制，不再识别。
+  if (raw.season !== undefined) {
+    throw new Error("这份存档是旧版本的，请选择新的游戏目录");
+  }
+  if (typeof raw.chainId !== "number" || typeof raw.world !== "string") {
+    throw new Error("game.json 缺少链或世界");
   }
   return {
     chainId: raw.chainId,
     world: address(raw.world),
-    season: raw.season,
   };
 }
 
-export type LiveSeason = {
+// 链上当前这一局：链 ID 和 World 地址。
+export type LiveGame = {
   chainId: number;
-  open: boolean;
   world: string;
-  season: number;
 };
 
-// 文件里的局必须和链上正在开放的那一局是同一个。季号更大说明还没轮到，其余对不上都算已经结束。
+// 存档的链和 World 必须和链上当前这一局一致，否则就是别的局。
 export function decideGameStatus(
   file: GameId,
-  live: LiveSeason,
-): "current" | "not-started" | "ended" {
-  const liveWorld = live.world.toLowerCase();
-  const notOpened =
-    !live.open ||
-    live.season === 0 ||
-    liveWorld === "0x0000000000000000000000000000000000000000";
-  if (notOpened) {
-    return "not-started";
-  }
-  if (
-    file.chainId === live.chainId &&
-    file.world === liveWorld &&
-    file.season === live.season
-  ) {
-    return "current";
-  }
-  if (file.world === liveWorld && file.season > live.season) {
-    return "not-started";
-  }
-  return "ended";
+  live: LiveGame,
+): "current" | "ended" {
+  const isSameGame =
+    file.chainId === live.chainId && file.world === live.world.toLowerCase();
+  return isSameGame ? "current" : "ended";
 }
 
 export const endedGameNotice = {
   title: "游戏已经结束",
-  detail: "请让 agent 加入新一季的游戏。",
+  detail: "这份存档不属于链上当前这一局。请让 agent 在当前游戏里重新加入。",
 } as const;
 
 // 家写进目录时，这只钱包已经在当时的链上出过生。新一局里出生星会回到 0。
@@ -134,7 +115,6 @@ export function serializeGameFile(game: GameId): string {
   return JSON.stringify({
     chainId: game.chainId,
     world: address(game.world),
-    season: game.season,
   });
 }
 

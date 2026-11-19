@@ -23,9 +23,6 @@ import { privateKeyToAccount } from "viem/accounts";
 const LOCKER_ABI = parseAbi([
   "function nft() view returns (address)",
   "function handleRegistry() view returns (address)",
-  "function activeWorld() view returns (address)",
-  "function activeSeason() view returns (uint8)",
-  "function isSeasonOpen() view returns (bool)",
   "function isPlayerInActiveSeason(address player) view returns (bool)",
   "function stakedTokenOf(address player) view returns (uint256)",
   "function stake(uint256 tokenId)",
@@ -47,12 +44,9 @@ const HANDLE_ABI = parseAbi([
 type GamePassRequirement = {
   isEnabled: boolean;
   isLoading: boolean;
-  isSeasonOpen: boolean;
   isJoined: boolean;
   hasNft: boolean;
   hasHandle: boolean;
-  activeWorld?: Address;
-  activeSeason?: number;
   stakedTokenId?: bigint;
   error?: string;
 };
@@ -203,7 +197,6 @@ export const RedPillRegisterPlayer = ({
     useState<GamePassRequirement>({
       isEnabled: false,
       isLoading: false,
-      isSeasonOpen: false,
       isJoined: false,
       hasNft: false,
       hasHandle: false,
@@ -348,7 +341,6 @@ export const RedPillRegisterPlayer = ({
       setGamePassRequirement({
         isEnabled: !!passAddress,
         isLoading: false,
-        isSeasonOpen: false,
         isJoined: false,
         hasNft: false,
         hasHandle: false,
@@ -364,35 +356,12 @@ export const RedPillRegisterPlayer = ({
     }));
 
     try {
-      const [
-        isSeasonOpen,
-        isJoined,
-        activeWorld,
-        activeSeason,
-        nft,
-        registry,
-        stakedTokenId,
-      ] = await Promise.all([
-        publicClient.readContract({
-          address: passAddress,
-          abi: LOCKER_ABI,
-          functionName: "isSeasonOpen",
-        }),
+      const [isJoined, nft, registry, stakedTokenId] = await Promise.all([
         publicClient.readContract({
           address: passAddress,
           abi: LOCKER_ABI,
           functionName: "isPlayerInActiveSeason",
           args: [playerAddress],
-        }),
-        publicClient.readContract({
-          address: passAddress,
-          abi: LOCKER_ABI,
-          functionName: "activeWorld",
-        }),
-        publicClient.readContract({
-          address: passAddress,
-          abi: LOCKER_ABI,
-          functionName: "activeSeason",
         }),
         publicClient.readContract({
           address: passAddress,
@@ -425,12 +394,9 @@ export const RedPillRegisterPlayer = ({
       setGamePassRequirement({
         isEnabled: true,
         isLoading: false,
-        isSeasonOpen,
         isJoined,
         hasNft: ownedTokenId !== undefined,
         hasHandle: handle.length > 0,
-        activeWorld,
-        activeSeason: Number(activeSeason),
         stakedTokenId,
       });
     } catch (error) {
@@ -438,7 +404,6 @@ export const RedPillRegisterPlayer = ({
       setGamePassRequirement({
         isEnabled: true,
         isLoading: false,
-        isSeasonOpen: false,
         isJoined: false,
         hasNft: false,
         hasHandle: false,
@@ -458,12 +423,7 @@ export const RedPillRegisterPlayer = ({
     playerAddress: Address,
     walletClient: WalletClient,
   ) => {
-    const [isSeasonOpen, alreadyJoined, nft, registry] = await Promise.all([
-      publicClient.readContract({
-        address: passAddress,
-        abi: LOCKER_ABI,
-        functionName: "isSeasonOpen",
-      }),
+    const [alreadyJoined, nft, registry] = await Promise.all([
       publicClient.readContract({
         address: passAddress,
         abi: LOCKER_ABI,
@@ -482,9 +442,6 @@ export const RedPillRegisterPlayer = ({
       }),
     ]);
 
-    if (!isSeasonOpen) {
-      throw new Error("当前轮还没开放。等管理员开始这一轮后再质押。");
-    }
     if (alreadyJoined) return;
 
     const handle = await publicClient.readContract({
@@ -500,7 +457,7 @@ export const RedPillRegisterPlayer = ({
     const tokenId = await findOwnedNft(nft, playerAddress);
     if (tokenId === undefined) {
       throw new Error(
-        "这只钱包还没有 AIPRO NFT。先取得一枚，再质押进当前这一轮。",
+        "这只钱包还没有 AIPRO NFT。先取得一枚，再质押进这局游戏。",
       );
     }
 
@@ -528,7 +485,7 @@ export const RedPillRegisterPlayer = ({
       });
     }
 
-    setRegistrationMessage("把 AIPRO NFT 质押进当前这一轮...");
+    setRegistrationMessage("把 AIPRO NFT 质押进这局游戏...");
     await writeAndWait(walletClient, {
       address: passAddress,
       abi: LOCKER_ABI,
@@ -541,8 +498,7 @@ export const RedPillRegisterPlayer = ({
     const message = error instanceof Error ? error.message : String(error);
     if (
       message.includes("没有 Binance handle") ||
-      message.includes("还没有 AIPRO NFT") ||
-      message.includes("当前轮还没开放")
+      message.includes("还没有 AIPRO NFT")
     ) {
       return message;
     }
@@ -650,22 +606,18 @@ export const RedPillRegisterPlayer = ({
     let accessStatus: React.ReactNode;
     if (gamePassRequirement.isLoading) {
       accessStatus = "正在检查...";
-    } else if (!gamePassRequirement.isSeasonOpen) {
-      accessStatus = (
-        <Red>当前轮还没开放。轮次结束后，已质押的 NFT 才能取出。</Red>
-      );
     } else if (gamePassRequirement.isJoined) {
       accessStatus = (
         <Green>
           已质押 #{gamePassRequirement.stakedTokenId?.toString() ?? "-"}
-          ，可以进入这一轮
+          ，可以进入这局游戏
         </Green>
       );
     } else if (!gamePassRequirement.hasHandle) {
       accessStatus = <Red>这只钱包没有 Binance handle，不能质押。</Red>;
     } else if (gamePassRequirement.hasNft) {
       accessStatus = (
-        <Green>已有 AIPRO NFT，注册时会把它质押进当前这一轮。</Green>
+        <Green>已有 AIPRO NFT，注册时会把它质押进这局游戏。</Green>
       );
     } else {
       accessStatus = <Red>还没有 AIPRO NFT。先取得一枚再来注册。</Red>;
@@ -678,12 +630,11 @@ export const RedPillRegisterPlayer = ({
         </div>
         <div>
           这只钱包需要有 Binance handle，并持有一枚 AIPRO
-          NFT。注册时会把那一枚质押进当前轮。本轮结束前不能取出。
+          NFT。注册时会把那一枚质押进这局游戏。质押的 NFT
+          可以随时取出，取出后这只钱包不能行动。
         </div>
         <div className="mt-3 space-y-1">
           <div>状态：{accessStatus}</div>
-          <div>当前世界：{gamePassRequirement.activeWorld ?? "-"}</div>
-          <div>当前轮：{gamePassRequirement.activeSeason ?? "-"}</div>
         </div>
         {gamePassRequirement.error && (
           <div className="mt-3 rounded border border-yellow-400 bg-yellow-900/30 p-3 text-yellow-200">

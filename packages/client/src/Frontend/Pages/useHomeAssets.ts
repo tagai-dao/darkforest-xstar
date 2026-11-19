@@ -36,8 +36,6 @@ const nftAbi = parseAbi([
 
 const lockerAbi = parseAbi([
   "function nft() view returns (address)",
-  "function isSeasonOpen() view returns (bool)",
-  "function activeSeason() view returns (uint8)",
   "function stakedTokenOf(address player) view returns (uint256)",
 ]);
 
@@ -62,8 +60,6 @@ export type HomeAssets = {
   tokenAddress?: string;
   tokenBalance?: string;
   pendingRewards?: string;
-  seasonLabel: string;
-  season?: number;
   nfts: NftRow[];
 };
 
@@ -71,7 +67,6 @@ const EMPTY: HomeAssets = {
   pools: [],
   poolNote: "正在读取矿池",
   tokenSymbol: "AIPRO",
-  seasonLabel: "正在读取赛季",
   nfts: [],
 };
 
@@ -204,7 +199,6 @@ export function useHomeAssets(wallet: string | undefined): HomeAssets {
           : "Nutbox 社区还没接到这局里",
         tokenSymbol: "AIPRO",
         tokenAddress: paymentToken,
-        seasonLabel: passAddress ? "轮次状态读不到" : "入场质押还没配置",
         nfts: [],
       };
 
@@ -260,22 +254,8 @@ export function useHomeAssets(wallet: string | undefined): HomeAssets {
             abi: lockerAbi,
             functionName: "nft",
           });
-          const open = await publicClient.readContract({
-            address: passAddress,
-            abi: lockerAbi,
-            functionName: "isSeasonOpen",
-          });
-          const season = await publicClient.readContract({
-            address: passAddress,
-            abi: lockerAbi,
-            functionName: "activeSeason",
-          });
-          next.seasonLabel = open
-            ? `第 ${Number(season)} 轮开放`
-            : "本轮已结束";
-          if (open) next.season = Number(season);
         } catch {
-          next.seasonLabel = "轮次状态读不到";
+          // 读不到 NFT 合约地址时，NFT 那一栏就不显示。
         }
       }
 
@@ -349,7 +329,6 @@ export function useHomeAssets(wallet: string | undefined): HomeAssets {
         setAssets({
           ...EMPTY,
           poolNote: "链上暂时读不到",
-          seasonLabel: "链上暂时读不到",
         });
       }
     });

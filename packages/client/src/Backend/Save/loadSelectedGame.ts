@@ -13,8 +13,6 @@ import {
   playedSaveBelongsToChain,
 } from "./GameSave";
 
-const GAME_PASS_TABLE =
-  "0x7462646600000000000000000000000047616d65506173734e46540000000000";
 const SPAWN_PLANET_TABLE =
   "0x74626466000000000000000000000000537061776e506c616e65740000000000";
 
@@ -32,30 +30,6 @@ const worldAbi = [
       { name: "encodedLengths", type: "bytes32" },
       { name: "dynamicData", type: "bytes" },
     ],
-  },
-] as const;
-
-const passAbi = [
-  {
-    type: "function",
-    name: "isSeasonOpen",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "bool" }],
-  },
-  {
-    type: "function",
-    name: "activeWorld",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "address" }],
-  },
-  {
-    type: "function",
-    name: "activeSeason",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "uint256" }],
   },
 ] as const;
 
@@ -125,11 +99,6 @@ async function readFiles(
   return files;
 }
 
-function addressFromStatic(data: Hex): string {
-  const hex = data.toLowerCase().replace(/^0x/, "");
-  return `0x${hex.slice(-40)}`;
-}
-
 function addressKey(player: string): Hex {
   return `0x${player.toLowerCase().replace(/^0x/, "").padStart(64, "0")}`;
 }
@@ -139,42 +108,6 @@ function uint256FromStatic(data: Hex): bigint {
     return 0n;
   }
   return BigInt(data);
-}
-
-async function readLiveSeason(world: string): Promise<{
-  open: boolean;
-  world: string;
-  season: number;
-}> {
-  const client = createPublicClient({
-    chain: mudFoundry,
-    transport: http("http://localhost:8545"),
-  });
-  const record = await client.readContract({
-    address: world as Hex,
-    abi: worldAbi,
-    functionName: "getRecord",
-    args: [GAME_PASS_TABLE as Hex, []],
-  });
-  const pass = addressFromStatic(record[0]);
-  const [open, activeWorld, activeSeason] = await Promise.all([
-    client.readContract({
-      address: pass as Hex,
-      abi: passAbi,
-      functionName: "isSeasonOpen",
-    }),
-    client.readContract({
-      address: pass as Hex,
-      abi: passAbi,
-      functionName: "activeWorld",
-    }),
-    client.readContract({
-      address: pass as Hex,
-      abi: passAbi,
-      functionName: "activeSeason",
-    }),
-  ]);
-  return { open, world: activeWorld, season: Number(activeSeason) };
 }
 
 async function readSpawnPlanet(world: string, player: string): Promise<bigint> {
@@ -227,7 +160,7 @@ export async function loadSelectedGame(
         ok: false,
         reason: "other",
         title: "游戏还未开始",
-        detail: "这个赛季目录里还没有钱包存档。",
+        detail: "这个游戏目录里还没有钱包存档。",
       };
     }
     if (wallets.length > 1) {
@@ -235,7 +168,7 @@ export async function loadSelectedGame(
         ok: false,
         reason: "other",
         title: "请改选钱包目录",
-        detail: "这个赛季目录里有多个钱包。请选择其中一个钱包目录。",
+        detail: "这个游戏目录里有多个钱包。请选择其中一个钱包目录。",
       };
     }
     wallet = wallets[0];
@@ -287,28 +220,8 @@ export async function loadSelectedGame(
     };
   }
 
-  onProgress({ done: 1, total: 1, label: "正在读取链上的赛季" });
-  let live;
-  try {
-    live = await readLiveSeason(liveGame.world);
-  } catch {
-    return {
-      ok: false,
-      reason: "other",
-      title: "读不到当前游戏",
-      detail: "链上读不到这一局的入场质押。",
-    };
-  }
-
-  const status = decideGameStatus(game, { chainId: liveGame.chainId, ...live });
-  if (status === "not-started") {
-    return {
-      ok: false,
-      reason: "other",
-      title: "游戏还未开始",
-      detail: `存档是第 ${game.season} 季，链上当前季号是 ${live.season}。`,
-    };
-  }
+  // 链 ID 和 World 对得上才是这一局；对不上的存档不再使用。
+  const status = decideGameStatus(game, liveGame);
   if (status === "ended") {
     return { ok: false, reason: "ended", ...endedGameNotice };
   }

@@ -268,20 +268,9 @@ function useMatchFacts(): { tick?: number; players?: number } {
   };
 }
 
-function GameData({
-  season,
-  tick,
-  players,
-}: {
-  season?: number;
-  tick?: number;
-  players?: number;
-}) {
+function GameData({ tick, players }: { tick?: number; players?: number }) {
   return (
     <>
-      <FactLine>
-        赛季 {season === undefined ? "未开放" : `第 ${season} 季`}
-      </FactLine>
       <FactLine>tick {whole(tick)}</FactLine>
       <FactLine>玩家数 {whole(players)}</FactLine>
     </>
@@ -303,7 +292,7 @@ function AgentSkill() {
     <>
       <SkillRow>
         <SkillLink href={skillUrl} target="_blank" rel="noreferrer">
-          darkforest-local-session
+          darkforest-punk-player
         </SkillLink>
         <CopyButton
           type="button"
@@ -370,11 +359,11 @@ export function HomeLobby({
           <Card>
             <CardTitle>怎么玩</CardTitle>
             <List>
-              <li>从家出发，在本地把周围的星球挖出来。</li>
+              <li>从家出发，在本地探索周围的星球。</li>
               <li>派出舰队占领星球，搬运能量和银。</li>
               <li>银进入 Nutbox 矿池，按质押份额领取 AIPRO。</li>
               <li>
-                有 Binance handle 的钱包，把 AIPRO NFT 质押进当前轮才能玩。
+                有 Binance handle 的钱包，把 AIPRO NFT 质押进这局游戏才能玩。
               </li>
             </List>
           </Card>
@@ -422,11 +411,7 @@ export function HomeLobby({
         <Facts>
           <Card>
             <CardTitle>游戏数据</CardTitle>
-            <GameData
-              season={assets.season}
-              tick={match.tick}
-              players={match.players}
-            />
+            <GameData tick={match.tick} players={match.players} />
           </Card>
           <Card>
             <CardTitle>Nutbox 矿池</CardTitle>
@@ -458,7 +443,6 @@ export function HomeLobby({
           </Card>
           <Card>
             <CardTitle>NFT</CardTitle>
-            <FactLine>{assets.seasonLabel}</FactLine>
             {assets.nfts.length === 0 ? (
               <FactLine>链上还没有可展示的 NFT。</FactLine>
             ) : (

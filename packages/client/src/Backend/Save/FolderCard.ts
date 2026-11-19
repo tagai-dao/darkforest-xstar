@@ -4,7 +4,6 @@ export type FolderCard = {
   folderName: string;
   address?: string;
   chainId?: number;
-  season?: number;
   homeX?: number;
   homeY?: number;
   priceText?: string;
@@ -66,9 +65,8 @@ export function folderCardFromFiles(
     try {
       const game = parseGameFile(files.game);
       card.chainId = game.chainId;
-      card.season = game.season;
     } catch {
-      // 赛季文件对不上时，首页仍显示目录名。
+      // 游戏文件对不上时，首页仍显示目录名。
     }
   }
   const home = readHome(files.homes);

@@ -77,6 +77,23 @@ describe("game docs", () => {
     });
   });
 
+  it("lists the innate stat doubles after the planet type", () => {
+    const planets = findChapter("planets");
+    const table = planets.blocks.find(
+      (block) => block.kind === "table" && block.headers[0] === "属性",
+    );
+    expect(table).toMatchObject({
+      headers: ["属性", "加成"],
+      rows: [
+        ["能量上限", "×2"],
+        ["能量成长", "×2"],
+        ["射程", "×2"],
+        ["速度", "×2"],
+        ["防御", "×2"],
+      ],
+    });
+  });
+
   it("explains the foundry prospect window", () => {
     const planets = findChapter("planets");
     expect(chapterHeadings(planets).map((heading) => heading.id)).toContain(
@@ -169,7 +186,7 @@ describe("game docs", () => {
       "goal",
       "round",
       "contracts",
-      "season",
+      "entry",
     ]);
   });
 });
