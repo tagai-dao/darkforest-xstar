@@ -130,7 +130,7 @@ b_radiusx1000 = 75000000
 c_speed = 87
 
 [guild_config]
-a_create_fee = 5000000000000000  # 0.005 ETH
+a_create_fee = 20000000000000000  # 0.02 BNB
 b_max_members = 6
 c_cooldown_ticks=14400  # 14400 seconds
 # c_cooldown_ticks = 60   # 60 seconds
@@ -182,10 +182,10 @@ c_ABANDON_RANGE_CHANGE_PERCENT = 150
 d_SPACE_JUNK_FREE_ALLOCATION = 1 # 1 means 1000 SPACE_JUNK
 e_SPACE_JUNK_LINEAR_MIN_PURCHASE = 2
 f_SPACE_JUNK_LINEAR_MAX_PURCHASE = 8
-g_SPACE_JUNK_LINEAR_BASE_PRICE = 1000000000000000
+g_SPACE_JUNK_LINEAR_BASE_PRICE = 3000000000000000 # 0.003 BNB
 h_SPACE_JUNK_QUADRATIC_MIN_PURCHASE = 9
 i_SPACE_JUNK_QUADRATIC_MAX_PURCHASE = 1000
-j_SPACE_JUNK_QUADRATIC_BASE_PRICE = 1000000000000000
+j_SPACE_JUNK_QUADRATIC_BASE_PRICE = 3000000000000000 # 0.003 BNB
 
 # The amount of junk that each level of planet gives the player when moving to it for the first time.
 # Don't forget to update getJunk function in PlanetLabels.tsx

@@ -123,9 +123,9 @@ Clearing junk returns that cost. The caller must be the junk owner. If this wall
 
 Energy, silver, and materials grow only while the owner and the junk owner are the same wallet and the ticker is advancing. Move, upgrade, withdraw, and buy silver revert while those two differ. A capture changes the owner and leaves the junk owner in place, so the captured planet cannot launch until this wallet registers it. The previous wallet keeps that quota until then, or until it clears.
 
-The limit can be raised. `buy-junk` takes a new allocation from 2 through 1000. The stored limit becomes that allocation times 1000, so the ceiling is 1,000,000. The wallet must already be registered. The cumulative price is 0 at allocation 1, `(allocation - 1) × 0.001 ETH` from 2 through 8, and `0.007 ETH + (allocation - 8)² × 0.001 ETH` from 9 upward. Send the difference between the new price and the current price. A step from 1 to 2 costs 0.001 ETH. Extra ETH is not returned. Ask the owner before the first purchase.
+The limit can be raised. `buy-junk` takes a new allocation from 2 through 1000. The stored limit becomes that allocation times 1000, so the ceiling is 1,000,000. The wallet must already be registered. The cumulative price is 0 at allocation 1, `(allocation - 1) × 0.003 BNB` from 2 through 8, and `0.021 BNB + (allocation - 8)² × 0.003 BNB` from 9 upward. Send the difference between the new price and the current price. A step from 1 to 2 costs 0.003 BNB. Extra BNB is not returned. Ask the owner before the first purchase.
 
-That ETH, the entry fee on other calls, and the 0.005 ETH guild-creation fee all stay in the world contract's `df` namespace balance. `buy-junk` does not record the payment in `RevenueStats`. The namespace owner can later withdraw the whole balance with `GuildSystem.withdraw`. None of it is staked, and none of it is paid to other players.
+That BNB, the entry fee on other calls, and the 0.02 BNB guild-creation fee all stay in the world contract's `df` namespace balance. `buy-junk` does not record the payment in `RevenueStats`. The namespace owner can later withdraw the whole balance with `GuildSystem.withdraw`. None of it is staked, and none of it is paid to other players.
 
 ## 6. Voyage and combat
 
@@ -216,6 +216,6 @@ One game is one world and the pool bound to that world. `PlayerScore` starts at 
 
 Artifacts change one planet's defense, range, speed, or energy, or reveal and destroy planets in a window. The installed four are [artifacts.md](artifacts.md). A cannon weakens defense while it charges, then buffs the next move. A wormhole shortens distance. A bloom filter fills energy to the cap and breaks. A pink bomb reveals the launcher and can destroy planets in a radius.
 
-A guild lets members reinforce each other instead of fighting. Creating one costs 0.005 ETH and that ETH follows the junk payment into the namespace balance. Ask the owner before the first guild purchase. The twelve calls are in [actions.md](actions.md).
+A guild lets members reinforce each other instead of fighting. Creating one costs 0.02 BNB and that BNB follows the junk payment into the namespace balance. Ask the owner before the first guild purchase. The twelve calls are in [actions.md](actions.md).
 
 Reveal publishes coordinates. The cooldown is 14400 stored ticks. A reveal does not move energy, silver, or stake. Recall is allowed during the first half of a trip and returns a fleet with half the energy and half the silver. While the ticker is paused at 0, a fleet sent at tick 0 can be recalled. Both calls are in [actions.md](actions.md).

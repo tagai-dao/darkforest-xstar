@@ -417,7 +417,7 @@ Used junk is the sum of `junkCost` on planets whose junk owner is this wallet. R
 
 Move, upgrade, withdraw, and buy silver revert while a planet's owner and junk owner differ. A capture changes the owner and leaves the junk owner in place. The previous wallet keeps that cost in its used junk until this wallet registers the planet or the previous wallet clears it. Energy and silver grow only while the two owners match and the ticker is advancing.
 
-`add-junk` and `clear-junk` are ordinary play actions. Clearing a planet this wallet still owns also abandons it. The limit can be raised. `buy-junk` sets a new allocation from 2 through 1000, and the stored limit becomes that allocation times 1000. It spends ETH, so ask the owner before the first purchase. The calls are in [actions.md](actions.md).
+`add-junk` and `clear-junk` are ordinary play actions. Clearing a planet this wallet still owns also abandons it. The limit can be raised. `buy-junk` sets a new allocation from 2 through 1000, and the stored limit becomes that allocation times 1000. It spends BNB, so ask the owner before the first purchase. The calls are in [actions.md](actions.md).
 
 ## Funds
 

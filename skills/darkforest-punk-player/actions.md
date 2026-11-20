@@ -10,7 +10,7 @@ The `strategy` field is the current filename, such as `aggressive.md`. An order 
 
 ## Recording a pasted order
 
-A pasted order is the owner's own call. Write its line after the receipt with `time`, `action`, `detail`, and `tx`, and `to` on a move. `detail` carries every parameter the block carried, so the owner can read what was sent without opening the block. Write amounts in display units: a chain amount in the block divided by 1000, and `pendingWei` or a price in wei divided by 10^18 as AIPRO. Do not write `circuit`, a proof, or `entryFeeWei`.
+A pasted order is the owner's own call. Write its line after the receipt with `time`, `action`, `detail`, and `tx`, and `to` on a move. `detail` carries every parameter the block carried, so the owner can read what was sent without opening the block. Write amounts in display units: a chain amount in the block divided by 1000, and `pendingWei` or a price in wei divided by 10^18 as AIPRO. `valueWei` on a junk purchase divided by 10^18 is BNB. Do not write `circuit`, a proof, or `entryFeeWei`.
 
 Write a planet as `(x, y)` so the page can jump to it. A block that carries coordinates in `circuit` gives them as field elements. A value above half of `21888242871839275222246405745257275088548364400416034343698204186575808495617` is a negative coordinate: subtract that number. When the block has no coordinates, use them from a planet file this turn already read, such as `owned.json` or `homeLocations.json`. If none has that planet, write its `planetHashHex`.
 
@@ -24,6 +24,7 @@ Write a planet as `(x, y)` so the page can jump to it. A block that carries coor
 | `DARKFOREST_UPGRADE`           | `upgrade`                                                                   | `range +<rangeTimes>, speed +<speedTimes>, defense +<defenseTimes> on <planet>`                                                                                                            |
 | `DARKFOREST_ADD_JUNK`          | `add-junk`                                                                  | `<planet>, biomebase <biomebase>, junk <used> of <limit>`                                                                                                                                  |
 | `DARKFOREST_CLEAR_JUNK`        | `clear-junk`                                                                | `<planet>, abandoned` when `ownsPlanet` is true, otherwise `<planet>, quota returned`                                                                                                      |
+| `DARKFOREST_BUY_JUNK`          | `buy-junk`                                                                  | `limit <currentAllocation * 1000> to <limit>, paid <valueWei as BNB> BNB`                                                                                                                  |
 | `DARKFOREST_FIND_ARTIFACT`     | `prospect` when `phase` is `prospect-then-find`, then `find-artifact`       | `<planet>, biomebase <biomebase>`                                                                                                                                                          |
 | `DARKFOREST_USE_ARTIFACT`      | `charge-artifact`, `activate-artifact`, `shutdown-artifact`, or `land-bomb` | `artifact #<artifactId> on <planet>, <dataKind>`. For `wormhole` add `, to <targetPlanet>`. For `reveal` add `, reveals <targetPlanet>`. For `land-bomb` the planet is the hit target.     |
 | `DARKFOREST_CLAIM_REWARDS`     | `claim`                                                                     | `<pendingWei as AIPRO> AIPRO game reward from pool <pool>`                                                                                                                                 |
@@ -45,7 +46,7 @@ A message with several orders writes one line per receipt, in the order the call
 
 ## Catalog
 
-These are the player calls. `legacyMove`, `legacyUpgradePlanet`, `legacyRevealLocation`, `findArtifact`, and `initializePlayer` run the same body as the current function. Send the current name. A call marked "ask" locks the AIPRO NFT or spends AIPRO or ETH beyond the entry fee, so ask the owner before the first one.
+These are the player calls. `legacyMove`, `legacyUpgradePlanet`, `legacyRevealLocation`, `findArtifact`, and `initializePlayer` run the same body as the current function. Send the current name. A call marked "ask" locks the AIPRO NFT or spends AIPRO or BNB beyond the entry fee, so ask the owner before the first one.
 
 | Action                              | Call                                                                 | Ask            |
 | ----------------------------------- | -------------------------------------------------------------------- | -------------- |
@@ -139,11 +140,13 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 ## Buy a higher junk limit
 
-**Send.** World `df__buyJunk(uint256 allocation)` with `value` equal to the fee below. This call does not charge the entry fee. Ask the owner before the first purchase. Do not write `spends.ndjson`. `allocation` is the new cap counted in thousands. The stored limit becomes `allocation * 1000`. After spawn the allocation is 1, so the limit is 1000. The argument must be at least the current allocation and at most 1000. The cumulative fee, in wei, is 0 at allocation 1, `(allocation - 1) * 10^15` from 2 through 8, and `7 * 10^15 + (allocation - 8)^2 * 10^15` from 9 upward. Send the difference between the new fee and the current fee.
+**Send.** World `df__buyJunk(uint256 allocation)` with `value` equal to the fee below. This call does not charge the entry fee. Ask the owner before the first purchase. Do not write `spends.ndjson`. `allocation` is the new cap counted in thousands. The stored limit becomes `allocation * 1000`. After spawn the allocation is 1, so the limit is 1000. The argument must be at least the current allocation and at most 1000. The cumulative fee, in BNB, is 0 at allocation 1, `(allocation - 1) * 0.003` from 2 through 8, and `0.021 + (allocation - 8)^2 * 0.003` from 9 upward. Send the difference between the new fee and the current fee, as wei: that BNB amount times 10^18.
 
 **Effect.** Only the limit changes. Used junk stays the same. No AIPRO moves.
 
-**Impact.** A higher limit is what lets the next `add-junk` succeed after `JunkLimitExceeded`. The ETH does not return. Record `buy-junk` with the new limit and the ETH paid.
+**Impact.** A higher limit is what lets the next `add-junk` succeed after `JunkLimitExceeded`. The BNB does not return. Record `buy-junk` with the new limit and the BNB paid.
+
+**Pasted order.** The page copies a `DARKFOREST_BUY_JUNK` block from the 购买 button beside 垃圾额度. Follow [SKILL.md](SKILL.md) under Pasted junk purchase and send it in the same turn it is read. Call `df__buyJunk(allocation)` and attach `valueWei`. A pasted purchase is the owner's own choice, so do not ask first.
 
 ## Claim injected rewards
 
@@ -243,7 +246,7 @@ These are two calls. Prospect does not create an artifact. Find does. Send them 
 
 ## Guild
 
-**Send.** `df__createGuild(string name)` costs `5000000000000000` wei (0.005 ETH). Ask before paying. The caller must be registered and not already in a guild. `df__inviteToGuild(address)` requires officer or leader; the invitee must be registered and guildless. `df__acceptInvitation(uint8 guildId)` requires that id in this wallet's invitations. `df__applyToGuild(uint8 guildId)` records an application. Both check the 14400-tick leave cooldown. `df__approveApplication(address)` requires officer or leader. `df__leaveGuild()` is for a member or officer. `df__kickMember(address)`, `df__transferGuildLeadership(address)`, `df__disbandGuild()`, and `df__setMemberRole(address, uint8 role)` are leader only. Role 1 is member and role 2 is officer. `df__setGrant(uint8 role)` is any member and does not change the caller's role.
+**Send.** `df__createGuild(string name)` costs `20000000000000000` wei (0.02 BNB). Ask before paying. The caller must be registered and not already in a guild. `df__inviteToGuild(address)` requires officer or leader; the invitee must be registered and guildless. `df__acceptInvitation(uint8 guildId)` requires that id in this wallet's invitations. `df__applyToGuild(uint8 guildId)` records an application. Both check the 14400-tick leave cooldown. `df__approveApplication(address)` requires officer or leader. `df__leaveGuild()` is for a member or officer. `df__kickMember(address)`, `df__transferGuildLeadership(address)`, `df__disbandGuild()`, and `df__setMemberRole(address, uint8 role)` are leader only. Role 1 is member and role 2 is officer. `df__setGrant(uint8 role)` is any member and does not change the caller's role.
 
 **Effect.** Create makes this wallet the leader and copies its withdrawn-silver total into the guild silver. Invite, apply, and approve only change membership records. Accept and approve add a member. Leave and kick remove a member. A voluntary leave starts the cooldown. A kick does not. Transfer swaps the leader. Disband reverts while any other member remains, then marks the guild disbanded. Set-role changes a member between member and officer. Set-grant stores a grant value only.
 
@@ -259,11 +262,11 @@ These are two calls. Prospect does not create an artifact. Find does. Send them 
 
 ## GPT credits
 
-**Send.** `df__buyGPTTokens(uint256 amount)` costs `amount * 10^13` wei, 0.00001 ETH per credit. Ask before the first purchase. `df__sendGPTTokens(address, uint256)` and `df__spendGPTTokens(uint256)` move or decrease an existing balance.
+**Send.** `df__buyGPTTokens(uint256 amount)` costs `amount * 10^13` wei, 0.00001 BNB per credit. Ask before the first purchase. `df__sendGPTTokens(address, uint256)` and `df__spendGPTTokens(uint256)` move or decrease an existing balance.
 
 **Effect.** Buy increases the `GPTTokens` counter. Send moves that counter to another address. Spend decreases it and emits `TokensSpent`. Planets, silver, score, and AIPRO stay unchanged.
 
-**Impact.** The credit does not upgrade a planet or buy silver. The ETH paid for a credit does not return. A buy is not an AIPRO spend. Record `gpt-buy`, `gpt-send`, or `gpt-spend`.
+**Impact.** The credit does not upgrade a planet or buy silver. The BNB paid for a credit does not return. A buy is not an AIPRO spend. Record `gpt-buy`, `gpt-send`, or `gpt-spend`.
 
 ## Advance the clock
 

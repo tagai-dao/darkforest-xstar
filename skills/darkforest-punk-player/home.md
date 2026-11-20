@@ -8,7 +8,7 @@ Do this before [mining.md](mining.md). Do not mine from `0, 0`. The center of th
 
 ## Read the chain
 
-Use the world `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f` and Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send ETH to Multicall3.
+Use the world `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f` and Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send BNB to Multicall3.
 
 | Table       | Id                                                                   |
 | ----------- | -------------------------------------------------------------------- |
@@ -66,7 +66,7 @@ Finding the coordinate does not spend tokens. Once one unowned legal coordinate 
 
 If the player index is zero, ask the owner what name to register. Wait for that name. Do not invent one, and do not use `pilot` plus part of the address. The question is only the name. An example: "What name should this new player use?" If registration reverts because that name is taken, say so and ask for a different name. Do not append a number unless the owner gives that new name.
 
-If the ETH balance cannot pay for the register and spawn transactions, stop and tell the owner. Do not search further and do not write the home files.
+If the BNB balance cannot pay for the register and spawn transactions, stop and tell the owner. Do not search further and do not write the home files.
 
 Sign with the current wallet. A legacy transaction is fine. Wait for each receipt. Call the world. Staking is the locker call in [SKILL.md](SKILL.md), not a world call.
 

@@ -1,7 +1,7 @@
 ---
 name: darkforest-punk-player
 version: 1.0.0
-description: Join Dark Forest, initialize a home planet, explore outward from that home, and play with a named strategy file. When speaking to the owner, call map hashing 探索. Use when the owner wants an agent to start playing, stake an AIPRO NFT, spawn a home, explore, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_REVERT_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, DARKFOREST_FIND_ARTIFACT, DARKFOREST_USE_ARTIFACT, DARKFOREST_CLEAR_JUNK, DARKFOREST_CLAIM_REWARDS, or DARKFOREST_CLAIM_COMMUNITY.
+description: Join Dark Forest, initialize a home planet, explore outward from that home, and play with a named strategy file. When speaking to the owner, call map hashing 探索. Use when the owner wants an agent to start playing, stake an AIPRO NFT, spawn a home, explore, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_REVERT_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, DARKFOREST_BUY_JUNK, DARKFOREST_FIND_ARTIFACT, DARKFOREST_USE_ARTIFACT, DARKFOREST_CLEAR_JUNK, DARKFOREST_CLAIM_REWARDS, or DARKFOREST_CLAIM_COMMUNITY.
 ---
 
 # Dark Forest player
@@ -135,7 +135,13 @@ The game page does not clear junk. It copies a block. The first line is `DARKFOR
 
 That JSON is the whole clear. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start, and do not ask which planet. Do not change `planetHash`. There is no proof. Call World `df__clearJunk` with `planetHash`. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Then record `clear-junk` as [actions.md](actions.md) describes. When `ownsPlanet` is true, the planet was abandoned. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
 
-A message can contain more than one of these blocks. Send every fleet first, then every fleet recall, then every junk registration, then every artifact find, then every artifact use, then every silver withdrawal, then every material withdrawal, then every silver purchase, then every upgrade, then every junk clear, then every game-reward claim, then every community-reward claim, all in this turn.
+A message can contain more than one of these blocks. Send every fleet first, then every fleet recall, then every junk purchase, then every junk registration, then every artifact find, then every artifact use, then every silver withdrawal, then every material withdrawal, then every silver purchase, then every upgrade, then every junk clear, then every game-reward claim, then every community-reward claim, all in this turn.
+
+## Pasted junk purchase
+
+The game page does not buy junk limit. Beside 垃圾额度, the 购买 button opens a price list, and each tier's button copies a block. The first line is `DARKFOREST_BUY_JUNK`. The next line is one JSON object with `"kind": "darkforest-buy-junk"`.
+
+That JSON is the whole purchase. The owner already picked the tier and saw its price, so do not ask again. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start. There is no proof and no entry fee. Call World `df__buyJunk` with `allocation`. Attach `valueWei` wei as the transaction value. Sign with the player wallet. Wait for a successful receipt. Then record `buy-junk` as [actions.md](actions.md) describes. If the receipt reverts, tell the owner. The price on chain may have changed since the page computed it. Do not write `actions.ndjson`.
 
 ## Pasted game reward claim
 
@@ -151,7 +157,7 @@ That JSON is the whole claim. The moment it is recognized, send it in this turn.
 
 ## Ask first
 
-After reading this skill, ask whether to start. Do not ask again in this conversation if the owner already answered. A message that contains `DARKFOREST_MOVE`, `DARKFOREST_REVERT_MOVE`, `DARKFOREST_WITHDRAW_MATERIAL`, `DARKFOREST_WITHDRAW_SILVER`, `DARKFOREST_BUY_SILVER`, `DARKFOREST_UPGRADE`, `DARKFOREST_ADD_JUNK`, `DARKFOREST_FIND_ARTIFACT`, `DARKFOREST_USE_ARTIFACT`, `DARKFOREST_CLEAR_JUNK`, `DARKFOREST_CLAIM_REWARDS`, or `DARKFOREST_CLAIM_COMMUNITY` is an order, not a new start. Send each order as its pasted section describes, and do not ask this question.
+After reading this skill, ask whether to start. Do not ask again in this conversation if the owner already answered. A message that contains `DARKFOREST_MOVE`, `DARKFOREST_REVERT_MOVE`, `DARKFOREST_WITHDRAW_MATERIAL`, `DARKFOREST_WITHDRAW_SILVER`, `DARKFOREST_BUY_SILVER`, `DARKFOREST_UPGRADE`, `DARKFOREST_ADD_JUNK`, `DARKFOREST_BUY_JUNK`, `DARKFOREST_FIND_ARTIFACT`, `DARKFOREST_USE_ARTIFACT`, `DARKFOREST_CLEAR_JUNK`, `DARKFOREST_CLAIM_REWARDS`, or `DARKFOREST_CLAIM_COMMUNITY` is an order, not a new start. Send each order as its pasted section describes, and do not ask this question.
 
 > Start playing Dark Forest? I will read the connected wallet and then decide whether to stake an AIPRO NFT, or initialize a home.
 
@@ -161,7 +167,7 @@ The owner chooses a root folder for this agent. Each agent has its own root. If 
 
 ## Reads
 
-Every chain read goes through Multicall3 `aggregate3`. Do not send a separate `eth_call` for each value. Set `allowFailure` to false. Do not send ETH to Multicall3, and do not call `aggregate3Value`. If one call fails, stop and tell the owner. Writes stay separate transactions to the AIPRO NFT, the locker, and the world. Do not call a DFPT token or `buyPass`.
+Every chain read goes through Multicall3 `aggregate3`. Do not send a separate `eth_call` for each value. Set `allowFailure` to false. Do not send BNB to Multicall3, and do not call `aggregate3Value`. If one call fails, stop and tell the owner. Writes stay separate transactions to the AIPRO NFT, the locker, and the world. Do not call a DFPT token or `buyPass`.
 
 The locker address is not fixed. Read it from the world table `GamePassNFT`, then read the NFT and the handle registry from that locker.
 
@@ -169,7 +175,7 @@ The locker address is not fixed. Read it from the world table `GamePassNFT`, the
 | ----------- | -------------------------------------------------------------------- |
 | GamePassNFT | `0x7462646600000000000000000000000047616d65506173734e46540000000000` |
 
-The first batch is the ETH balance and that table. The table key is empty. Its static data is one address, 20 bytes packed from the left. That address is the locker. An empty record, or an address of zero, means this world has no locker. Stop and tell the owner. Do not register and do not look for a pass to buy.
+The first batch is the BNB balance and that table. The table key is empty. Its static data is one address, 20 bytes packed from the left. That address is the locker. An empty record, or an address of zero, means this world has no locker. Stop and tell the owner. Do not register and do not look for a pass to buy.
 
 ```bash
 export NO_PROXY=127.0.0.1,localhost
@@ -212,7 +218,7 @@ Each wallet has its own NFT, handle, registration, balances, home, and save fold
 
 Read all of these before deciding:
 
-- ETH balance, for gas
+- BNB balance, for gas
 - The locker address from `GamePassNFT`
 - `isPlayerInActiveSeason(player)` and `stakedTokenOf(player)`
 - `handleOf(player)`
@@ -231,7 +237,7 @@ Follow this order. Take the first match. A staked wallet keeps its NFT in the lo
 5. The wallet is not staked, has a handle, and the NFT balance is 0: **paid mint**. Ask before spending. Then stake the minted token.
 6. The wallet is not staked, has a handle, and holds an NFT: **stake**.
 
-Before staking, registering, or spawning, if the ETH balance cannot pay for one ordinary transaction, decide **not enough gas** and do not send a transaction. Registering uses the name the owner just gave. Spawning does not need its own yes once a legal home coordinate is known. A search the owner already stopped stays stopped. A home that just got saved is followed by the 探索 and strategy question, and the run starts only after they answer.
+Before staking, registering, or spawning, if the BNB balance cannot pay for one ordinary transaction, decide **not enough gas** and do not send a transaction. Registering uses the name the owner just gave. Spawning does not need its own yes once a legal home coordinate is known. A search the owner already stopped stays stopped. A home that just got saved is followed by the 探索 and strategy question, and the run starts only after they answer.
 
 ## How to talk
 
@@ -245,21 +251,21 @@ Do not ask again for the same wallet and the same action. Ask again when the wal
 
 Do the work and report it when it does not lock the NFT. Before staking, ask and wait for a yes. If the owner says no, stop. A home search the owner already stopped stays stopped. Once a home has just been saved, the next message asks them to start 探索 and pick a strategy. Do not say 挖矿 or mining in that question. Do not treat that question as optional.
 
-Staking is the join. Do not ask a second time after the owner agrees. The question names the wallet, the token id, the small ETH cost, and that the NFT can be withdrawn later. While it is out, this wallet cannot take game actions.
+Staking is the join. Do not ask a second time after the owner agrees. The question names the wallet, the token id, the small BNB cost, and that the NFT can be withdrawn later. While it is out, this wallet cannot take game actions.
 
 Example, when this wallet has a handle and an NFT and has not staked:
 
-> Stake AIPRO NFT #1 with this wallet now? It moves into the locker and costs a little ETH. You can withdraw it later. While it is out, this wallet cannot take game actions.
+> Stake AIPRO NFT #1 with this wallet now? It moves into the locker and costs a little BNB. You can withdraw it later. While it is out, this wallet cannot take game actions.
 
 No Binance handle. Do not send a transaction. Tell the owner this wallet has an empty handle, so it cannot stake. Ask whether this is the wallet they mean.
 
 No AIPRO NFT, and not already staked. Ask before minting. The question names the wallet, the AIPRO price, and the native fee.
 
-> Mint an AIPRO NFT with this wallet now? It costs 100000 AIPRO and 0.01 ETH. The NFT stays in this wallet until it is staked.
+> Mint an AIPRO NFT with this wallet now? It costs 100000 AIPRO and 0.01 BNB. The NFT stays in this wallet until it is staked.
 
 A staked wallet is not this case. Its balance is 0 because the locker holds the NFT, and play continues. If the owner says no, stop.
 
-Not enough gas. Do not send a transaction. Tell the owner this wallet needs ETH for gas.
+Not enough gas. Do not send a transaction. Tell the owner this wallet needs BNB for gas.
 
 Joined, and a home is saved. If `strategy.txt` is missing or the map run has not been started, ask the 探索 and strategy question from [mining.md](mining.md) and wait. The sentence the owner reads uses 探索. Do not end the turn with only the home coordinates. Do not ask them to confirm the home again.
 
@@ -271,8 +277,8 @@ Sign with the current wallet. A legacy transaction is fine. Do not write a priva
 
 Paid mint, only after the owner says yes:
 
-1. Read `communityTokenPrice()` and `nativePrice()` on the NFT. The NFT collection returns `100000` AIPRO, which is `100000` ether in raw units, and `0.01` ether. Stop if either value differs.
-2. Read the AIPRO balance. The payment token is `paymentToken` in `DFXStarConfig`, the address in [nutbox.md](nutbox.md). Stop if the balance is below the price, or the ETH balance cannot cover `0.01` ether plus gas. Tell the owner which one is short. Do not mint from another wallet.
+1. Read `communityTokenPrice()` and `nativePrice()` on the NFT. The NFT collection returns `100000` AIPRO, which is `100000 * 10^18` raw units, and `0.01` BNB. Stop if either value differs.
+2. Read the AIPRO balance. The payment token is `paymentToken` in `DFXStarConfig`, the address in [nutbox.md](nutbox.md). Stop if the balance is below the price, or the BNB balance cannot cover `0.01` BNB plus gas. Tell the owner which one is short. Do not mint from another wallet.
 3. Read `allowance(player, NFT)`. If it is below the price, approve the NFT for the price. Approve the NFT contract, not the locker and not the World.
 4. Call NFT `mint(uint256 referrerTokenId)` with value `nativePrice`. Pass `0` unless the owner named a referrer token id. The receipt mints the next token to this wallet. The wallet must already have a handle. Do not call `setHandle`.
 
@@ -290,7 +296,7 @@ export NO_PROXY=127.0.0.1,localhost
 export no_proxy=127.0.0.1,localhost
 RPC=http://127.0.0.1:8545
 
-# Paid mint. $AIPRO is the payment token. Value is nativePrice, 0.01 ether.
+# Paid mint. $AIPRO is the payment token. Value is nativePrice, 0.01 BNB.
 cast send --legacy --rpc-url $RPC $AIPRO "approve(address,uint256)" $NFT 100000000000000000000000
 cast send --legacy --rpc-url $RPC $NFT "mint(uint256)" 0 --value 0.01ether
 

@@ -48,7 +48,7 @@ The send is in [actions.md](actions.md). After the receipt the planet's silver f
 
 The withdraw system does not call the pool itself. It calls the root system `StakeScoreSystem`, which runs inside the World, so the pool sees the World as the caller. That caller must equal `pool.world()`. Do not add the withdraw systems as admins. A player calling `StakeScoreSystem` does not stake. Material withdrawal uses the same call.
 
-This call does not move AIPRO. It increases `userStakes` and `totalStaked`. It can be the first stake in the pool. It reverts when the pool has no code, when `pool.world()` is not this World, or when the pool's community calls fail. Send it with no ETH attached. `pool.world()` is `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`.
+This call does not move AIPRO. It increases `userStakes` and `totalStaked`. It can be the first stake in the pool. It reverts when the pool has no code, when `pool.world()` is not this World, or when the pool's community calls fail. Send it with no BNB attached. `pool.world()` is `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`.
 
 ## Buy silver burns, then injects the remainder
 
@@ -58,6 +58,6 @@ The whole-token amount counts against the cap in [play.md](play.md). If `balance
 
 ## Claim
 
-Call `claimExternalRewards()` on the pool with no ETH attached. This pays the game-reward pending in AIPRO and clears it. It does not pay community pending, and it is not a spend. Skip the call when injected pending is 0. Record it in `actions.ndjson` as `claim`.
+Call `claimExternalRewards()` on the pool with no BNB attached. This pays the game-reward pending in AIPRO and clears it. It does not pay community pending, and it is not a spend. Skip the call when injected pending is 0. Record it in `actions.ndjson` as `claim`.
 
-Community rewards are separate. `HourlyTickCalculator.inject(community, amount)` pulls AIPRO into the community and vests it across 168 hours. The player's share is `getPendingCommunityRewards`. Call `withdrawPoolsRewards` on the community with the score pool as the only address and no ETH attached. Skip the call when that pending is 0. Record it as `claim-community`.
+Community rewards are separate. `HourlyTickCalculator.inject(community, amount)` pulls AIPRO into the community and vests it across 168 hours. The player's share is `getPendingCommunityRewards`. Call `withdrawPoolsRewards` on the community with the score pool as the only address and no BNB attached. Skip the call when that pending is 0. Record it as `claim-community`.
