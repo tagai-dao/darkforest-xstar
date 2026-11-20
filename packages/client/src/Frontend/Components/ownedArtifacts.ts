@@ -237,7 +237,7 @@ export function artifactUseChoices(artifact: {
   return choices;
 }
 
-function formatCoord(value: number): string {
+export function formatCoord(value: number): string {
   if (!Number.isFinite(value)) return "-";
   return value.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 }

@@ -26,6 +26,43 @@ export type DocChapter = {
   blocks: DocBlock[];
 };
 
+/** 配额的基础单价，单位是 0.001 BNB。与 df.config.toml 的 g_、j_ 一致，即 0.003 BNB。 */
+const JUNK_BASE_PRICE_MILLI = 3;
+
+/**
+ * 配额档的累计价格，单位是 0.001 BNB。
+ * 1 档免费；2 到 8 档每多一档加 1 个基础单价；9 档起在 7 个基础单价上加上 (档位 - 8)² 个基础单价。
+ * 这和合约 getBuyJunkFee 的分段规则一致。
+ */
+function junkTierPriceMilli(tier: number): number {
+  if (tier <= 1) {
+    return 0;
+  }
+  if (tier <= 8) {
+    return (tier - 1) * JUNK_BASE_PRICE_MILLI;
+  }
+  return (7 + (tier - 8) ** 2) * JUNK_BASE_PRICE_MILLI;
+}
+
+/** 文档里只列 20,000 额度以内的档位，也就是 1 到 20 档。 */
+const JUNK_DOC_MAX_TIER = 20;
+
+/** 配额价格表的每一行：档位、配额上限、累计价格、从上一档加多少钱。 */
+const junkTierRows: DocRun[][] = Array.from(
+  { length: JUNK_DOC_MAX_TIER },
+  (_, index) => {
+    const tier = index + 1;
+    const total = junkTierPriceMilli(tier);
+    const step = tier === 1 ? null : total - junkTierPriceMilli(tier - 1);
+    return [
+      String(tier),
+      String(tier * 1000),
+      (total / 1000).toFixed(3),
+      step === null ? "—" : (step / 1000).toFixed(3),
+    ];
+  },
+);
+
 export const gameDocs: DocChapter[] = [
   {
     id: "overview",
@@ -323,7 +360,7 @@ export const gameDocs: DocChapter[] = [
       },
       {
         kind: "p",
-        text: "太空、深空、死空把射程、速度、两种上限和两种成长分别乘以 5/4、3/2 和 2。防御换成星云防御的 1/2、1/4 和 3/20。初始能量百分比乘以 4、10 和 20。每一步都用整数除法。",
+        text: "太空、深空、死空把射程、速度、两种上限和两种成长，分别变为星云的 125%、150% 和 200%（100% 即不变）。防御变为星云防御的 50%、25% 和 15%。初始能量百分比变为 400%、1000% 和 2000%。每一步都用整数除法。",
       },
       { kind: "h2", id: "types", title: "五种类型" },
       {
@@ -352,11 +389,11 @@ export const gameDocs: DocChapter[] = [
         kind: "table",
         headers: ["属性", "加成"],
         rows: [
-          ["能量上限", "×2"],
-          ["能量成长", "×2"],
-          ["射程", "×2"],
-          ["速度", "×2"],
-          ["防御", "×2"],
+          ["能量上限", "200%"],
+          ["能量成长", "200%"],
+          ["射程", "200%"],
+          ["速度", "200%"],
+          ["防御", "200%"],
         ],
       },
       { kind: "h2", id: "prospect", title: "勘探和发现" },
@@ -407,11 +444,12 @@ export const gameDocs: DocChapter[] = [
       { kind: "h2", id: "raise", title: "提高上限" },
       {
         kind: "p",
-        text: "可以购买新的配额档，档位从 2 到 1000。存下的上限变成档位乘以 1000，最高 1,000,000。钱包必须已经登记。累计价格在 1 档是 0；2 到 8 档是 (档位 - 1) × 0.001 BNB；9 档起是 0.007 BNB + (档位 - 8)² × 0.001 BNB。支付的是新价格和当前价格的差。从 1 档到 2 档是 0.001 BNB。多付的 BNB 不退。",
+        text: "可以购买新的配额档，档位从 2 到 1000。存下的上限变成档位乘以 1000，最高 1,000,000。钱包必须已经登记。支付的是新档位的累计价格和当前累计价格的差，多付的 BNB 不退。下表列出 20,000 额度以内每一档的价格。",
       },
       {
-        kind: "p",
-        text: "这笔 BNB、其他调用的入场费，以及创建公会的 0.005 BNB，都留在世界合约的 df 余额里。买配额不会记进收入统计，也不会质押，也不会付给其他玩家。",
+        kind: "table",
+        headers: ["档位", "配额上限", "累计价格（BNB）", "从上一档加价（BNB）"],
+        rows: junkTierRows,
       },
     ],
   },
@@ -464,8 +502,8 @@ export const gameDocs: DocChapter[] = [
       {
         kind: "ul",
         items: [
-          "任意一项每升一级，能量上限和能量成长都乘以 120/100。",
-          "射程每级乘以 125/100。速度每级乘以 175/100。防御每级乘以 120/100。",
+          "任意一项每升一级，能量上限和能量成长都变为原来的 120%（即提高 20%）。",
+          "射程每级变为原来的 125%。速度每级变为原来的 175%。防御每级变为原来的 120%。",
           "单项停在 4 级。三项合计在星云停在 3，太空停在 4，深空或死空停在 5。",
         ],
       },
@@ -610,59 +648,59 @@ export const gameDocs: DocChapter[] = [
         kind: "table",
         headers: ["编号", "材料", "倍率"],
         rows: [
-          ["0", materialLabel(MaterialType.UNKNOWN, "未知（Unknown）"), "100"],
+          ["0", materialLabel(MaterialType.UNKNOWN, "未知（Unknown）"), "100%"],
           [
             "1",
             materialLabel(
               MaterialType.WATER_CRYSTALS,
               "水晶体（Water Crystals）",
             ),
-            "105",
+            "105%",
           ],
           [
             "2",
             materialLabel(MaterialType.LIVING_WOOD, "活木（Living Wood）"),
-            "110",
+            "110%",
           ],
           [
             "3",
             materialLabel(MaterialType.WINDSTEEL, "风钢（Wind Steel）"),
-            "120",
+            "120%",
           ],
           [
             "4",
             materialLabel(MaterialType.AURORIUM, "极光金（Aurorium）"),
-            "130",
+            "130%",
           ],
           [
             "5",
             materialLabel(MaterialType.MYCELIUM, "菌胶（Mycelium）"),
-            "150",
+            "150%",
           ],
           [
             "6",
             materialLabel(MaterialType.SANDGLASS, "沙玻璃（Sand Glass）"),
-            "180",
+            "180%",
           ],
           [
             "7",
             materialLabel(MaterialType.CRYOSTONE, "冰晶石（Cryostone）"),
-            "200",
+            "200%",
           ],
           [
             "8",
             materialLabel(MaterialType.SCRAPIUM, "废金（Scrapium）"),
-            "250",
+            "250%",
           ],
           [
             "9",
             materialLabel(MaterialType.PYROSTEEL, "火钢（Pyrosteel）"),
-            "300",
+            "300%",
           ],
           [
             "10",
             materialLabel(MaterialType.BLACKALLOY, "黑合金（Blackalloy）"),
-            "400",
+            "400%",
           ],
           [
             "11",
@@ -670,7 +708,7 @@ export const gameDocs: DocChapter[] = [
               MaterialType.CORRUPTED_CRYSTAL,
               "腐化水晶（Corrupted Crystal）",
             ),
-            "600",
+            "600%",
           ],
         ],
       },
@@ -752,11 +790,11 @@ export const gameDocs: DocChapter[] = [
         kind: "table",
         headers: ["稀有度", "充能时防御", "激活后射程", "激活后速度"],
         rows: [
-          ["普通", "×1/2", "×2", "×5"],
-          ["稀有", "×2/5", "×2", "×10"],
-          ["史诗", "×3/10", "×2", "×15"],
-          ["传说", "×1/5", "×2", "×20"],
-          ["神话", "×1/10", "×2", "×25"],
+          ["普通", "50%", "200%", "500%"],
+          ["稀有", "40%", "200%", "1000%"],
+          ["史诗", "30%", "200%", "1500%"],
+          ["传说", "20%", "200%", "2000%"],
+          ["神话", "10%", "200%", "2500%"],
         ],
       },
       {
@@ -807,7 +845,7 @@ export const gameDocs: DocChapter[] = [
       { kind: "h2", id: "guild", title: "公会" },
       {
         kind: "p",
-        text: "公会让成员互相增援，而不是互相攻击。创建一个公会花费 0.005 BNB，这笔 BNB 和买配额的付款一样进入命名空间余额。",
+        text: "公会让成员互相增援，而不是互相攻击。创建一个公会花费 0.02 BNB，这笔 BNB 和买配额的付款一样进入命名空间余额。",
       },
       { kind: "h2", id: "reveal", title: "揭示和召回" },
       {

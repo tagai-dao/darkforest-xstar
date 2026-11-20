@@ -22,6 +22,7 @@ import {
 import { OpenPinkButton } from "../Components/OpenPinkButton";
 import { snips } from "../Styles/dfstyles";
 import { useAccount, useSelectedPlanet, useUIManager } from "../Utils/AppHooks";
+import { planetToClearCarry } from "../Utils/carryArtifact";
 import { useEmitterSubscribe } from "../Utils/EmitterHooks";
 import { useOnUp } from "../Utils/KeyEmitters";
 import {
@@ -431,15 +432,20 @@ export function PlanetContextPane({
   // If the locationId changes, cancel any sending
   useEmitterSubscribe(
     uiManager.selectedPlanetId$,
-    () => {
+    (selectedId) => {
       const uiEmitter = UIEmitter.getInstance();
       uiEmitter.emit(UIEmitterEvent.SendCancelled);
 
-      // Get the previous planet and clear it's artifact
-      // so it doesn't have a ship selected the next time the planet is selected
+      // 离开一颗星球时，清掉它上面已选中的运送神器，
+      // 免得下次再选中这颗星球时还带着上次选的神器。
+      // 重新选中同一颗星球不算离开，否则刚点的“运送”会被立刻清掉。
       const previousPlanet = uiManager.getPreviousSelectedPlanet();
-      if (previousPlanet) {
-        uiManager.setArtifactSending(previousPlanet.locationId, undefined);
+      const clearId = planetToClearCarry(
+        previousPlanet?.locationId,
+        selectedId,
+      );
+      if (clearId) {
+        uiManager.setArtifactSending(clearId, undefined);
       }
     },
     [uiManager],

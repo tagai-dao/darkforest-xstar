@@ -82,10 +82,10 @@ const GROUPS: SpaceGroup[] = [
     stats: [
       "等级上限 5",
       "升级合计 4",
-      "射程、速度 ×5/4",
-      "上限、成长 ×5/4",
-      "防御 ×1/2",
-      "初始能量 ×4",
+      "射程、速度 125%",
+      "上限、成长 125%",
+      "防御 50%",
+      "初始能量 400%",
     ],
     artifacts: FOUNDRY_ARTIFACTS,
     biomes: [
@@ -119,10 +119,10 @@ const GROUPS: SpaceGroup[] = [
     stats: [
       "等级上限 9",
       "升级合计 5",
-      "射程、速度 ×3/2",
-      "上限、成长 ×3/2",
-      "防御 ×1/4",
-      "初始能量 ×10",
+      "射程、速度 150%",
+      "上限、成长 150%",
+      "防御 25%",
+      "初始能量 1000%",
     ],
     artifacts: FOUNDRY_ARTIFACTS,
     biomes: [
@@ -156,10 +156,10 @@ const GROUPS: SpaceGroup[] = [
     stats: [
       "等级上限 9",
       "升级合计 5",
-      "射程、速度 ×2",
-      "上限、成长 ×2",
-      "防御 ×3/20",
-      "初始能量 ×20",
+      "射程、速度 200%",
+      "上限、成长 200%",
+      "防御 15%",
+      "初始能量 2000%",
     ],
     artifacts: FOUNDRY_ARTIFACTS,
     biomes: [
@@ -391,7 +391,7 @@ export function BiomeTable() {
                           key={material.id}
                           style={{ color: getMaterialColor(material.id) }}
                         >
-                          {material.name} ×{material.multiplier}
+                          {material.name} {material.multiplier}%
                         </div>
                       ))}
                     </td>

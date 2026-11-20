@@ -10,6 +10,7 @@ import dfstyles from "../Styles/dfstyles";
 import { useUIManager } from "../Utils/AppHooks";
 import { PlanetLink } from "../Views/PlanetLink";
 import { SortableTable } from "../Views/SortableTable";
+import { ArtifactHelp } from "./ArtifactHelp";
 import { ArtifactUseActions } from "./ArtifactUseActions";
 import type { OwnedArtifactLine } from "./ownedArtifacts";
 
@@ -333,6 +334,17 @@ export function OwnedArtifactsPanel({
     if (!planet || !isLocatable(planet)) return line.place;
     return <PlanetLink planet={planet}>{line.place}</PlanetLink>;
   };
+  // 名称后面跟一个“？”，悬浮看这件神器的作用和用法。
+  // 神器编号从已同步的神器里取，不放进 line，免得改动列表数据的结构。
+  const nameWithHelp = (line: OwnedArtifactLine) => {
+    const artifact = uiManager.getArtifactWithId(line.id as ArtifactId);
+    return (
+      <>
+        {line.name}
+        <ArtifactHelp artifactIndex={artifact?.artifactIndex} />
+      </>
+    );
+  };
   // 在钱包里的神器先存回星球才能充能或激活。
   const use = (line: OwnedArtifactLine) => {
     if (!line.planetId) return "在钱包，先放回星球";
@@ -358,7 +370,7 @@ export function OwnedArtifactsPanel({
           rows={artifacts}
           headers={["名称", "稀有度", "位置", "使用"]}
           columns={[
-            (line) => line.name,
+            (line) => nameWithHelp(line),
             (line) => line.rarity || "未知",
             (line) => place(line),
             (line) => use(line),

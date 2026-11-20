@@ -85,11 +85,11 @@ describe("game docs", () => {
     expect(table).toMatchObject({
       headers: ["属性", "加成"],
       rows: [
-        ["能量上限", "×2"],
-        ["能量成长", "×2"],
-        ["射程", "×2"],
-        ["速度", "×2"],
-        ["防御", "×2"],
+        ["能量上限", "200%"],
+        ["能量成长", "200%"],
+        ["射程", "200%"],
+        ["速度", "200%"],
+        ["防御", "200%"],
       ],
     });
   });
@@ -156,8 +156,8 @@ describe("game docs", () => {
     );
     expect(cannon).toMatchObject({
       rows: expect.arrayContaining([
-        ["普通", "×1/2", "×2", "×5"],
-        ["神话", "×1/10", "×2", "×25"],
+        ["普通", "50%", "200%", "500%"],
+        ["神话", "10%", "200%", "2500%"],
       ]),
     });
     const wormhole = more.blocks.find(
@@ -175,6 +175,21 @@ describe("game docs", () => {
     expect(bomb).toMatchObject({
       rows: expect.arrayContaining([["史诗", "4 到 6", "1500"]]),
     });
+  });
+
+  it("lists the junk limit prices for tiers up to 20,000", () => {
+    const junk = findChapter("junk");
+    const table = junk.blocks.find(
+      (block) => block.kind === "table" && block.headers[0] === "档位",
+    );
+    const rows = table && table.kind === "table" ? table.rows : [];
+
+    expect(rows).toHaveLength(20);
+    expect(rows[0]).toEqual(["1", "1000", "0.000", "—"]);
+    expect(rows[1]).toEqual(["2", "2000", "0.003", "0.003"]);
+    expect(rows[8]).toEqual(["9", "9000", "0.024", "0.003"]);
+    expect(rows[9]).toEqual(["10", "10000", "0.033", "0.009"]);
+    expect(rows[19]).toEqual(["20", "20000", "0.453", "0.069"]);
   });
 
   it("opens on the overview", () => {

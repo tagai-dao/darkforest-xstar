@@ -15,6 +15,7 @@ import {
 import Viewport from "../Game/Viewport";
 import { useUIManager } from "../Utils/AppHooks";
 import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
+import { BuyJunkOrderPanel } from "./BuyJunkOrderPanel";
 import {
   collectOwnedArtifacts,
   type OwnedArtifactLine,
@@ -89,6 +90,18 @@ const RefreshButton = styled.button`
   }
 `;
 
+// 标题行最右边的收起/展开开关，用 margin-left:auto 推到右端
+const CollapseButton = styled.button`
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #9be7ff;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+`;
+
 const ClaimButton = styled.button`
   background: none;
   border: none;
@@ -104,6 +117,9 @@ const ClaimButton = styled.button`
     text-decoration: none;
   }
 `;
+
+// 垃圾额度和购买按钮排在同一行。
+const JunkLine = styled(RewardLine)``;
 
 const OpenButton = styled.button`
   display: block;
@@ -187,13 +203,41 @@ function sumMaterials(planets: Planet[]): MaterialLine[] {
   }));
 }
 
+const COLLAPSED_KEY = "df.publicStatus.collapsed";
+
+/** 读上次是否收起；隐私模式等读不到本地存储时当作展开。 */
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveCollapsed(collapsed: boolean): void {
+  try {
+    window.localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    // 存不了就只在本次页面里生效
+  }
+}
+
 export function PublicGameStatus({ homeReady }: { homeReady: boolean }) {
   const uiManager = useUIManager();
   const [innerRadius, setInnerRadius] = useState<number | undefined>();
   const [tick, setTick] = useState<number | undefined>();
   const [facts, setFacts] = useState<WalletFacts>(EMPTY_FACTS);
+  // 右上角面板是否收起。记在本地，刷新页面后保持上次的选择。
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      saveCollapsed(!current);
+      return !current;
+    });
+  };
   const [planetsOpen, setPlanetsOpen] = useState(false);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
+  const [junkBuyOpen, setJunkBuyOpen] = useState(false);
   const [reward, setReward] = useState<RewardRead | undefined>();
   const [refreshing, setRefreshing] = useState(false);
   const seenFacts = useRef("");
@@ -390,101 +434,127 @@ export function PublicGameStatus({ homeReady }: { homeReady: boolean }) {
           <RefreshButton type="button" disabled={refreshing} onClick={refresh}>
             {refreshing ? "刷新中" : "刷新"}
           </RefreshButton>
+          <CollapseButton
+            type="button"
+            aria-expanded={!collapsed}
+            onClick={toggleCollapsed}
+          >
+            {collapsed ? "展开" : "收起"}
+          </CollapseButton>
         </TitleRow>
-        <div>收缩圈半径 {innerRadius ?? "..."}</div>
-        <div>当前 tick {tick ?? "..."}</div>
-        <div>总用户 {whole(facts.users)}</div>
-        <OpenButton
-          type="button"
-          onClick={() => {
-            setArtifactsOpen(false);
-            setPlanetsOpen(true);
-          }}
-        >
-          占领星球 {facts.planetCount}
-        </OpenButton>
-        <OpenButton
-          type="button"
-          onClick={() => {
-            setPlanetsOpen(false);
-            setArtifactsOpen(true);
-          }}
-        >
-          拥有神器 {facts.artifacts.length}
-        </OpenButton>
-        <div>
-          垃圾额度 {whole(facts.junkUsed)} / {whole(facts.junkLimit)}
-        </div>
-        <div>分数 {whole(facts.score)}</div>
-        <RewardLine>
-          <span>
-            游戏奖励：{reward ? wholeAipro(reward.game) : "..."} AIPRO
-          </span>
-          <ClaimButton
-            type="button"
-            disabled={!reward || reward.game === 0n}
-            onClick={() => {
-              if (!reward || reward.game === 0n) {
-                return;
-              }
-              copyOrder(
-                formatClaimRewardsOrder({
-                  pool: reward.pool,
-                  pendingWei: reward.game,
-                }),
-                "已复制游戏奖励领取单，直接粘贴给 agent",
-              );
-            }}
-          >
-            领取
-          </ClaimButton>
-        </RewardLine>
-        <RewardLine>
-          <span>
-            社区奖励：
-            {reward?.communityPending === undefined
-              ? "..."
-              : wholeAipro(reward.communityPending)}{" "}
-            AIPRO
-          </span>
-          <ClaimButton
-            type="button"
-            disabled={
-              !reward?.community ||
-              reward.communityPending === undefined ||
-              reward.communityPending === 0n
-            }
-            onClick={() => {
-              if (
-                !reward?.community ||
-                reward.communityPending === undefined ||
-                reward.communityPending === 0n
-              ) {
-                return;
-              }
-              copyOrder(
-                formatClaimCommunityOrder({
-                  community: reward.community,
-                  pool: reward.pool,
-                  pendingWei: reward.communityPending,
-                }),
-                "已复制社区奖励领取单，直接粘贴给 agent",
-              );
-            }}
-          >
-            领取
-          </ClaimButton>
-        </RewardLine>
-        <div>能量 {whole(facts.energy)}</div>
-        <div>银 {whole(facts.silver)}</div>
-        {facts.materials.length === 0 ? (
-          <div>材料 无</div>
-        ) : (
-          facts.materials.map((material) => (
-            <div key={material.name}>
-              {material.name} {whole(material.amount)}
-            </div>
-          ))
+        {!collapsed && (
+          <>
+            <div>收缩圈半径 {innerRadius ?? "..."}</div>
+            <div>当前 tick {tick ?? "..."}</div>
+            <div>总用户 {whole(facts.users)}</div>
+            <OpenButton
+              type="button"
+              onClick={() => {
+                setArtifactsOpen(false);
+                setJunkBuyOpen(false);
+                setPlanetsOpen(true);
+              }}
+            >
+              占领星球 {facts.planetCount}
+            </OpenButton>
+            <OpenButton
+              type="button"
+              onClick={() => {
+                setPlanetsOpen(false);
+                setJunkBuyOpen(false);
+                setArtifactsOpen(true);
+              }}
+            >
+              拥有神器 {facts.artifacts.length}
+            </OpenButton>
+            <JunkLine>
+              <span>
+                垃圾额度 {whole(facts.junkUsed)} / {whole(facts.junkLimit)}
+              </span>
+              <ClaimButton
+                type="button"
+                disabled={facts.junkLimit === undefined}
+                onClick={() => {
+                  setPlanetsOpen(false);
+                  setArtifactsOpen(false);
+                  setJunkBuyOpen(true);
+                }}
+              >
+                购买
+              </ClaimButton>
+            </JunkLine>
+            <div>分数 {whole(facts.score)}</div>
+            <RewardLine>
+              <span>
+                游戏奖励：{reward ? wholeAipro(reward.game) : "..."} AIPRO
+              </span>
+              <ClaimButton
+                type="button"
+                disabled={!reward || reward.game === 0n}
+                onClick={() => {
+                  if (!reward || reward.game === 0n) {
+                    return;
+                  }
+                  copyOrder(
+                    formatClaimRewardsOrder({
+                      pool: reward.pool,
+                      pendingWei: reward.game,
+                    }),
+                    "已复制游戏奖励领取单，直接粘贴给 agent",
+                  );
+                }}
+              >
+                领取
+              </ClaimButton>
+            </RewardLine>
+            <RewardLine>
+              <span>
+                社区奖励：
+                {reward?.communityPending === undefined
+                  ? "..."
+                  : wholeAipro(reward.communityPending)}{" "}
+                AIPRO
+              </span>
+              <ClaimButton
+                type="button"
+                disabled={
+                  !reward?.community ||
+                  reward.communityPending === undefined ||
+                  reward.communityPending === 0n
+                }
+                onClick={() => {
+                  if (
+                    !reward?.community ||
+                    reward.communityPending === undefined ||
+                    reward.communityPending === 0n
+                  ) {
+                    return;
+                  }
+                  copyOrder(
+                    formatClaimCommunityOrder({
+                      community: reward.community,
+                      pool: reward.pool,
+                      pendingWei: reward.communityPending,
+                    }),
+                    "已复制社区奖励领取单，直接粘贴给 agent",
+                  );
+                }}
+              >
+                领取
+              </ClaimButton>
+            </RewardLine>
+            <div>能量 {whole(facts.energy)}</div>
+            <div>银 {whole(facts.silver)}</div>
+            {facts.materials.length === 0 ? (
+              <div>材料 无</div>
+            ) : (
+              facts.materials.map((material) => (
+                <div key={material.name}>
+                  {material.name} {whole(material.amount)}
+                </div>
+              ))
+            )}
+          </>
         )}
       </Panel>
       {planetsOpen && (
@@ -494,6 +564,13 @@ export function PublicGameStatus({ homeReady }: { homeReady: boolean }) {
         <OwnedArtifactsPanel
           artifacts={facts.artifacts}
           onClose={() => setArtifactsOpen(false)}
+        />
+      )}
+      {junkBuyOpen && (
+        <BuyJunkOrderPanel
+          junkLimit={facts.junkLimit}
+          onCopy={copyOrder}
+          onClose={() => setJunkBuyOpen(false)}
         />
       )}
       {!homeReady && (

@@ -354,7 +354,7 @@ export function formatUseArtifactOrder(input: UseArtifactOrderInput): string {
   return `DARKFOREST_USE_ARTIFACT\n${JSON.stringify(order)}`;
 }
 
-// 领取买银注入的游戏奖励。agent 读到后调用池子的 claimExternalRewards，不附带 ETH。
+// 领取买银注入的游戏奖励。agent 读到后调用池子的 claimExternalRewards，不附带 BNB。
 export function formatClaimRewardsOrder(input: {
   pool: string;
   pendingWei: bigint;
@@ -369,7 +369,7 @@ export function formatClaimRewardsOrder(input: {
   return `DARKFOREST_CLAIM_REWARDS\n${JSON.stringify(order)}`;
 }
 
-// 领取社区按小时释放的奖励。agent 读到后调用社区的 withdrawPoolsRewards，不附带 ETH。
+// 领取社区按小时释放的奖励。agent 读到后调用社区的 withdrawPoolsRewards，不附带 BNB。
 export function formatClaimCommunityOrder(input: {
   community: string;
   pool: string;
@@ -425,6 +425,25 @@ export function formatClearJunkOrder(input: ClearJunkOrderInput): string {
     entryFeeWei: input.entryFeeWei.toString(),
   };
   return `DARKFOREST_CLEAR_JUNK\n${JSON.stringify(order)}`;
+}
+
+// 购买更高的垃圾额度。agent 读到后调用 df__buyJunk，附带 valueWei 的 BNB。
+// 这个调用不收入场费，也没有证明。valueWei 是从当前档升到目标档的差价。
+export function formatBuyJunkOrder(input: {
+  currentAllocation: number;
+  allocation: number;
+  valueWei: bigint;
+}): string {
+  const order = {
+    kind: "darkforest-buy-junk",
+    call: "df__buyJunk",
+    currentAllocation: input.currentAllocation,
+    allocation: input.allocation,
+    // 链上存的额度上限是档位乘以 1000。
+    limit: input.allocation * 1000,
+    valueWei: input.valueWei.toString(),
+  };
+  return `DARKFOREST_BUY_JUNK\n${JSON.stringify(order)}`;
 }
 
 export async function copyText(text: string): Promise<boolean> {

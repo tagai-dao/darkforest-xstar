@@ -1,22 +1,28 @@
 import { isLocatable } from "@df/gamelogic";
 import { getPlanetName } from "@df/procedural";
 import type { Artifact, LocatablePlanet } from "@df/types";
+import { TooltipName } from "@df/types";
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 
-import {
-  copyText,
-  formatUseArtifactOrder,
-} from "../../Backend/GameLogic/moveOrder";
+import type { GameUIManager } from "../../Backend/GameLogic/GameUIManager";
+import { TooltipTrigger } from "../Panes/Tooltip";
 import { useAccount, useUIManager } from "../Utils/AppHooks";
+import {
+  bombDestroyWindowOpen,
+  launchedBombStillUsable,
+} from "../Utils/bombPlan";
 import { useEmitterValue } from "../Utils/EmitterHooks";
-import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
+import { ArtifactHelp } from "./ArtifactHelp";
+import { ArtifactProgressMeter, readClock } from "./ArtifactProgressMeter";
+import { BombUseActions } from "./BombUseActions";
+import { copyArtifactOrder, copyDisabledReason } from "./copyArtifactOrder";
 import {
   artifactLevelFits,
-  type ArtifactProgress,
   artifactProgress,
   type ArtifactUseChoice,
   artifactUseChoices,
+  formatCoord,
   ownedArtifactName,
   ownedArtifactRarity,
 } from "./ownedArtifacts";
@@ -30,71 +36,165 @@ const USE_HINT: Record<number, string> = {
   6: "先充能。满 14400 tick 后再激活。",
 };
 
-const COPIED: Record<ArtifactUseChoice["action"], string> = {
-  charge: "已复制充能单，直接粘贴给 agent",
-  activate: "已复制激活单，直接粘贴给 agent",
-  shutdown: "已复制关闭单，直接粘贴给 agent",
-  land: "已复制摧毁单，等到达窗口再粘贴给 agent",
+// 图标统一用 16px 线条风格，颜色跟随按钮的 currentColor
+const ICON_PROPS = {
+  width: 16,
+  height: 16,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
 };
 
-type Clock = { tick: number; rate: number; paused: boolean };
-
-function readClock(
-  uiManager: ReturnType<typeof useUIManager>,
-): Clock | undefined {
-  try {
-    return {
-      tick: uiManager.getCurrentTick(),
-      rate: uiManager.getCurrentTickerRate(),
-      paused: uiManager.getPaused(),
-    };
-  } catch {
-    return undefined;
-  }
-}
-
-function remainText(progress: ArtifactProgress, clock: Clock): string {
-  if (progress.remainingTicks <= 0) return "已满";
-  if (clock.paused) return "时钟暂停";
-  if (!Number.isFinite(clock.rate) || clock.rate <= 0) {
-    return `还剩 ${Math.ceil(progress.remainingTicks)} tick`;
-  }
-  const seconds = Math.ceil(progress.remainingTicks / clock.rate);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hours > 0) return `还剩 ${hours}小时${minutes}分`;
-  if (minutes > 0) return `还剩 ${minutes}分${secs}秒`;
-  return `还剩 ${secs}秒`;
-}
-
-function ArtifactProgressMeter({
-  progress,
-  clock,
-}: {
-  progress: ArtifactProgress;
-  clock: Clock;
-}) {
-  const percent =
-    progress.remainingTicks <= 0
-      ? 100
-      : Math.min(99, Math.floor(progress.ratio * 100));
+/** 充能：闪电 */
+function ChargeIcon() {
   return (
-    <Progress>
-      <ProgressLabel>
-        <span>{progress.label}</span>
-        <span>
-          {percent}% {remainText(progress, clock)}
-        </span>
-      </ProgressLabel>
-      <Track>
-        <Fill $percent={percent} />
-      </Track>
-    </Progress>
+    <svg {...ICON_PROPS}>
+      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />
+    </svg>
   );
 }
 
-/** 点一下选中神器，再从它所在的星球拖到目标星球。和出发银是同一次拖动。 */
+/** 激活：向四周放射的火花 */
+function ActivateIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
+    </svg>
+  );
+}
+
+/** 关闭：电源按钮 */
+function ShutdownIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M12 2v10" />
+      <path d="M6.4 5.6a9 9 0 1 0 11.2 0" />
+    </svg>
+  );
+}
+
+/** 摧毁：炸弹加引线 */
+function LandIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <circle cx="10" cy="14" r="6" />
+      <path d="M14.5 9.5 18 6" />
+      <path d="M18 3v3M18 6h3" />
+    </svg>
+  );
+}
+
+// 每种复制动作对应的图标、浮窗名称
+const COPY_ICON: Record<ArtifactUseChoice["action"], () => React.ReactElement> =
+  {
+    charge: ChargeIcon,
+    activate: ActivateIcon,
+    shutdown: ShutdownIcon,
+    land: LandIcon,
+  };
+
+const COPY_TOOLTIP: Record<ArtifactUseChoice["action"], TooltipName> = {
+  charge: TooltipName.ArtifactCopyCharge,
+  activate: TooltipName.ArtifactCopyActivate,
+  shutdown: TooltipName.ArtifactCopyShutdown,
+  land: TooltipName.ArtifactCopyLand,
+};
+
+/**
+ * 图标按钮：悬浮时弹出和右侧卡片一样的中文浮窗。
+ * 禁用时用 $disabled 样式和 aria-disabled，而不是原生 disabled，
+ * 这样鼠标移上去仍能触发浮窗，把原因显示出来。
+ */
+function IconAction({
+  name,
+  label,
+  icon,
+  disabled = false,
+  reason,
+  hint,
+  onClick,
+}: {
+  name: TooltipName;
+  label: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  /** 禁用时的原因，优先显示 */
+  reason?: string;
+  /** 可用时的补充提示 */
+  hint?: string;
+  onClick: () => void;
+}) {
+  const extra = disabled ? reason : hint;
+  return (
+    <TooltipTrigger
+      name={name}
+      style={{ display: "inline-flex" }}
+      extraContent={extra ? <Hint>{extra}</Hint> : undefined}
+    >
+      <IconButton
+        type="button"
+        aria-label={label}
+        aria-disabled={disabled}
+        $disabled={disabled}
+        onClick={() => {
+          if (!disabled) onClick();
+        }}
+      >
+        {icon}
+      </IconButton>
+    </TooltipTrigger>
+  );
+}
+
+/**
+ * “出发时携带”复选框：用文字和勾选状态直接说明带不带。
+ * 不能携带时用 aria-disabled 置灰而不是原生 disabled，悬浮仍能看到原因。
+ */
+function CarryCheckbox({
+  checked,
+  blockedReason,
+  onToggle,
+}: {
+  checked: boolean;
+  /** 不能携带的原因；没有则表示可以勾选 */
+  blockedReason?: string;
+  onToggle: () => void;
+}) {
+  const blocked = blockedReason !== undefined;
+  let extra: string | undefined;
+  if (blockedReason) {
+    extra = blockedReason;
+  } else if (checked) {
+    extra = "已勾选：拖到目标星球出发时会带上这件神器。";
+  }
+
+  return (
+    <TooltipTrigger
+      name={TooltipName.ArtifactCarry}
+      style={{ display: "inline-flex" }}
+      extraContent={extra ? <Hint>{extra}</Hint> : undefined}
+    >
+      <CarryLabel $blocked={blocked} $checked={checked}>
+        <input
+          type="checkbox"
+          checked={checked}
+          aria-disabled={blocked}
+          onChange={() => {
+            if (!blocked) onToggle();
+          }}
+        />
+        出发时携带
+      </CarryLabel>
+    </TooltipTrigger>
+  );
+}
+
+/** 勾选后，从它所在的星球拖到目标星球的出发命令会带上这件神器。和出发银是同一次拖动。 */
 function CarryToggle({
   planet,
   artifact,
@@ -104,17 +204,24 @@ function CarryToggle({
 }) {
   const uiManager = useUIManager();
   const account = useAccount(uiManager);
-  const sending = useEmitterValue(uiManager.artifactSending$, undefined);
-  const armed =
-    sending?.planetId === planet.locationId &&
-    sending.artifact?.id === artifact.id;
+  // 事件只用来触发重绘；是否勾选一律直接读 uiManager 里存的值。
+  // 之前用“最后一次事件”判断：别的星球发一次事件就会把这里冲成未勾选，
+  // 重新挂载时（还没收到事件）也会显示成未勾选，而实际上神器还记着。
+  useEmitterValue(uiManager.artifactSending$, undefined);
+  const sendingHere = uiManager.getArtifactSending(planet.locationId);
+  const armed = sendingHere?.id === artifact.id;
   if (!sameAddress(planet.owner, account)) return null;
+  // 已损坏的神器不再显示“出发时携带”
+  if (artifact.status === 5) return null;
+
+  // 不能携带的两种情况：复选框置灰，悬浮时说明原因
+  let blockedReason: string | undefined;
   if (!sameAddress(planet.junkOwner, account)) {
-    return <Note>先登记垃圾配额，才能把神器拖走</Note>;
-  }
-  if (artifact.status !== undefined && artifact.status >= 2) {
-    if (artifact.status === 5) return null;
-    return <Note>充能、待发或生效中的神器不能带走</Note>;
+    // 垃圾配额没登记
+    blockedReason = "先登记垃圾配额，才能把神器拖走";
+  } else if (artifact.status !== undefined && artifact.status >= 2) {
+    // 充能、待发、生效中的神器不能带走
+    blockedReason = "充能、待发或生效中的神器不能带走";
   }
 
   const toggle = () => {
@@ -122,31 +229,17 @@ function CarryToggle({
       uiManager.setArtifactSending(planet.locationId, undefined);
       return;
     }
-    if (sending?.planetId && sending.planetId !== planet.locationId) {
-      uiManager.setArtifactSending(sending.planetId, undefined);
-    }
     uiManager.setArtifactSending(planet.locationId, artifact);
     uiManager.centerPlanet(planet);
   };
 
   return (
-    <>
-      <ChoiceButton type="button" onClick={toggle}>
-        {armed ? "取消运送" : "运送"}
-      </ChoiceButton>
-      {armed && <Note>按住这颗星球，拖到目标星球。</Note>}
-    </>
+    <CarryCheckbox
+      checked={armed}
+      blockedReason={blockedReason}
+      onToggle={toggle}
+    />
   );
-}
-
-function useNote(
-  junkOk: boolean,
-  levelOk: boolean,
-  index: number | undefined,
-): string {
-  if (!junkOk) return "先登记垃圾配额";
-  if (!levelOk) return "这颗星球的等级不能用它";
-  return USE_HINT[index ?? 0] ?? "";
 }
 
 function sameAddress(left?: string, right?: string): boolean {
@@ -158,11 +251,6 @@ function distance2(from: LocatablePlanet, to: LocatablePlanet): number {
   const dx = from.location.coords.x - to.location.coords.x;
   const dy = from.location.coords.y - to.location.coords.y;
   return dx * dx + dy * dy;
-}
-
-function formatCoord(value: number): string {
-  if (!Number.isFinite(value)) return "-";
-  return value.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 }
 
 /**
@@ -177,14 +265,7 @@ export function ArtifactUseActions({
 }) {
   const uiManager = useUIManager();
   const account = useAccount(uiManager);
-  const choices = artifactUseChoices(artifact);
-  const needsTarget = choices.some((choice) => choice.needsTarget);
-  const includeOthers = artifact.artifactIndex === 1;
-  const targets = targetPlanets(uiManager, account, planet, includeOthers);
-  const [targetId, setTargetId] = useState<string | undefined>();
   const [clock, setClock] = useState(() => readClock(uiManager));
-  const chosen =
-    targets.find((item) => item.locationId === targetId) ?? targets[0];
   // 充能和飞行按墙上的秒往前走，每秒读一次当前 tick。
   useEffect(() => {
     const read = () => setClock(readClock(uiManager));
@@ -192,13 +273,35 @@ export function ArtifactUseActions({
     const id = window.setInterval(read, 1000);
     return () => window.clearInterval(id);
   }, [uiManager]);
-  const zone =
-    artifact.artifactIndex === 1
-      ? uiManager.getPinkZoneByArtifactId(artifact.id)
+
+  // 粉红炸弹发射后状态是“已损坏”，但到达后的 300 tick 内仍可摧毁。
+  // 其余时候（没发射、还在飞、窗口已过）不能摧毁，也就不该给摧毁按钮和目标列表。
+  const isBomb = artifact.artifactIndex === 1;
+  const nowTick = clock?.tick ?? 0;
+  const bombFlight = isBomb ? uiManager.getBombFlight(artifact.id) : undefined;
+  const destroyOpen = bombDestroyWindowOpen(
+    bombFlight?.arrivalTick ?? 0,
+    nowTick,
+  );
+  const choices = artifactUseChoices(artifact).filter(
+    (choice) =>
+      !(artifact.status === 5 && choice.action === "land" && !destroyOpen),
+  );
+
+  const needsTarget = choices.some((choice) => choice.needsTarget);
+  const targets = targetPlanets(uiManager, account, planet, isBomb);
+  const [targetId, setTargetId] = useState<string | undefined>();
+  const chosen =
+    targets.find((item) => item.locationId === targetId) ?? targets[0];
+
+  // 飞行进度以链上的出发/到达 tick 为准
+  const flight =
+    bombFlight && bombFlight.arrivalTick > 0
+      ? {
+          departureTick: bombFlight.departureTick,
+          arrivalTick: bombFlight.arrivalTick,
+        }
       : undefined;
-  const flight = zone
-    ? { departureTick: zone.launchTick, arrivalTick: zone.arrivalTick }
-    : undefined;
   const progress = clock
     ? artifactProgress(artifact, clock.tick, flight)
     : undefined;
@@ -206,13 +309,15 @@ export function ArtifactUseActions({
   if (!sameAddress(planet.owner, account)) return null;
   if (choices.length === 0) {
     return (
-      <Stack>
+      <Row>
         {progress && clock && (
-          <ArtifactProgressMeter progress={progress} clock={clock} />
+          <ProgressSlot>
+            <ArtifactProgressMeter progress={progress} clock={clock} />
+          </ProgressSlot>
         )}
-        <Note>{artifact.status === 5 ? "已经损坏" : "还不能从这里使用"}</Note>
+        <Note>{unusableNote(artifact.status, bombFlight, nowTick)}</Note>
         <CarryToggle planet={planet} artifact={artifact} />
-      </Stack>
+      </Row>
     );
   }
 
@@ -228,39 +333,16 @@ export function ArtifactUseActions({
     if (choice.revealSelf) subject = planet;
     else if (choice.needsTarget) subject = chosen;
     if (choice.dataKind === "reveal" && !subject) return;
-    const hashConfig = uiManager.getHashConfig();
-    const text = formatUseArtifactOrder({
-      action: choice.action,
-      planetId: planet.locationId,
-      artifactId: artifact.id,
-      dataKind: choice.dataKind,
-      target: subject
-        ? {
-            id: subject.locationId,
-            x: subject.location.coords.x,
-            y: subject.location.coords.y,
-          }
-        : undefined,
-      planetHashKey: hashConfig.planetHashKey,
-      spaceTypeKey: hashConfig.spaceTypeKey,
-      scale: hashConfig.perlinLengthScale,
-      mirrorX: hashConfig.perlinMirrorX,
-      mirrorY: hashConfig.perlinMirrorY,
-      entryFeeWei: uiManager.getGameManager().getTransactionFee(),
-    });
-    void copyText(text).then((copied) => {
-      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
-        text,
-        copied,
-        label: COPIED[choice.action],
-      });
-    });
+    copyArtifactOrder({ uiManager, planet, artifact, choice, subject });
   };
 
+  // 所有操作放在同一行：进度/状态、目标选择、各个复制图标、运送。窄了自动换行。
   return (
-    <Stack>
+    <Row>
       {progress && clock ? (
-        <ArtifactProgressMeter progress={progress} clock={clock} />
+        <ProgressSlot>
+          <ArtifactProgressMeter progress={progress} clock={clock} />
+        </ProgressSlot>
       ) : (
         status && <Note>{status}</Note>
       )}
@@ -283,22 +365,63 @@ export function ArtifactUseActions({
         </Target>
       )}
       {choices.map((choice) => {
-        const missingTarget = choice.needsTarget && !chosen;
+        const missingTarget = Boolean(choice.needsTarget && !chosen);
+        const disabled = !junkOk || !levelOk || missingTarget;
+        const reason = copyDisabledReason(junkOk, levelOk, missingTarget);
+        const Icon = COPY_ICON[choice.action];
         return (
-          <ChoiceButton
+          <IconAction
             key={`${choice.action}-${choice.dataKind}`}
-            type="button"
-            disabled={!junkOk || !levelOk || missingTarget}
+            name={COPY_TOOLTIP[choice.action]}
+            label={choice.label}
+            icon={<Icon />}
+            disabled={disabled}
+            reason={reason}
+            hint={USE_HINT[artifact.artifactIndex ?? 0]}
             onClick={() => copy(choice)}
-          >
-            {choice.label}
-          </ChoiceButton>
+          />
         );
       })}
-      <Note>{useNote(junkOk, levelOk, artifact.artifactIndex)}</Note>
       <CarryToggle planet={planet} artifact={artifact} />
-    </Stack>
+    </Row>
   );
+}
+
+/** 没有可复制的单子时，告诉玩家为什么：炸弹要区分“还在飞”“窗口已过”“真的坏了”。 */
+function unusableNote(
+  status: number | undefined,
+  bombFlight: { arrivalTick: number } | undefined,
+  nowTick: number,
+): string {
+  if (status !== 5) return "还不能从这里使用";
+  const arrival = bombFlight?.arrivalTick ?? 0;
+  if (arrival > 0 && nowTick < arrival) return "飞行中，到达后才能摧毁";
+  if (arrival > 0) return "摧毁窗口已过";
+  return "已损坏";
+}
+
+/**
+ * 已从这颗星球发射、还在飞行或摧毁窗口内的粉红炸弹。
+ * 激活时合约会把炸弹从星球神器栏里移除，但仍记着它是从这颗星球出发的
+ * （artifact.onPlanetId），所以要单独找出来，面板才能继续显示它的进度。
+ */
+function launchedBombsFrom(
+  uiManager: GameUIManager,
+  planet: LocatablePlanet,
+): Artifact[] {
+  const nowTick = readClock(uiManager)?.tick ?? 0;
+  return uiManager
+    .getMyArtifacts()
+    .filter(
+      (artifact) =>
+        artifact.artifactIndex === 1 &&
+        artifact.onPlanetId === planet.locationId &&
+        !planet.heldArtifactIds?.includes(artifact.id) &&
+        launchedBombStillUsable(
+          uiManager.getBombFlight(artifact.id).arrivalTick,
+          nowTick,
+        ),
+    );
 }
 
 /** 点中的星球上如果放着神器，就在详情里给出和列表相同的使用按钮。 */
@@ -307,9 +430,10 @@ export function PlanetArtifactUse({ planet }: { planet: LocatablePlanet }) {
   const account = useAccount(uiManager);
   if (!sameAddress(planet.owner, account)) return null;
   if (planet.destroyed || planet.frozen) return null;
-  const artifacts = (planet.heldArtifactIds ?? [])
+  const held = (planet.heldArtifactIds ?? [])
     .map((id) => uiManager.getArtifactWithId(id))
     .filter((item): item is Artifact => !!item);
+  const artifacts = [...held, ...launchedBombsFrom(uiManager, planet)];
   if (artifacts.length === 0) return null;
 
   return (
@@ -320,11 +444,40 @@ export function PlanetArtifactUse({ planet }: { planet: LocatablePlanet }) {
           <Name>
             {ownedArtifactName(artifact.artifactIndex, artifact.artifactType)}{" "}
             {ownedArtifactRarity(artifact.rarity)}
+            <ArtifactHelp artifactIndex={artifact.artifactIndex} />
           </Name>
-          <ArtifactUseActions planet={planet} artifact={artifact} />
+          {artifact.artifactIndex === 1 ? (
+            <BombArtifactUse planet={planet} artifact={artifact} />
+          ) : (
+            <ArtifactUseActions planet={planet} artifact={artifact} />
+          )}
         </Item>
       ))}
     </Box>
+  );
+}
+
+/**
+ * 粉红炸弹在星球详情里用四步面板（选目标 → 充能 → 激活 → 摧毁）。
+ * 候选目标、垃圾配额、“出发时携带”开关在这里准备好，传给面板。
+ */
+function BombArtifactUse({
+  planet,
+  artifact,
+}: {
+  planet: LocatablePlanet;
+  artifact: Artifact;
+}) {
+  const uiManager = useUIManager();
+  const account = useAccount(uiManager);
+  return (
+    <BombUseActions
+      planet={planet}
+      artifact={artifact}
+      junkOk={sameAddress(planet.junkOwner, account)}
+      targets={targetPlanets(uiManager, account, planet, true)}
+      carry={<CarryToggle planet={planet} artifact={artifact} />}
+    />
   );
 }
 
@@ -357,28 +510,72 @@ function targetPlanets(
   return [...owned, ...others.slice(0, 40)];
 }
 
-const Stack = styled.div`
+// 操作区的一整行：自动换行，间距固定
+const Row = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 140px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 `;
 
-const ChoiceButton = styled.button`
+// 进度条占一段弹性宽度，窄了也不会把按钮挤出去
+const ProgressSlot = styled.div`
+  flex: 1 1 180px;
+  min-width: 0;
+`;
+
+const IconButton = styled.button<{ $disabled: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
   height: 28px;
-  color: #e8eef7;
+  padding: 0;
+  color: ${({ $disabled }) => ($disabled ? "#6d7b8c" : "#e8eef7")};
   background: transparent;
   border: 1px solid #3d4d63;
-  cursor: pointer;
+  cursor: ${({ $disabled }) => ($disabled ? "default" : "pointer")};
 
-  &:disabled {
-    color: #6d7b8c;
-    cursor: default;
+  &:hover {
+    border-color: ${({ $disabled }) => ($disabled ? "#3d4d63" : "#7eb6ff")};
   }
 `;
 
+// “出发时携带”：勾选后文字变亮蓝，不能勾选时整体置灰
+const CarryLabel = styled.label<{ $blocked: boolean; $checked: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: ${({ $blocked, $checked }) => {
+    if ($blocked) return "#6d7b8c";
+    return $checked ? "#7eb6ff" : "#e8eef7";
+  }};
+  cursor: ${({ $blocked }) => ($blocked ? "default" : "pointer")};
+
+  input {
+    margin: 0;
+    accent-color: #7eb6ff;
+    cursor: inherit;
+  }
+`;
+
+// 浮窗里的补充说明（禁用原因或使用提示）
+const Hint = styled.div`
+  margin-top: 4px;
+  color: #9aabbe;
+  font-size: 12px;
+`;
+
 const Target = styled.select`
-  width: 100%;
+  flex: 1 1 160px;
+  min-width: 120px;
+  max-width: 240px;
+  height: 28px;
   color: #e8eef7;
   background: #101820;
   border: 1px solid #3d4d63;
@@ -387,32 +584,6 @@ const Target = styled.select`
 const Note = styled.div`
   color: #9aabbe;
   font-size: 12px;
-`;
-
-const Progress = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const ProgressLabel = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  color: #9aabbe;
-  font-size: 12px;
-`;
-
-const Track = styled.div`
-  height: 8px;
-  background: #1c2836;
-  border: 1px solid #3d4d63;
-`;
-
-const Fill = styled.div<{ $percent: number }>`
-  height: 100%;
-  width: ${(props) => props.$percent}%;
-  background: #7eb6ff;
 `;
 
 const Box = styled.div`

@@ -1,7 +1,13 @@
 import { getRange, isLocatable } from "@df/gamelogic";
 import { isUnconfirmedMoveTx } from "@df/serde";
 import type { Planet, RGBVec, UIRendererType, WorldCoords } from "@df/types";
-import { ArtifactType, RendererType, RenderZIndex } from "@df/types";
+import {
+  ArtifactType,
+  RendererType,
+  RenderZIndex,
+  TextAlign,
+  TextAnchor,
+} from "@df/types";
 
 import { engineConsts } from "./EngineConsts";
 import type { Renderer } from "./Renderer";
@@ -26,6 +32,93 @@ export class UIRenderer implements UIRendererType {
     circleRenderer.queueCircleWorld({ x: 0, y: 0 }, radius, whiteA, 2);
     const innerRadius = gameUIManager.getInnerRadius();
     circleRenderer.queueCircleWorld({ x: 0, y: 0 }, innerRadius, whiteA, 2);
+  }
+
+  /**
+   * 粉红炸弹的预览：
+   * - 射程圈：虚线，样式和星球的射程圈一致，大小随炸弹星球当前的能量变化；
+   * - 炸毁线：从炸弹星球到目标，够不到时变红；
+   * - 摧毁半径圈：以目标为圆心，到达后这个范围内的星球都能摧毁。
+   */
+  queueBombPreview() {
+    const {
+      context: uiManager,
+      circleRenderer: cR,
+      lineRenderer: lR,
+      textRenderer: tR,
+    } = this.renderer;
+    this.queueBombVictimMark();
+
+    const preview = uiManager.getBombPreview();
+    if (!preview) return;
+
+    const { from, reachRadius, target } = preview;
+    // 能量太少时射程为 0，没东西可画
+    if (reachRadius > 1) {
+      cR.queueCircleWorld(from, reachRadius, pinkA, 1, 1, true);
+      tR.queueTextWorld(
+        `Bomb ${Math.round(reachRadius)}`,
+        { x: from.x, y: from.y + reachRadius },
+        pinkA,
+        0,
+        TextAlign.Center,
+        TextAnchor.Bottom,
+      );
+    }
+
+    if (target) {
+      const lineColor = target.inReach ? pinkA : redA;
+      lR.queueLineWorld(
+        from,
+        target.coords,
+        lineColor,
+        2,
+        RenderZIndex.Voyages,
+        false,
+      );
+      cR.queueCircleWorld(
+        target.coords,
+        target.blastRadius,
+        [255, 192, 203, 160],
+        2,
+      );
+      // 在线的中点标出距离，够不到时多写一个提示
+      tR.queueTextWorld(
+        target.inReach
+          ? `${Math.round(target.distance)}`
+          : `${Math.round(target.distance)} Too far`,
+        {
+          x: (from.x + target.coords.x) / 2,
+          y: (from.y + target.coords.y) / 2,
+        },
+        lineColor,
+      );
+    }
+  }
+
+  /** 已选中的受害星球：用红色实线圈住，并标上 Destroy，方便和面板里的选择对上。 */
+  private queueBombVictimMark() {
+    const {
+      context: uiManager,
+      circleRenderer: cR,
+      textRenderer: tR,
+    } = this.renderer;
+    const victim = uiManager.getBombVictim();
+    if (!victim) return;
+
+    const radius = 2.3 * uiManager.getRadiusOfPlanetLevel(victim.planetLevel);
+    cR.queueCircleWorld(victim.location.coords, radius, redA, 2);
+    tR.queueTextWorld(
+      "Destroy",
+      {
+        x: victim.location.coords.x,
+        y: victim.location.coords.y + radius,
+      },
+      redA,
+      0,
+      TextAlign.Center,
+      TextAnchor.Bottom,
+    );
   }
 
   queueMousePath() {

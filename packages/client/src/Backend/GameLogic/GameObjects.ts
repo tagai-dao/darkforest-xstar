@@ -98,6 +98,7 @@ import {
 } from "../../Frontend/Utils/EmitterUtils";
 import type { PlanetDiff } from "./ArrivalUtils";
 import { arrive, updatePlanetToTick } from "./ArrivalUtils";
+import { isNewlyDestroyed } from "./destroySound";
 import { updateArtifactStatus } from "./ArtifactUtils";
 import { GuildUtils } from "./GuildUtils";
 import { LayeredMap } from "./LayeredMap";
@@ -235,6 +236,11 @@ export class GameObjects {
   public readonly planetUpdated$: Monomitter<LocationId>;
 
   /**
+   * 星球从“没摧毁”变成“已摧毁”时发出，参数是星球 id。用来放爆炸声。
+   */
+  public readonly planetDestroyed$: Monomitter<LocationId>;
+
+  /**
    * Event emitter which publishes whenever an artifact has been updated.
    */
   public readonly artifactUpdated$: Monomitter<ArtifactId>;
@@ -304,6 +310,7 @@ export class GameObjects {
 
     this.guildUtils = new GuildUtils({ components });
     this.planetUpdated$ = monomitter();
+    this.planetDestroyed$ = monomitter();
     this.artifactUpdated$ = monomitter();
     this.myArtifactsUpdated$ = monomitter();
     this.myPlanetsUpdated$ = monomitter();
@@ -1288,6 +1295,33 @@ export class GameObjects {
     this.pinkZones.set(pinkZone.artifactId, pinkZone);
   }
 
+  /**
+   * 直接读链上 PinkBomb 表：炸弹的目标，以及起飞和到达的 tick。
+   * 和 pinkZones 不同，充能阶段（还没激活）也能读到目标。
+   * 目标还没写入时 target 为 undefined，没发射过时 arrivalTick 为 0。
+   */
+  public getBombFlight(artifactId: ArtifactId): {
+    target?: LocationId;
+    departureTick: number;
+    arrivalTick: number;
+  } {
+    const { PinkBomb } = this.components;
+    const entity = encodeEntity(PinkBomb.metadata.keySchema, {
+      bombId: Number(artifactIdToDecStr(artifactId)),
+    });
+    const bomb = getComponentValue(PinkBomb, entity);
+    if (!bomb) return { departureTick: 0, arrivalTick: 0 };
+
+    const targetHex = bomb.target.toString();
+    // 全 0 的 bytes32 表示还没选目标
+    const hasTarget = !/^(0x)?0*$/.test(targetHex);
+    return {
+      target: hasTarget ? locationIdFromHexStr(targetHex) : undefined,
+      departureTick: Number(bomb.departureTick),
+      arrivalTick: Number(bomb.arrivalTick),
+    };
+  }
+
   public getAIZones(): Set<AIZone> {
     return this.aiZones;
   }
@@ -1373,6 +1407,12 @@ export class GameObjects {
       this.layeredMap.insertPlanet(planet.location, planet.planetLevel);
     }
 
+    // 先记下更新前的摧毁状态：同步会原地改写对象，之后再读就分不清了
+    const known = this.planets.has(planet.locationId);
+    const wasDestroyed = known
+      ? Boolean(this.planets.get(planet.locationId)?.destroyed)
+      : undefined;
+
     setObjectSyncState<Planet, LocationId>(
       this.planets,
       this.myPlanets,
@@ -1383,6 +1423,10 @@ export class GameObjects {
       getPlanetOwner,
       planet,
     );
+
+    if (isNewlyDestroyed(wasDestroyed, planet.destroyed)) {
+      this.planetDestroyed$.publish(planet.locationId);
+    }
   }
 
   /**

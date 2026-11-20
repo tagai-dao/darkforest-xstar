@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMoveOrder,
   formatAddJunkOrder,
+  formatBuyJunkOrder,
   formatBuySilverOrder,
   formatClaimCommunityOrder,
   formatClaimRewardsOrder,
@@ -341,5 +342,24 @@ describe("move order", () => {
     expect(order.planetHash).toBe("10");
     expect(order.ownsPlanet).toBe(true);
     expect(order.entryFeeWei).toBe("1000000000000");
+  });
+
+  it("writes a junk purchase with the tier, the limit, and the price to attach", () => {
+    // 从 1 档买到 3 档：差价 0.006 BNB。这个调用不收入场费。
+    const text = formatBuyJunkOrder({
+      currentAllocation: 1,
+      allocation: 3,
+      valueWei: 6000000000000000n,
+    });
+    const order = JSON.parse(text.slice("DARKFOREST_BUY_JUNK\n".length));
+
+    expect(text.startsWith("DARKFOREST_BUY_JUNK\n")).toBe(true);
+    expect(order.kind).toBe("darkforest-buy-junk");
+    expect(order.call).toBe("df__buyJunk");
+    expect(order.currentAllocation).toBe(1);
+    expect(order.allocation).toBe(3);
+    expect(order.limit).toBe(3000);
+    expect(order.valueWei).toBe("6000000000000000");
+    expect(order.entryFeeWei).toBeUndefined();
   });
 });

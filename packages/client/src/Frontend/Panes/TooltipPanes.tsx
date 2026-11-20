@@ -81,6 +81,133 @@ export function ShutdownArtifactPane() {
   return <>Shutdown this artifact</>;
 }
 
+// 神器列表里的图标按钮说明（中文）
+export function ArtifactCopyChargePane() {
+  return (
+    <>
+      <White>复制充能单：</White>粘贴给 agent
+      即可充能。粉红炸弹充能时会揭示所选目标的坐标。
+    </>
+  );
+}
+
+export function ArtifactCopyActivatePane() {
+  return (
+    <>
+      <White>复制激活单：</White>粘贴给 agent
+      即可激活。激活后按这件神器的效果生效，之后可能进入冷却或损坏。
+    </>
+  );
+}
+
+export function ArtifactCopyShutdownPane() {
+  return (
+    <>
+      <White>复制关闭单：</White>粘贴给 agent 即可关闭这件神器。
+    </>
+  );
+}
+
+export function ArtifactCopyLandPane() {
+  return (
+    <>
+      <White>复制摧毁单：</White>要在到达之后的 <White>300 tick</White>{" "}
+      内粘贴，才能摧毁目标周围的星球。
+    </>
+  );
+}
+
+// 神器名称后面“？”的说明。内容来自游戏文档里对四种神器的规则，时间单位都是 tick。
+export function ArtifactHelpPinkBombPane() {
+  return (
+    <>
+      <White>粉红炸弹</White>
+      <br />
+      <White>作用：</White>远程摧毁目标周围一定半径内的星球，用完即毁。
+      <br />
+      <White>用法：</White>
+      <br />
+      1. 选好目标，复制充能单，充能 14400 tick，会揭示目标坐标。
+      <br />
+      2. 充能完成后复制激活单，发射并冷却 14400
+      tick；射程和速度暂时减半，发射耗能 = 能量上限 / 20 × 2^(距离/射程)。
+      <br />
+      3. 到达后的 300 tick 内复制摧毁单粘贴，摧毁目标周围的星球。
+      <br />
+      摧毁半径：普通 500 / 稀有 1000 / 史诗 1500 / 传说 2000 / 神话
+      2500。只能用在 4 级及以上的星球，稀有度越高上限越高。
+    </>
+  );
+}
+
+export function ArtifactHelpBloomFilterPane() {
+  return (
+    <>
+      <White>布隆过滤器</White>
+      <br />
+      <White>作用：</White>
+      把这颗星球的能量直接补满到能量上限，然后神器损坏（一次性）。
+      <br />
+      <White>用法：</White>不用充能，也不冷却，直接复制激活单粘贴给 agent。
+      <br />
+      稀有度决定能用在哪些等级的星球：普通 0 到 2 级 / 稀有 3 到 4 级 / 史诗 5
+      到 6 级 / 传说 7 到 8 级 / 神话 9 级。等级不符时按钮会置灰。
+    </>
+  );
+}
+
+export function ArtifactHelpWormholePane() {
+  return (
+    <>
+      <White>虫洞</White>
+      <br />
+      <White>作用：</White>
+      把你自己的两颗星球连起来，缩短它们之间的航行距离，可以反复开关。
+      <br />
+      <White>用法：</White>
+      <br />
+      1.
+      在放着虫洞的星球上选另一颗自己的星球，复制激活单（两端必须是同一个拥有者，不能连自己）。
+      <br />
+      2. 激活后冷却 14400 tick。不用时复制关闭单即可关掉。
+      <br />
+      距离 = 原距离 × 系数 / 1000：普通 500 / 稀有 250 / 史诗 125 / 传说 62 /
+      神话 31。同一条连线上已有虫洞时，系数会相乘。
+    </>
+  );
+}
+
+export function ArtifactHelpCannonPane() {
+  return (
+    <>
+      <White>火炮</White>
+      <br />
+      <White>作用：</White>让这颗星球的下一次移动射程变成 2
+      倍，速度按稀有度放大（普通 500% / 稀有 1000% / 史诗 1500% / 传说 2000% /
+      神话 2500%），用完即毁。没有等级限制。
+      <br />
+      <White>用法：</White>
+      <br />
+      1. 复制充能单，充能 14400 tick。充能期间这颗星球的防御会按稀有度缩小。
+      <br />
+      2. 充能完成后复制激活单。
+      <br />
+      3. 激活后发出下一次移动，加成随这次移动结算，防御削弱也一起去掉。
+      <br />
+      一颗星球同时只能有一门火炮在充能或待发。
+    </>
+  );
+}
+
+export function ArtifactCarryPane() {
+  return (
+    <>
+      <White>出发时携带：</White>
+      勾选后，按住这颗星球拖到目标星球出发，出发命令里会带上这件神器，和运银是同一次拖动。再点一次取消勾选；每次出发后会自动取消。
+    </>
+  );
+}
+
 export function TimeUntilActivationPossiblePane() {
   return (
     <>You must wait this amount of time before you can activate this artifact</>
@@ -161,10 +288,8 @@ export function BonusTooltipPane() {
 export function SilverTooltipPane() {
   return (
     <>
-      <White>Silver:</White> the universe&apos;s monetary resource. It allows
-      you to buy upgrades. Only
-      <White> Asteroid Fields</White> produce silver or so we&apos;ve been
-      told...
+      <White>银：</White>宇宙中的货币，用来买升级。目前只有
+      <White>小行星带（Asteroid Field）</White>会产银。
     </>
   );
 }
@@ -172,8 +297,8 @@ export function SilverTooltipPane() {
 export function EnergyTooltipPane() {
   return (
     <>
-      <White>Energy:</White> allows you to make moves. Energy grows following an{" "}
-      <White>s-curve</White>, and grows fastest at <White>50% capacity</White>.
+      <White>能量：</White>用来发起移动。能量沿 <White>S 形曲线</White>增长，在
+      <White>上限的 50%</White> 时增长最快。
     </>
   );
 }
@@ -247,10 +372,8 @@ export function SelectedSilverTooltipPane() {
 export function RangeTooltipPane() {
   return (
     <>
-      <White>Range:</White> how far you can send your forces.{" "}
-      <White>Forces decay</White> the farther out you send them. <br />
-      Higher range means that you can send forces the same distance with less
-      decay.
+      <White>射程：</White>能派出兵力的距离。<White>兵力会随距离衰减</White>
+      ，射程越高，同样距离上的衰减越少。
     </>
   );
 }
@@ -285,9 +408,8 @@ export function Time90TooltipPane() {
 export function EnergyGrowthTooltipPane() {
   return (
     <>
-      <White>Energy Growth:</White> the maximum growth rate of this
-      planet&apos;s energy representing the rate at the middle of the{" "}
-      <White>s-curve</White>.
+      <White>能量成长：</White>能量正好是上限一半时，每个 tick 增加的最大速度
+      （即 <White>S 形曲线</White>的中点）。
     </>
   );
 }
@@ -295,8 +417,7 @@ export function EnergyGrowthTooltipPane() {
 export function SilverGrowthTooltipPane() {
   return (
     <>
-      <White>Silver Growth</White>: the per-minute linear growth rate of this
-      planet&apos;s silver.
+      <White>银成长：</White>这颗星球的银每分钟线性增加的量，直到银上限。
     </>
   );
 }
@@ -435,9 +556,8 @@ export function ClowntownTooltipPane() {
 function DefenseTooltipPane() {
   return (
     <>
-      <White>Defense:</White> Planets with higher defense will negate incoming
-      damage. Planets with lower than 100 defense are vulnerable and will take
-      more damage!
+      <White>防御：</White>防御越高，越能抵消入侵的伤害。防御低于{" "}
+      <White>100</White> 的星球很脆弱，会受到更多伤害。
     </>
   );
 }
@@ -452,11 +572,9 @@ function SpaceJunkTooltipPane() {
     //   your space junk and place it back on the planet.
     // </>
     <>
-      <White>Space Junk:</White> Before a player can interact with the planet,
-      the junk must be added to the player's total junk value. When a player
-      clears the junk, they automatically relinquish ownership of the planet.
-      Even if another player captures the planet, you can still clear the junk
-      value.
+      <White>太空垃圾：</White>
+      玩家操作星球前，必须先把这颗星球的垃圾登记到自己的
+      垃圾配额里。清除垃圾后，你会自动放弃这颗星球的所有权；即使别人占领了它，你仍然可以清除垃圾。
     </>
   );
 }
@@ -485,8 +603,7 @@ function AbandonTooltipPane() {
 function SpeedTooltipPane() {
   return (
     <>
-      <White>Speed:</White> The rate at which energy travels across the
-      universe, the faster the better!
+      <White>速度：</White>能量在宇宙中传播的速度，<White>越快越好</White>。
     </>
   );
 }
@@ -610,10 +727,9 @@ const MaterialWaterCrystalsTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.WATER_CRYSTALS, 24)}
     <Colored color={getMaterialColor(MaterialType.WATER_CRYSTALS)}>
-      WATER CRYSTALS:
+      水晶体：
     </Colored>{" "}
-    A shimmering liquid harvested from deep ocean wells, used in cooling
-    systems, fluidic shields, and hydro-reactive engines.
+    采自深海井的闪亮液体，用于冷却系统、流体护盾和水反应引擎。
   </>
 );
 
@@ -621,10 +737,9 @@ const MaterialLivingWoodTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.LIVING_WOOD, 24)}
     <Colored color={getMaterialColor(MaterialType.LIVING_WOOD)}>
-      LIVING WOOD:
+      活木：
     </Colored>{" "}
-    An organic, flexible biofiber that forms the core of regenerative hull
-    plating and photosynthetic tech modules.
+    柔韧的有机生物纤维，是再生船体装甲和光合科技模块的核心。
   </>
 );
 
@@ -632,10 +747,9 @@ const MaterialWindsteelTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.WINDSTEEL, 24)}
     <Colored color={getMaterialColor(MaterialType.WINDSTEEL)}>
-      WINDSTEEL:
+      风钢：
     </Colored>{" "}
-    Lightweight and highly conductive alloy spun from atmospheric windsteel
-    veins; vital for turbine propulsion and trade ship frames.
+    用大气中的风钢矿脉纺成的轻质高导电合金，是涡轮推进器和贸易船骨架的关键材料。
   </>
 );
 
@@ -643,11 +757,9 @@ const MaterialAuroriumTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.AURORIUM, 24)}
     <Colored color={getMaterialColor(MaterialType.AURORIUM)}>
-      AURORIUM:
+      极光金：
     </Colored>{" "}
-    Luminous mineral infused with polar energy, mined from aurora-lit tundra
-    fields. Used in advanced navigation cores, sensor arrays, and
-    energy-reflective ship plating.
+    蕴含极地能量的发光矿物，采自极光照耀的冻原。用于高级导航核心、传感器阵列和能量反射船体装甲。
   </>
 );
 
@@ -655,10 +767,9 @@ const MaterialMyceliumTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.MYCELIUM, 24)}
     <Colored color={getMaterialColor(MaterialType.MYCELIUM)}>
-      MYCELIUM GEL:
+      菌胶：
     </Colored>{" "}
-    Pulsating fungal gel infused with life essence; powers alchemical reactors
-    and mycelial growth algorithms.
+    搏动的真菌凝胶，蕴含生命精华，为炼金反应堆和菌丝生长算法提供动力。
   </>
 );
 
@@ -666,10 +777,9 @@ const MaterialSandglassTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.SANDGLASS, 24)}
     <Colored color={getMaterialColor(MaterialType.SANDGLASS)}>
-      SANDGLASS:
+      沙玻璃：
     </Colored>{" "}
-    Sharp, granular shards capable of storing temporal energy—used in
-    chrono-sensors and time-slowing projectiles.
+    能储存时间能量的尖锐颗粒状碎片，用于时间传感器和减速弹。
   </>
 );
 
@@ -677,10 +787,9 @@ const MaterialCryostoneTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.CRYOSTONE, 24)}
     <Colored color={getMaterialColor(MaterialType.CRYOSTONE)}>
-      CRYOSTONE:
+      冰晶石：
     </Colored>{" "}
-    Frozen mineral forged in vacuum conditions, used in advanced refrigeration,
-    stasis chambers, and cryo-lasers.
+    在真空条件下锻造的冻结矿物，用于高级制冷、休眠舱和冷冻激光。
   </>
 );
 
@@ -688,10 +797,9 @@ const MaterialScrapiumTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.SCRAPIUM, 24)}
     <Colored color={getMaterialColor(MaterialType.SCRAPIUM)}>
-      SCRAPIUM:
+      废金：
     </Colored>{" "}
-    Junk-forged alloy made from Wasteland scraps, restructured into modular
-    components for rough industrial builds.
+    用废土废料熔铸的合金，重组为模块化部件，用于粗放的工业建造。
   </>
 );
 
@@ -699,10 +807,9 @@ const MaterialPyrosteelTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.PYROSTEEL, 24)}
     <Colored color={getMaterialColor(MaterialType.PYROSTEEL)}>
-      PYROSTEEL:
+      火钢：
     </Colored>{" "}
-    Ultra-dense alloy mined from volcanic zones, ideal for magma engines,
-    high-heat armor, and thermal weapon cores.
+    采自火山地带的超高密度合金，适合制造岩浆引擎、高温装甲和热能武器核心。
   </>
 );
 
@@ -710,10 +817,9 @@ const MaterialBlackalloyTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.BLACKALLOY, 24)}
     <Colored color={getMaterialColor(MaterialType.BLACKALLOY)}>
-      BLACKALLOY:
+      黑合金：
     </Colored>{" "}
-    A forbidden dark alloy synthesized from corrupted zones. Dense, unstable,
-    and extremely powerful in shadow-tech applications.
+    在腐化区域合成的禁忌暗黑合金，致密而不稳定，在暗影科技中威力极大。
   </>
 );
 
@@ -721,10 +827,10 @@ const MaterialCorruptedCrystalTooltip = () => (
   <>
     {getMaterialIcon(MaterialType.CORRUPTED_CRYSTAL, 24)}
     <Colored color={getMaterialColor(MaterialType.CORRUPTED_CRYSTAL)}>
-      CORRUPTED CRYSTAL:
+      腐化水晶：
     </Colored>{" "}
-    Crystallized corruption extracted from reality-warped biomes. Essential for
-    ZK-reactors, entropy drives, and unstable modules.
+    从现实扭曲的生态区提取的结晶腐化物，是 ZK
+    反应堆、熵驱动和不稳定模块的关键材料。
   </>
 );
 
@@ -899,6 +1005,33 @@ export function TooltipContent({ name }: { name: TooltipName | undefined }) {
   }
   if (name === TooltipName.ShutdownArtifact) {
     return <ShutdownArtifactPane />;
+  }
+  if (name === TooltipName.ArtifactCopyCharge) {
+    return <ArtifactCopyChargePane />;
+  }
+  if (name === TooltipName.ArtifactCopyActivate) {
+    return <ArtifactCopyActivatePane />;
+  }
+  if (name === TooltipName.ArtifactCopyShutdown) {
+    return <ArtifactCopyShutdownPane />;
+  }
+  if (name === TooltipName.ArtifactCopyLand) {
+    return <ArtifactCopyLandPane />;
+  }
+  if (name === TooltipName.ArtifactCarry) {
+    return <ArtifactCarryPane />;
+  }
+  if (name === TooltipName.ArtifactHelpPinkBomb) {
+    return <ArtifactHelpPinkBombPane />;
+  }
+  if (name === TooltipName.ArtifactHelpBloomFilter) {
+    return <ArtifactHelpBloomFilterPane />;
+  }
+  if (name === TooltipName.ArtifactHelpWormhole) {
+    return <ArtifactHelpWormholePane />;
+  }
+  if (name === TooltipName.ArtifactHelpCannon) {
+    return <ArtifactHelpCannonPane />;
   }
   if (name === TooltipName.DefenseMultiplier) {
     return <DefenseMultiplierPane />;

@@ -13,6 +13,7 @@ import type {
   ArtifactId,
   BaseRenderer,
   Biome,
+  BombPreview,
   Chunk,
   Diagnostics,
   EthAddress,
@@ -60,6 +61,12 @@ import type { HashConfig } from "../../_types/global/GlobalTypes";
 import ModalManager from "../../Frontend/Game/ModalManager";
 import NotificationManager from "../../Frontend/Game/NotificationManager";
 import Viewport from "../../Frontend/Game/Viewport";
+import {
+  bombBlastRadius,
+  bombReachRadius,
+  planetsInBlast,
+  resolveBombTarget,
+} from "../../Frontend/Utils/bombPlan";
 import { MIN_CHUNK_SIZE } from "../../Frontend/Utils/constants";
 import { getObjectWithIdFromMap } from "../../Frontend/Utils/EmitterUtils";
 import {
@@ -79,7 +86,9 @@ import { getChunkOfSideLengthContainingPoint } from "../Miner/ChunkUtils";
 import type { MiningPattern } from "../Miner/MiningPatterns";
 import { coordsEqual } from "../Utils/Coordinates";
 import { noteMyArrivals } from "./arrivalSound";
-import { playEffect, preloadEffect } from "./effectSound";
+import { BombPlanState } from "./BombPlanState";
+import { BombVictimState } from "./BombVictimState";
+import { playEffect, playExplosion, preloadEffect } from "./effectSound";
 import type { GameManager } from "./GameManager";
 import { GameManagerEvent } from "./GameManager";
 import type { GameObjects } from "./GameObjects";
@@ -91,6 +100,9 @@ import { ViewportEntities } from "./ViewportEntities";
 
 // Hover delay in milliseconds
 const MULTI_MOVE_HOVER_DELAY = 500;
+
+// 爆炸声的最短间隔：一次可能连炸好几颗，间隔内只响一次
+const EXPLOSION_COOLDOWN_MS = 800;
 
 export const enum GameUIManagerEvent {
   InitializedPlayer = "InitializedPlayer",
@@ -161,6 +173,14 @@ export class GameUIManager extends EventEmitter {
   private materialSending: { [key: string]: number } = {}; // this is a percentage
 
   private artifactSending: { [key: string]: Artifact | undefined } = {};
+
+  // 上一次播放爆炸声的时间（毫秒），用来做间隔限制
+  private lastExplosionAt = 0;
+
+  /** 粉红炸弹的“使用神器”选择：点地图选目标、记住目标，换星球就放弃 */
+  public readonly bombPlan = new BombPlanState();
+  /** 摧毁阶段选的受害星球（下拉框或地图点选） */
+  public readonly bombVictim = new BombVictimState();
 
   private plugins: PluginManager;
 
@@ -302,6 +322,10 @@ export class GameUIManager extends EventEmitter {
     uiManager.startArrivalWatch();
 
     gameManager.on(GameManagerEvent.PlanetUpdate, uiManager.updatePlanets);
+    // 星球被炸毁时放爆炸声
+    gameManager
+      .getGameObjects()
+      .planetDestroyed$.subscribe(() => uiManager.onPlanetDestroyed());
     gameManager.on(
       GameManagerEvent.DiscoveredNewChunk,
       uiManager.onDiscoveredChunk,
@@ -350,6 +374,8 @@ export class GameUIManager extends EventEmitter {
     this.multipleMoves$.clear();
     this.showMultiMoveSelector$.clear();
     this.multiMoveSelectorPosition$.clear();
+    this.bombPlan.changed$.clear();
+    this.bombVictim.changed$.clear();
   }
 
   public getStringSetting(setting: Setting): string | undefined {
@@ -822,6 +848,23 @@ export class GameUIManager extends EventEmitter {
     const hoveringOverCoords = this.updateMouseHoveringOverCoords(coords);
     const hoveringOverPlanet =
       this.gameManager.getPlanetWithCoords(hoveringOverCoords);
+
+    // 正在为粉红炸弹点选目标：这一下按键只用来选目标，
+    // 不能再当成“选中星球”或“开始拖动出发”，所以不记录按下的星球。
+    if (this.bombPlan.isPicking()) {
+      this.pickBombTarget(hoveringOverPlanet);
+      this.mouseDownOverPlanet = undefined;
+      this.mouseDownOverCoords = undefined;
+      return;
+    }
+
+    // 正在为粉红炸弹点选要摧毁的星球：同样只用来选，不改变当前选中的星球
+    if (this.bombVictim.isPicking()) {
+      this.pickBombVictim(hoveringOverPlanet);
+      this.mouseDownOverPlanet = undefined;
+      this.mouseDownOverCoords = undefined;
+      return;
+    }
 
     if (this.getIsChoosingTargetPlanet()) {
       this.isChoosingTargetPlanet = false;
@@ -1321,6 +1364,10 @@ export class GameUIManager extends EventEmitter {
 
     if (planet?.locationId) this.playClickSound();
 
+    // 选中了别的星球（或取消选中），就放弃“使用神器”进行到一半的选择
+    this.bombPlan.keepOnlyForPlanet(planet?.locationId);
+    this.bombVictim.keepOnlyForPlanet(planet?.locationId);
+
     this.selectedPlanetId$.publish(planet?.locationId);
   }
 
@@ -1384,6 +1431,12 @@ export class GameUIManager extends EventEmitter {
 
     // Set to undefined after SendComplete so it can send another one
     this.artifactSending[locationId] = undefined;
+    // 同时通知界面：否则“运送”按钮还亮着，看起来仍带着神器，
+    // 其实下一次出发的命令里已经不带了。
+    this.artifactSending$.publish({
+      planetId: locationId,
+      artifact: undefined,
+    });
 
     this.sendingPlanet = undefined;
     // Done at the end so they clear the artifact
@@ -2093,6 +2146,104 @@ export class GameUIManager extends EventEmitter {
     return this.gameManager.getPinkZoneByArtifactId(artifactId);
   }
 
+  /** 粉红炸弹在链上的目标和起飞、到达 tick。充能阶段（还没激活）也能读到目标。 */
+  public getBombFlight(artifactId: ArtifactId) {
+    return this.gameManager.getBombFlight(artifactId);
+  }
+
+  /**
+   * 点选炸弹目标：点中已知星球（不是炸弹所在的那颗）就选定。
+   * 点到空处不处理，继续等玩家点。
+   */
+  private pickBombTarget(planet: Planet | undefined): void {
+    const plan = this.bombPlan.get();
+    if (!plan || !planet || !isLocatable(planet)) return;
+    if (planet.locationId === plan.planetId) return;
+    this.bombPlan.chooseTarget(planet.locationId);
+  }
+
+  /**
+   * 点选要摧毁的星球：必须在目标的爆炸范围内、且还没被摧毁才算数。
+   * 不合格的记下来给面板提示，继续等玩家点；点到空处不处理。
+   */
+  private pickBombVictim(planet: Planet | undefined): void {
+    const pick = this.bombVictim.get();
+    if (!pick || !planet || !isLocatable(planet)) return;
+
+    const artifact = this.getArtifactWithId(pick.artifactId);
+    const targetId = this.getBombFlight(pick.artifactId).target;
+    const targetCoords = targetId
+      ? this.getLocationOfPlanet(targetId)?.coords
+      : undefined;
+    if (!artifact || !targetCoords) return;
+
+    const inBlast =
+      planetsInBlast([planet], targetCoords, bombBlastRadius(artifact.rarity))
+        .length > 0;
+    if (inBlast && !planet.destroyed) {
+      this.bombVictim.choose(pick.planetId, pick.artifactId, planet.locationId);
+    } else {
+      this.bombVictim.reject(planet.locationId);
+    }
+  }
+
+  /** 地图上要标出的“已选中的受害星球”，没有选就是 undefined。 */
+  public getBombVictim(): LocatablePlanet | undefined {
+    const victimId = this.bombVictim.get()?.victimId;
+    const planet = victimId ? this.getPlanetWithId(victimId) : undefined;
+    return planet && isLocatable(planet) ? planet : undefined;
+  }
+
+  /**
+   * 地图上要画的炸弹预览。
+   * - 选中放着粉红炸弹的星球：画“按当前能量能飞多远”的射程圈，能量变了圈跟着变。
+   * - 选好目标（界面上刚选的，或充能后链上记的）：再画炸毁线和摧毁半径圈。
+   * - 炸弹发射之后交给 PinkZoneRenderer 画，这里不再画。
+   */
+  public getBombPreview(): BombPreview | undefined {
+    const plan = this.bombPlan.get();
+    const planet = plan
+      ? this.getPlanetWithId(plan.planetId)
+      : this.getSelectedPlanet();
+    if (!planet || !isLocatable(planet)) return undefined;
+
+    const artifacts = plan
+      ? [this.getArtifactWithId(plan.artifactId)]
+      : (planet.heldArtifactIds ?? []).map((id) => this.getArtifactWithId(id));
+
+    for (const artifact of artifacts) {
+      if (artifact?.artifactIndex !== 1) continue; // 1 是粉红炸弹
+      // 冷却中和已损坏的炸弹不能再发射，不画
+      if (artifact.status === 1 || artifact.status === 5) continue;
+      const flight = this.getBombFlight(artifact.id);
+      if (flight.arrivalTick > 0) continue; // 已经发射
+
+      const targetId = resolveBombTarget({
+        status: artifact.status,
+        planTarget: plan?.targetId,
+        chainTarget: flight.target,
+      });
+
+      const from = planet.location.coords;
+      const reach = bombReachRadius(planet);
+      const preview: BombPreview = { from, reachRadius: reach };
+      const targetCoords = targetId
+        ? this.getLocationOfPlanet(targetId)?.coords
+        : undefined;
+      if (targetCoords) {
+        const distance = this.getDistCoords(from, targetCoords);
+        preview.target = {
+          coords: targetCoords,
+          blastRadius: bombBlastRadius(artifact.rarity),
+          distance,
+          inReach: distance <= reach,
+        };
+      }
+      return preview;
+    }
+    return undefined;
+  }
+
   public getMyPinkZones() {
     return [];
     // return this.gameManager.getMyPinkZones();
@@ -2559,13 +2710,26 @@ export class GameUIManager extends EventEmitter {
     return Math.min(1, Math.max(0, value / 10));
   }
 
+  // 界面音效（点击、悬浮、落地、爆炸）共用的开关：设置里关了就一律不响
+  private uiSoundOn(): boolean {
+    return getBooleanSetting(
+      this.soundConfig(),
+      Setting.BackgroundMusicEnabled,
+    );
+  }
+
   private playUiEffect(src: string) {
-    if (
-      !getBooleanSetting(this.soundConfig(), Setting.BackgroundMusicEnabled)
-    ) {
-      return;
-    }
+    if (!this.uiSoundOn()) return;
     playEffect(src, this.effectVolume());
+  }
+
+  /** 星球被炸毁：间隔够长才响，避免一次连炸几颗时声音叠成一片。 */
+  public onPlanetDestroyed(): void {
+    const now = Date.now();
+    if (now - this.lastExplosionAt < EXPLOSION_COOLDOWN_MS) return;
+    this.lastExplosionAt = now;
+    if (!this.uiSoundOn()) return;
+    playExplosion(this.effectVolume());
   }
 
   private startArrivalWatch() {

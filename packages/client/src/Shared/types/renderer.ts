@@ -826,6 +826,11 @@ export interface UIRendererType {
   queueMousePath(): void;
 
   /**
+   * 粉红炸弹的预览：按当前能量的射程圈，以及选了目标之后的炸毁线和摧毁半径圈。
+   */
+  queueBombPreview(): void;
+
+  /**
    * The game calls the queue function when the entities should be put into a back buffer queue.
    * The back buffer is used to contain information on the entities being drawn for later use in the flush function.
    * The implementing renderer should contains its own back buffer.

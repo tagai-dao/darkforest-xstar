@@ -12,6 +12,7 @@ import type {
   BlackDomainRendererType,
   BlueZone,
   BlueZoneRendererType,
+  BombPreview,
   CaptureZone,
   CaptureZoneRendererType,
   Chunk,
@@ -132,6 +133,8 @@ export interface RendererGameContext extends DiagnosticUpdater {
   getInnerRadius(): number;
   getMouseDownPlanet(): LocatablePlanet | undefined;
   getAttackPreview(): { from: WorldCoords; to: WorldCoords } | undefined;
+  getBombPreview(): BombPreview | undefined;
+  getBombVictim(): LocatablePlanet | undefined;
   getLocationsAndChunks(): {
     chunks: Set<Chunk>;
     cachedPlanets: Map<LocationId, PlanetRenderInfo>;
@@ -462,6 +465,7 @@ export class Renderer {
     this.aizoneRenderer.flush();
 
     this.uiRenderManager.queueSelectedRangeRing();
+    this.uiRenderManager.queueBombPreview();
     this.uiRenderManager.queueSelectedRect();
     this.uiRenderManager.queueHoveringRect();
     this.uiRenderManager.queueMousePath();

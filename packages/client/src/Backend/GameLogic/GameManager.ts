@@ -2005,6 +2005,11 @@ export class GameManager extends EventEmitter {
     return this.entityStore.getPinkZones().get(artifactId);
   }
 
+  /** 粉红炸弹在链上的目标和起飞、到达 tick，充能阶段也能读到 */
+  getBombFlight(artifactId: ArtifactId) {
+    return this.entityStore.getBombFlight(artifactId);
+  }
+
   // getKardashevLocations(): Map<LocationId, BurnedLocation> {
   //   return this.entityStore.getKardashevLocations();
   // }

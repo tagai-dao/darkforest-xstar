@@ -93,6 +93,17 @@ export const TooltipName = {
   ChargeArtifact: "ChargeArtifact" as TooltipName,
   ActivateArtifact: "ActivateArtifact" as TooltipName,
   ShutdownArtifact: "ShutdownArtifact" as TooltipName,
+  // 神器列表里的图标按钮说明（中文）
+  ArtifactCopyCharge: "ArtifactCopyCharge" as TooltipName,
+  ArtifactCopyActivate: "ArtifactCopyActivate" as TooltipName,
+  ArtifactCopyShutdown: "ArtifactCopyShutdown" as TooltipName,
+  ArtifactCopyLand: "ArtifactCopyLand" as TooltipName,
+  ArtifactCarry: "ArtifactCarry" as TooltipName,
+  // 神器名称后面的“？”说明：每种神器的作用和用法
+  ArtifactHelpPinkBomb: "ArtifactHelpPinkBomb" as TooltipName,
+  ArtifactHelpBloomFilter: "ArtifactHelpBloomFilter" as TooltipName,
+  ArtifactHelpWormhole: "ArtifactHelpWormhole" as TooltipName,
+  ArtifactHelpCannon: "ArtifactHelpCannon" as TooltipName,
   RetryTransaction: "RetryTransaction" as TooltipName,
   CancelTransaction: "CancelTransaction" as TooltipName,
   PrioritizeTransaction: "PrioritizeTransaction" as TooltipName,
