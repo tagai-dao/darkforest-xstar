@@ -354,7 +354,8 @@ export function SelectedSilverTooltipPane() {
           {selected.value.planetType === PlanetType.SILVER_MINE ? (
             <>
               Growth:
-              <span>{selected.value.silverGrowth * 60}</span>
+              {/* 每 tick 的银成长（客户端值已是页面单位） */}
+              <span>{selected.value.silverGrowth}</span>
             </>
           ) : (
             <>

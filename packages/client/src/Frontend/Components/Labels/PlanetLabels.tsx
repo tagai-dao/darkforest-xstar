@@ -155,6 +155,7 @@ export const EnergyGrowthText = ({
   planet: Planet | undefined;
 }) => <GrowthText planet={planet} getStat={getEnergyGrowth} />;
 
+// 客户端 silverGrowth 已在 PlanetUtils 中除以精度，这里就是每 tick 的银成长（不依赖 tickRate）
 const getSilverGrowth = (p: Planet) => p.silverGrowth;
 export const SilverGrowthText = ({
   planet,
