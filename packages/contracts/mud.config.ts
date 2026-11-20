@@ -752,6 +752,13 @@ export default defineWorld({
       },
       key: [],
     },
+    // 买银累计销毁的 AIPRO，单位是 wei。只在买银时增加，从不减少。名字不超过 16 字节。
+    SilverBurnStats: {
+      schema: {
+        totalBurned: "uint256",
+      },
+      key: [],
+    },
     PlayerStats: {
       schema: {
         player: "address",

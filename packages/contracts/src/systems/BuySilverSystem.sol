@@ -8,6 +8,7 @@ import { Planet } from "libraries/Planet.sol";
 import { PlanetType } from "codegen/common.sol";
 import { Player } from "codegen/tables/Player.sol";
 import { DFXStarConfig } from "codegen/tables/DFXStarConfig.sol";
+import { SilverBurnStats } from "codegen/tables/SilverBurnStats.sol";
 import { DFUtils } from "libraries/DFUtils.sol";
 import { SilverMarket } from "libraries/SilverMarket.sol";
 import { IDFXStarScoreStaking } from "interfaces/nutbox/IDFXStarScoreStaking.sol";
@@ -67,6 +68,8 @@ contract BuySilverSystem is BaseSystem {
     token.safeTransferFrom(executor, address(this), price);
     if (burnAmount != 0) {
       token.safeTransfer(BURN_ADDRESS, burnAmount);
+      // 累计销毁量只在真正转走代币时增加，整笔不销毁时不写表。
+      SilverBurnStats.setTotalBurned(SilverBurnStats.getTotalBurned() + burnAmount);
     }
     if (poolAmount != 0) {
       token.forceApprove(pool, poolAmount);

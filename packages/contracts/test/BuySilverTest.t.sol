@@ -11,6 +11,7 @@ import { PlanetType, SpaceType } from "../src/codegen/common.sol";
 import { DFXStarConfig } from "../src/codegen/tables/DFXStarConfig.sol";
 import { SilverFrontier } from "../src/codegen/tables/SilverFrontier.sol";
 import { SilverPurchaseConfig } from "../src/codegen/tables/SilverPurchaseConfig.sol";
+import { SilverBurnStats } from "../src/codegen/tables/SilverBurnStats.sol";
 import { PlanetAddJunkTick } from "../src/codegen/tables/PlanetAddJunkTick.sol";
 import { Ticker } from "../src/codegen/tables/Ticker.sol";
 import { Errors } from "../src/interfaces/errors.sol";
@@ -211,6 +212,57 @@ contract BuySilverTest is BaseTest {
     assertEq(token.balanceOf(_burnAddress()), 34_000 ether);
     assertEq(token.balanceOf(user1), 1_000_000 ether - 34_000 ether);
     assertEq(PlanetTable.getSilver(bytes32(planetHash)), 10_000_000);
+  }
+
+  function testBuySilver_accumulatesTotalBurned() public {
+    // 一开始没有销毁记录。
+    assertEq(SilverBurnStats.getTotalBurned(), 0);
+
+    uint256 first = _ownPlanet("burn-1", 5, PlanetType.PLANET, SpaceType.NEBULA, 0);
+    uint256 second = _ownPlanet("burn-2", 5, PlanetType.PLANET, SpaceType.NEBULA, 0);
+    pool.depositFromGame(user2, 1);
+
+    vm.startPrank(user1);
+    token.approve(_buySilverSystem(), type(uint256).max);
+    // 5 级 20% 价格 34000，半销毁 17000。买两次。
+    IWorld(worldAddress).df__buySilver(first, 0);
+    assertEq(SilverBurnStats.getTotalBurned(), 17_000 ether);
+    IWorld(worldAddress).df__buySilver(second, 0);
+    vm.stopPrank();
+
+    // 两次合计 34000，和真实转到销毁地址的数量一致。
+    assertEq(SilverBurnStats.getTotalBurned(), 34_000 ether);
+    assertEq(SilverBurnStats.getTotalBurned(), token.balanceOf(_burnAddress()));
+  }
+
+  function testBuySilver_zeroBurnKeepsTotalUnchanged() public {
+    vm.prank(admin);
+    IWorld(worldAddress).df__updateSilverBurnBps(0);
+
+    uint256 planetHash = _ownPlanet("no-burn-stat", 5, PlanetType.PLANET, SpaceType.NEBULA, 0);
+    pool.depositFromGame(user2, 1);
+
+    vm.startPrank(user1);
+    token.approve(_buySilverSystem(), type(uint256).max);
+    IWorld(worldAddress).df__buySilver(planetHash, 0);
+    vm.stopPrank();
+
+    // 不销毁时计数保持 0。
+    assertEq(SilverBurnStats.getTotalBurned(), 0);
+  }
+
+  function testBuySilver_fullBurnCountsWholePayment() public {
+    vm.prank(admin);
+    IWorld(worldAddress).df__updateSilverBurnBps(10_000);
+
+    uint256 planetHash = _ownPlanet("full-burn-stat", 5, PlanetType.PLANET, SpaceType.NEBULA, 0);
+
+    vm.startPrank(user1);
+    token.approve(_buySilverSystem(), type(uint256).max);
+    IWorld(worldAddress).df__buySilver(planetHash, 0);
+    vm.stopPrank();
+
+    assertEq(SilverBurnStats.getTotalBurned(), 34_000 ether);
   }
 
   function testUpdateSilverBurnBps_rejectsOutOfRangeAndStrangers() public {
