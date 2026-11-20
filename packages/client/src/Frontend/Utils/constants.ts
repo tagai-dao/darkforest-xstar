@@ -25,5 +25,7 @@ export const enum DFZIndex {
   HoverPlanet = 1001,
   Modal = 1002,
   Tooltip = 16000000,
+  // 浮窗本身要比 Tooltip 层（如右侧星球信息窗）再高一点，否则同层时会被盖住
+  TooltipPopup = 16000100,
   Notification = 1000,
 }

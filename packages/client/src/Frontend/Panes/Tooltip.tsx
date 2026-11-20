@@ -152,7 +152,8 @@ const StyledTooltip = styled.div`
   padding: 0.5em 1em;
   border-radius: 3px;
   line-height: 1.5em;
-  z-index: ${DFZIndex.Tooltip};
+  // 用比 Tooltip 更高的层级，保证浮窗不会被右侧信息窗等同层元素挡住
+  z-index: ${DFZIndex.TooltipPopup};
 `;
 
 export function getMaterialTooltipName(
