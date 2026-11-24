@@ -5,8 +5,9 @@
   "license": "GPL-3.0",
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "wait-port localhost:8545 && vite",
+    "sync:skill": "node ./scripts/sync-skill-public.mjs",
+    "build": "pnpm sync:skill && vite build",
+    "dev": "pnpm sync:skill && wait-port localhost:8545 && vite",
     "format": "prettier --write .",
     "preview": "vite preview",
     "test": "vitest run",

@@ -23,8 +23,8 @@ chmod +x start.sh
 
 例如 Nginx / Caddy：
 
-- 公网：`https://sldf-indexer.tagai.fun`
-- 上游：`http://127.0.0.1:3001`
+- 公网：`https://darkforest-indexer.tagai.fun`
+- 上游：`http://127.0.0.1:3101`
 
 CORS：indexer 自带 cors；若前面还有网关，允许 `https://starlinkdf.tagai.fun`。
 
@@ -33,7 +33,7 @@ CORS：indexer 自带 cors；若前面还有网关，允许 `https://starlinkdf.
 `packages/client/.env.production`：
 
 ```bash
-VITE_INDEXER_URL=https://sldf-indexer.tagai.fun
+VITE_INDEXER_URL=https://darkforest-indexer.tagai.fun
 ```
 
 然后：

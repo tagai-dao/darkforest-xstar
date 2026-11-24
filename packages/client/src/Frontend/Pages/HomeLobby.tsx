@@ -1,15 +1,14 @@
 import type { FolderCard } from "@backend/Save/FolderCard";
-import { aiproPriceLabel } from "@frontend/Components/ActionHistory";
 import { useComponentValue } from "@latticexyz/react";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import styled from "styled-components";
 
 import dfstyles from "../Styles/dfstyles";
 import { DocsCorner } from "./docs/DocsCorner";
 import { HomeLeaderboardPanel } from "./HomeLeaderboardPanel";
-import { skillPack } from "./skillPack";
+import { skillPublicBasePath } from "./skillPack";
 import type { HomeAssets } from "./useHomeAssets";
 
 const Page = styled.main`
@@ -151,15 +150,6 @@ const ImportButton = styled.button`
   }
 `;
 
-const BoardButton = styled(ImportButton)`
-  border-color: ${dfstyles.colors.dfpink};
-  color: ${dfstyles.colors.dfpink};
-
-  &:hover {
-    background: rgba(255, 105, 180, 0.16);
-  }
-`;
-
 const ChangeButton = styled.button`
   border: none;
   background: none;
@@ -229,6 +219,21 @@ function shortAddress(value: string): string {
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
 }
 
+function explorerAddress(chainId: number, address: string): string {
+  if (chainId === 56) return `https://bscscan.com/address/${address}`;
+  return `https://etherscan.io/address/${address}`;
+}
+
+const AddrLink = styled.a`
+  color: ${dfstyles.colors.dfgreen};
+  text-decoration: none;
+  word-break: break-all;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
 function whole(value: number | undefined): string {
   if (value === undefined || !Number.isFinite(value)) {
     return "读取中";
@@ -236,78 +241,88 @@ function whole(value: number | undefined): string {
   return Math.round(value).toLocaleString("zh-CN");
 }
 
-function useMatchFacts(): { tick?: number; players?: number } {
+/** 与 df.config.toml [inner_circle].a_radius 一致：开局内圈半径。 */
+const INNER_CIRCLE_START = 75000;
+
+function useMatchFacts(): {
+  shrinkPct?: number;
+  maxPlanetLevel?: number;
+  players?: number;
+} {
   const {
-    components: { Ticker, GlobalStats },
+    components: { InnerCircle, SilverFrontier, GlobalStats },
   } = useMUD();
-  const ticker = useComponentValue(Ticker, singletonEntity);
+  const circle = useComponentValue(InnerCircle, singletonEntity);
+  const frontier = useComponentValue(SilverFrontier, singletonEntity);
   const stats = useComponentValue(GlobalStats, singletonEntity);
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNow(Math.floor(Date.now() / 1000));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  if (!ticker) {
-    return {
-      players: stats ? Number(stats.spawnPlayerCount) : undefined,
-    };
+  let shrinkPct: number | undefined;
+  if (circle) {
+    const radius = Number(circle.radius);
+    shrinkPct = Math.min(
+      100,
+      Math.max(0, ((INNER_CIRCLE_START - radius) / INNER_CIRCLE_START) * 100),
+    );
   }
-  const rate = Number(ticker.tickRate);
-  const storedTick = Number(ticker.tickNumber);
-  const storedTime = Number(ticker.timestamp);
-  const tick = ticker.paused
-    ? storedTick
-    : storedTick + (now - storedTime) * rate;
+
   return {
-    tick,
+    shrinkPct,
+    maxPlanetLevel: frontier ? Number(frontier.level) : undefined,
     players: stats ? Number(stats.spawnPlayerCount) : undefined,
   };
 }
 
-function GameData({ tick, players }: { tick?: number; players?: number }) {
+function GameData({
+  shrinkPct,
+  maxPlanetLevel,
+  players,
+}: {
+  shrinkPct?: number;
+  maxPlanetLevel?: number;
+  players?: number;
+}) {
   return (
     <>
-      <FactLine>tick {whole(tick)}</FactLine>
+      <FactLine>
+        内圈收缩{" "}
+        {shrinkPct === undefined ? "读取中" : `${shrinkPct.toFixed(1)}%`}
+      </FactLine>
+      <FactLine>最高星球等级 {whole(maxPlanetLevel)}</FactLine>
       <FactLine>玩家数 {whole(players)}</FactLine>
+      <FactLine>排行榜</FactLine>
+      <HomeLeaderboardPanel previewLimit={5} framed={false} showTitle={false} />
     </>
   );
 }
 
 function AgentSkill() {
   const [copied, setCopied] = useState(false);
-  const skillUrl = useMemo(
-    () => URL.createObjectURL(new Blob([skillPack], { type: "text/markdown" })),
+  // 目录链接：agent 从这里按文件拉全包；复制与打开同一地址。
+  const skillBaseUrl = useMemo(
+    () =>
+      typeof window === "undefined"
+        ? skillPublicBasePath
+        : new URL(skillPublicBasePath, window.location.origin).href,
     [],
   );
 
-  useEffect(() => {
-    return () => URL.revokeObjectURL(skillUrl);
-  }, [skillUrl]);
-
   return (
-    <>
-      <SkillRow>
-        <SkillLink href={skillUrl} target="_blank" rel="noreferrer">
-          darkforest-punk-player
-        </SkillLink>
-        <CopyButton
-          type="button"
-          onClick={() => {
-            void navigator.clipboard.writeText(skillPack).then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 2000);
-            });
-          }}
-        >
-          {copied ? "已复制" : "复制"}
-        </CopyButton>
-      </SkillRow>
-      <FactLine>复制这段 skill，交给你的 agent。</FactLine>
-    </>
+    <SkillRow>
+      <SkillLink href={skillBaseUrl} target="_blank" rel="noreferrer">
+        darkforest-punk-player
+      </SkillLink>
+      <CopyButton
+        type="button"
+        onClick={() => {
+          void navigator.clipboard.writeText(skillBaseUrl).then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
+          });
+        }}
+      >
+        {copied ? "已复制链接" : "复制链接"}
+      </CopyButton>
+    </SkillRow>
   );
 }
 
@@ -342,7 +357,10 @@ export function HomeLobby({
   onChangeFolder: () => void;
 }) {
   const match = useMatchFacts();
-  const [boardOpen, setBoardOpen] = useState(false);
+  const {
+    network: { publicClient },
+  } = useMUD();
+  const chainId = publicClient.chain?.id ?? 56;
 
   return (
     <Page>
@@ -357,19 +375,20 @@ export function HomeLobby({
 
         <Split>
           <Card>
+            <CardTitle>如何开始</CardTitle>
+            <AgentSkill />
+          </Card>
+          <Card>
             <CardTitle>怎么玩</CardTitle>
             <List>
               <li>从家出发，在本地探索周围的星球。</li>
               <li>派出舰队占领星球，搬运能量和银。</li>
-              <li>银进入 Nutbox 矿池，按质押份额领取 AIPRO。</li>
+              <li>银进入 Nutbox 矿池，按质押份额领取奖励。</li>
               <li>
-                有 Binance handle 的钱包，把 AIPRO NFT 质押进这局游戏才能玩。
+                有 Binance handle 的钱包，把 Game Pass NFT
+                质押进这局游戏才能玩。
               </li>
             </List>
-          </Card>
-          <Card>
-            <CardTitle>Agent 怎么接</CardTitle>
-            <AgentSkill />
           </Card>
         </Split>
 
@@ -387,12 +406,6 @@ export function HomeLobby({
               >
                 {importing ? "正在读取" : "导入游戏数据"}
               </ImportButton>
-              <BoardButton
-                type="button"
-                onClick={() => setBoardOpen((open) => !open)}
-              >
-                {boardOpen ? "收起排行榜" : "排行榜"}
-              </BoardButton>
             </ButtonRow>
             {notice && <Notice role="status">{notice}</Notice>}
             {card && (
@@ -406,40 +419,55 @@ export function HomeLobby({
           </Center>
         </Stage>
 
-        {boardOpen && <HomeLeaderboardPanel />}
-
         <Facts>
           <Card>
             <CardTitle>游戏数据</CardTitle>
-            <GameData tick={match.tick} players={match.players} />
+            <GameData
+              shrinkPct={match.shrinkPct}
+              maxPlanetLevel={match.maxPlanetLevel}
+              players={match.players}
+            />
           </Card>
           <Card>
             <CardTitle>Nutbox 矿池</CardTitle>
             <FactLine>{assets.poolNote}</FactLine>
             {assets.pools.map((pool) => (
               <FactLine key={pool.address}>
-                {pool.label} {shortAddress(pool.address)}
+                {pool.label}
                 <br />
-                总质押 {pool.totalStaked}
-                {pool.userStaked ? ` · 我的 ${pool.userStaked}` : ""}
+                合约{" "}
+                <AddrLink
+                  href={explorerAddress(chainId, pool.address)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {pool.address}
+                </AddrLink>
+                <br />
+                质押数量 {pool.totalStaked}
+                <br />
+                每小时奖励 {pool.hourlyReward ?? "读不到"}
               </FactLine>
             ))}
           </Card>
           <Card>
             <CardTitle>{assets.tokenSymbol}</CardTitle>
             <FactLine>
-              {assets.tokenAddress
-                ? shortAddress(assets.tokenAddress)
-                : "支付代币还没配置"}
+              {assets.tokenAddress ? (
+                <AddrLink
+                  href={explorerAddress(chainId, assets.tokenAddress)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {shortAddress(assets.tokenAddress)}
+                </AddrLink>
+              ) : (
+                "支付代币还没配置"
+              )}
             </FactLine>
-            <FactLine>
-              余额{" "}
-              {assets.tokenBalance ?? (card?.address ? "读取中" : "导入后显示")}
-            </FactLine>
-            <FactLine>价格 {aiproPriceLabel(card?.priceText)}</FactLine>
-            {assets.pendingRewards && (
-              <FactLine>待领取 {assets.pendingRewards}</FactLine>
-            )}
+            <FactLine>已销毁 {assets.burnedAmount ?? "读取中"}</FactLine>
+            <FactLine>价格 {assets.tokenPrice ?? "读取中"}</FactLine>
+            <FactLine>FDV {assets.tokenFdv ?? "读取中"}</FactLine>
           </Card>
           <Card>
             <CardTitle>NFT</CardTitle>
@@ -451,9 +479,9 @@ export function HomeLobby({
                   {nft.label}
                   {nft.symbol ? ` ${nft.symbol}` : ""}
                   <br />
-                  持有{" "}
-                  {nft.balance ?? (card?.address ? "读取中" : "导入后显示")}
-                  {nft.tokenIds.length > 0 ? ` ${nft.tokenIds.join(" ")}` : ""}
+                  总发行量 {nft.maxSupply ?? "读不到"}
+                  <br />
+                  已发行 {nft.minted ?? "读不到"}
                 </FactLine>
               ))
             )}

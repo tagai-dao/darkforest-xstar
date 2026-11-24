@@ -1,2 +1,4 @@
-# Cloudflare Pages SPA fallback
+# Serve skill static files as-is (do not SPA-fallback the directory).
+/skills/*  /skills/:splat  200
+# Cloudflare Pages SPA fallback for the React app.
 /*    /index.html   200

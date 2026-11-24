@@ -8,7 +8,7 @@ Do this before [mining.md](mining.md). Do not mine from `0, 0`. The center of th
 
 ## Read the chain
 
-Use the world `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f` and Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send BNB to Multicall3.
+Use the world `0xfaD1cDDAD97113e4c0335FF5A815955c21b2ddca` and Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` from `SKILL.md`. Read these three tables in one `aggregate3`. Do not send a separate `eth_call` for each table. `allowFailure` is false. Do not send BNB to Multicall3.
 
 | Table       | Id                                                                   |
 | ----------- | -------------------------------------------------------------------- |
@@ -23,11 +23,9 @@ cast abi-encode "x(address)" <player>
 ```
 
 ```bash
-export NO_PROXY=127.0.0.1,localhost
-export no_proxy=127.0.0.1,localhost
-RPC=http://127.0.0.1:8545
+RPC=https://bsc.publicnode.com
 MULTI=0xcA11bde05977b3631167028862bE2a173976CA11
-WORLD=0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f
+WORLD=0xfaD1cDDAD97113e4c0335FF5A815955c21b2ddca
 KEY=$(cast abi-encode "x(address)" <player>)
 SPAWN=$(cast calldata "getRecord(bytes32,bytes32[])" 0x74626466000000000000000000000000537061776e506c616e65740000000000 "[$KEY]")
 PLAYER_REC=$(cast calldata "getRecord(bytes32,bytes32[])" 0x74626466000000000000000000000000506c6179657200000000000000000000 "[$KEY]")
@@ -64,13 +62,13 @@ Do not send a loop of individual `eth_call`, a JSON-RPC batch, or `Promise.all` 
 
 Finding the coordinate does not spend tokens. Once one unowned legal coordinate is known, generate its proof and create the home. A wallet that already has a player record keeps that name. Do not register it again. The burner is the same wallet. Do not create or store a second key.
 
-If the player index is zero, ask the owner what name to register. Wait for that name. Do not invent one, and do not use `pilot` plus part of the address. The question is only the name. An example: "What name should this new player use?" If registration reverts because that name is taken, say so and ask for a different name. Do not append a number unless the owner gives that new name.
+If the player index is zero, register with this wallet's Binance / Space ID handle. Read `handleOf(player)` from the handle registry in [SKILL.md](SKILL.md). That non-empty string is the game name. Do not ask the owner for a name. Do not invent one, and do not use `pilot` plus part of the address. If the handle is empty, stop and tell the owner to bind a handle before registering. If registration reverts because that name is taken, tell the owner and stop; do not invent a suffix.
 
 If the BNB balance cannot pay for the register and spawn transactions, stop and tell the owner. Do not search further and do not write the home files.
 
 Sign with the current wallet. A legacy transaction is fine. Wait for each receipt. Call the world. Staking is the locker call in [SKILL.md](SKILL.md), not a world call.
 
-1. If the player index is zero, call `df__registerPlayer(string,address)` with the name the owner just gave and the player address. If it reverts because the wallet is already registered, continue.
+1. If the player index is zero, call `df__registerPlayer(string,address)` with the handle from `handleOf(player)` and the player address. If it reverts because the wallet is already registered, continue.
 2. Prove the candidate with the example below. The world requires this proof.
 3. Call `df__initializePlayer(uint256[2],uint256[2][2],uint256[2],uint256[9])` with the `a`, `b`, `c`, and nine public signals printed by the example.
 

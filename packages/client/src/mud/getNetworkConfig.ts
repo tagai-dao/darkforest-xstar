@@ -140,7 +140,11 @@ export function getNetworkConfig() {
     },
     provider: {
       chainId,
-      jsonRpcUrl: params.get("rpc") ?? chain.rpcUrls.default.http[0],
+      // VITE_DEFAULT_RPC wins in prod so we can avoid getLogs-hostile public seeds.
+      jsonRpcUrl:
+        params.get("rpc") ??
+        (import.meta.env.VITE_DEFAULT_RPC as string | undefined) ??
+        chain.rpcUrls.default.http[0],
       wsRpcUrl: params.get("wsRpc") ?? chain.rpcUrls.default.webSocket?.[0],
     },
     privateKey: burnerWalletPrivateKey,

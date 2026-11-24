@@ -11,19 +11,17 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ??
   import.meta.env.VITE_LEADERBOARD_API_URL ??
   "http://localhost:4100") as string;
 
-/** 榜上优先显示 Binance handle。没登记时用缩短地址，避免整段钱包地址占满一行。 */
+/** 榜上显示缩短地址；有 Binance / Space ID handle 时加在括号里。 */
 export function displayHandle(
   address: string,
   handle: string | undefined,
 ): string {
+  const short =
+    address.length < 10
+      ? address
+      : `${address.slice(0, 6)}…${address.slice(-4)}`;
   const name = handle?.trim();
-  if (name) {
-    return name;
-  }
-  if (address.length < 10) {
-    return address;
-  }
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+  return name ? `${short} (${name})` : short;
 }
 
 /** 链上分数和击杀与银一样，页面上除以 1000。 */

@@ -26,13 +26,14 @@ const HANDLE_ABI = parseAbi([
   "function handleOf(address owner) view returns (string)",
 ]);
 
-// viem 的 Foundry 链没有登记 multicall3。本地 anvil 部署的是这个通用地址。
 const MULTICALL3: Address = "0xcA11bde05977b3631167028862bE2a173976CA11";
 
-const Panel = styled.section`
-  padding: 16px 18px;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid ${dfstyles.colors.border};
+const Panel = styled.section<{ $framed: boolean }>`
+  padding: ${(props) => (props.$framed ? "16px 18px" : "0")};
+  background: ${(props) =>
+    props.$framed ? "rgba(0, 0, 0, 0.45)" : "transparent"};
+  border: ${(props) =>
+    props.$framed ? `1px solid ${dfstyles.colors.border}` : "none"};
 `;
 
 const TitleRow = styled.div`
@@ -85,6 +86,7 @@ const Table = styled.table`
   td {
     padding: 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
+    word-break: break-all;
   }
 
   td:first-child,
@@ -96,9 +98,51 @@ const Table = styled.table`
   }
 `;
 
+const MoreButton = styled.button`
+  margin-top: 10px;
+  padding: 4px 10px;
+  border: 1px solid ${dfstyles.colors.dfgreen};
+  background: transparent;
+  color: ${dfstyles.colors.dfgreen};
+  font: inherit;
+  cursor: pointer;
+`;
+
+const Overlay = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
+`;
+
+const Modal = styled.div`
+  width: min(720px, 100%);
+  max-height: min(80vh, 720px);
+  overflow: auto;
+  padding: 18px;
+  background: #0a1012;
+  border: 1px solid ${dfstyles.colors.dfgreen};
+`;
+
 type ListedRow = HomeBoardRow & { label: string };
 
-export function HomeLeaderboardPanel() {
+type Props = {
+  /** 预览条数；不传则显示全部。 */
+  previewLimit?: number;
+  /** false 时去掉外边框，嵌进「游戏数据」卡片。 */
+  framed?: boolean;
+  showTitle?: boolean;
+};
+
+export function HomeLeaderboardPanel({
+  previewLimit,
+  framed = true,
+  showTitle = true,
+}: Props) {
   const {
     network: { publicClient },
     components: { GamePassNFT },
@@ -107,6 +151,7 @@ export function HomeLeaderboardPanel() {
   const [mode, setMode] = useState<HomeBoardMode>("score");
   const [rows, setRows] = useState<ListedRow[]>([]);
   const [status, setStatus] = useState("正在读取");
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let stopped = false;
@@ -114,7 +159,6 @@ export function HomeLeaderboardPanel() {
       setStatus("正在读取");
       try {
         const board = await fetchHomeBoard(mode);
-        // 名字读失败时，分数和击杀照样留下。
         let handles = new Map<string, string>();
         try {
           handles = await readHandles(
@@ -150,49 +194,99 @@ export function HomeLeaderboardPanel() {
     };
   }, [mode, pass?.addr, publicClient]);
 
+  const preview =
+    previewLimit !== undefined ? rows.slice(0, previewLimit) : rows;
+  const hasMore = previewLimit !== undefined && rows.length > previewLimit;
+
   return (
-    <Panel>
-      <TitleRow>
-        <Title>排行榜</Title>
-        <Modes>
-          <ModeButton
-            type="button"
-            $active={mode === "score"}
-            onClick={() => setMode("score")}
-          >
-            分数
-          </ModeButton>
-          <ModeButton
-            type="button"
-            $active={mode === "kills"}
-            onClick={() => setMode("kills")}
-          >
-            击杀
-          </ModeButton>
-        </Modes>
-      </TitleRow>
-      {status && <Status>{status}</Status>}
-      {rows.length > 0 && (
-        <Table>
-          <thead>
-            <tr>
-              <th>名次</th>
-              <th>玩家</th>
-              <th>{mode === "score" ? "分数" : "击杀"}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.address}>
-                <td>{row.rank}</td>
-                <td title={row.address}>{row.label}</td>
-                <td>{displayMetric(metricOf(row, mode))}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+    <>
+      <Panel $framed={framed}>
+        <TitleRow>
+          {showTitle ? <Title>排行榜</Title> : <span />}
+          <Modes>
+            <ModeButton
+              type="button"
+              $active={mode === "score"}
+              onClick={() => setMode("score")}
+            >
+              分数
+            </ModeButton>
+            <ModeButton
+              type="button"
+              $active={mode === "kills"}
+              onClick={() => setMode("kills")}
+            >
+              击杀
+            </ModeButton>
+          </Modes>
+        </TitleRow>
+        {status && <Status>{status}</Status>}
+        {preview.length > 0 && <BoardTable mode={mode} rows={preview} />}
+        {hasMore && (
+          <MoreButton type="button" onClick={() => setOpen(true)}>
+            更多
+          </MoreButton>
+        )}
+      </Panel>
+      {open && (
+        <Overlay role="dialog" aria-modal="true" onClick={() => setOpen(false)}>
+          <Modal onClick={(event) => event.stopPropagation()}>
+            <TitleRow>
+              <Title>排行榜</Title>
+              <MoreButton type="button" onClick={() => setOpen(false)}>
+                关闭
+              </MoreButton>
+            </TitleRow>
+            <Modes style={{ marginTop: 12 }}>
+              <ModeButton
+                type="button"
+                $active={mode === "score"}
+                onClick={() => setMode("score")}
+              >
+                分数
+              </ModeButton>
+              <ModeButton
+                type="button"
+                $active={mode === "kills"}
+                onClick={() => setMode("kills")}
+              >
+                击杀
+              </ModeButton>
+            </Modes>
+            {rows.length > 0 && <BoardTable mode={mode} rows={rows} />}
+          </Modal>
+        </Overlay>
       )}
-    </Panel>
+    </>
+  );
+}
+
+function BoardTable({
+  mode,
+  rows,
+}: {
+  mode: HomeBoardMode;
+  rows: ListedRow[];
+}) {
+  return (
+    <Table>
+      <thead>
+        <tr>
+          <th>名次</th>
+          <th>玩家</th>
+          <th>{mode === "score" ? "分数" : "击杀"}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.address}>
+            <td>{row.rank}</td>
+            <td title={row.address}>{row.label}</td>
+            <td>{displayMetric(metricOf(row, mode))}</td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }
 

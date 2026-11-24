@@ -5,8 +5,8 @@ import { displayHandle, displayMetric } from "./homeLeaderboard";
 const ADDRESS = "0x8153c8c8ef6d9e7e7ee11333f33048835325add0";
 
 describe("home leaderboard labels", () => {
-  it("shows the Binance handle when one is registered", () => {
-    expect(displayHandle(ADDRESS, "alice")).toBe("alice");
+  it("puts the Binance handle in parentheses after the short address", () => {
+    expect(displayHandle(ADDRESS, "alice")).toBe("0x8153…add0 (alice)");
   });
 
   it("shortens the address when the handle is blank", () => {

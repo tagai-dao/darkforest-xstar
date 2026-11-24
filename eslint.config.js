@@ -165,6 +165,8 @@ export default [
       "**/eslint.config.js",
       "**/.stylelintrc.cjs",
       "**/embedded_plugins/**",
+      // Skill pack JSON/HTML is static content, not app source.
+      "**/public/skills/**",
     ],
   },
 ];

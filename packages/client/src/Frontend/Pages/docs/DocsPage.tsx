@@ -4,6 +4,7 @@ import styled from "styled-components";
 
 import dfstyles from "../../Styles/dfstyles";
 import { BiomeTable } from "./BiomeTable";
+import { ContractsDocTable } from "./ContractsDocTable";
 import { EnergyCurveFigure } from "./EnergyCurve";
 import {
   chapterHeadings,
@@ -181,6 +182,9 @@ function Blocks({ blocks }: { blocks: DocBlock[] }) {
               ))}
             </BulletList>
           );
+        }
+        if (block.kind === "contracts") {
+          return <ContractsDocTable key={index} />;
         }
         if (block.kind === "energy-figure") {
           return <EnergyCurveFigure key={index} />;

@@ -1,7 +1,7 @@
 ---
 name: darkforest-punk-player
-version: 1.0.0
-description: Join Dark Forest, initialize a home planet, explore outward from that home, and play with a named strategy file. When speaking to the owner, call map hashing 探索. Use when the owner wants an agent to start playing, stake an AIPRO NFT, spawn a home, explore, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_REVERT_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, DARKFOREST_BUY_JUNK, DARKFOREST_FIND_ARTIFACT, DARKFOREST_USE_ARTIFACT, DARKFOREST_CLEAR_JUNK, DARKFOREST_CLAIM_REWARDS, or DARKFOREST_CLAIM_COMMUNITY.
+version: 1.1.0
+description: Join Dark Forest on BSC (chain 56), stake a game-pass NFT, spawn a home, explore, and play with a named strategy file. When speaking to the owner, call map hashing 探索. Use when the owner wants an agent to start playing, stake the game-pass NFT, spawn a home, explore, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_REVERT_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, DARKFOREST_BUY_JUNK, DARKFOREST_FIND_ARTIFACT, DARKFOREST_USE_ARTIFACT, DARKFOREST_CLEAR_JUNK, DARKFOREST_CLAIM_REWARDS, or DARKFOREST_CLAIM_COMMUNITY.
 ---
 
 # Dark Forest player
@@ -10,25 +10,26 @@ The owner does not know the chain, contracts, or price. Do not ask for them. The
 
 | Item            | Value                                                                                                                    |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Chain ID        | `31337`                                                                                                                  |
-| RPC             | `http://127.0.0.1:8545` (`http://localhost:8545` is the same)                                                            |
-| World           | `0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`                                                                             |
-| AIPRO NFT       | `0x3a622DB2db50f463dF562Dc5F341545A64C580fc`                                                                             |
-| Handle registry | `0xc6B407503dE64956Ad3cF5Ab112cA4f56AA13517`                                                                             |
-| Locker          | `0x6A47346e722937B60Df7a1149168c0E76DD6520f`                                                                             |
-| Entry           | One AIPRO NFT in the locker. `isPlayerInActiveSeason(player)` is true while it is there. Stake and withdraw at any time. |
+| Chain ID        | `56` (BNB Smart Chain)                                                                                                   |
+| RPC             | `https://bsc.publicnode.com`                                                                                             |
+| World           | `0xfaD1cDDAD97113e4c0335FF5A815955c21b2ddca`                                                                             |
+| Game pass NFT   | `0xD0ac6355Deb37711fBf365838c755D2BC44EB32A`                                                                             |
+| Handle registry | `0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F` (Binance / Space ID)                                                        |
+| Locker          | `0xe8d9F091d0650EdcB5237b2D4BB5b654783B61d6`                                                                             |
+| Entry           | One game-pass NFT in the locker. `isPlayerInActiveSeason(player)` is true while it is there. Stake and withdraw anytime. |
 | Multicall3      | `0xcA11bde05977b3631167028862bE2a173976CA11`. If this address has no code, stop.                                         |
 | Player          | The wallet the owner connected for this run. Do not write that address into this skill.                                  |
+| Game page       | `https://starlinkdf.tagai.fun/redpill/0xfaD1cDDAD97113e4c0335FF5A815955c21b2ddca`                                        |
 
-After each redeploy, rewrite the AIPRO NFT, handle registry, and locker above, and the five Nutbox addresses in [nutbox.md](nutbox.md), from that deploy's PostDeploy log. Leave World and Multicall3 unchanged when the log shows the same values.
+This is the live BSC deployment. Keep these addresses. Do not switch chains. Do not deploy contracts. The five Nutbox addresses are in [nutbox.md](nutbox.md).
 
-The chain can be reset to a fresh state while keeping the chain ID and the World address. This map uses planet hash key `20261119`, space key `20261120`, biome key `20261121`, and scale `8192`. At the start of a run, verify the World, locker, NFT, handle registry, and pool on chain before opening a wallet save. A matching folder name does not prove that its files belong to this map. If `SpawnPlanet` for this wallet is zero and the folder already contains `homeLocations.json` or `knownBoard.ndjson`, stop and ask the owner for an empty directory. Do not use those files. Create fresh files only after the current chain and wallet state have been read. Keep stopped mining and strategy processes stopped until the owner explicitly starts them for this run.
+This map uses planet hash key `20261119`, space key `20261120`, biome key `20261121`, and scale `8192`. At the start of a run, verify the World, locker, NFT, handle registry, and pool on chain before opening a wallet save. A matching folder name does not prove that its files belong to this map. If `SpawnPlanet` for this wallet is zero and the folder already contains `homeLocations.json` or `knownBoard.ndjson`, stop and ask the owner for an empty directory. Do not use those files. Create fresh files only after the current chain and wallet state have been read. Keep stopped mining and strategy processes stopped until the owner explicitly starts them for this run.
 
-After an agent or chain restart, treat any earlier chain snapshot, transaction receipt, staked NFT, registered name, home, and in-memory signer as unverified. Pin a fresh block and read the current `GamePassNFT` World record through the verified Multicall3; check the locker, NFT, handle registry, and pool against the current deployment before making a game decision. Derive the player address from a signer that is **still live**, then read `isPlayerInActiveSeason(player)` and `SpawnPlanet` from this deployment. A socket path or a saved address by itself does not prove that its old signer process survived the restart. Do not resume an old transaction plan or copy another map's board or action log into this save. The PostDeploy log and a wallet folder are supporting evidence; the current chain state decides what is live.
+After an agent restart, treat any earlier chain snapshot, transaction receipt, staked NFT, registered name, home, and in-memory signer as unverified. Pin a fresh block and read the current `GamePassNFT` World record through the verified Multicall3; check the locker, NFT, handle registry, and pool against the current deployment before making a game decision. Derive the player address from a signer that is **still live**, then read `isPlayerInActiveSeason(player)` and `SpawnPlanet` from this deployment. A socket path or a saved address by itself does not prove that its old signer process survived the restart. Do not resume an old transaction plan or copy another map's board or action log into this save. The current chain state decides what is live.
 
-Use the World from `packages/contracts/worlds.json` for chain 31337, and verify its code before using it. Read the locker from the World table and the NFT and handle registry from that locker. If `isPlayerInActiveSeason(player)` is false and the wallet holds an NFT, approve that NFT to the locker, then call `stake` on the locker. Stake transfers that NFT into the locker, so a staked wallet has an NFT balance of 0 and still plays. A wallet with a handle and no NFT pays to mint first. Do not call `setHandle`. Stop if any required address has no code.
+Use the World from `packages/contracts/worlds.json` for chain `56`, and verify its code before using it. Read the locker from the World table and the NFT and handle registry from that locker. If `isPlayerInActiveSeason(player)` is false and the wallet holds an NFT, approve that NFT to the locker, then call `stake` on the locker. Stake transfers that NFT into the locker, so a staked wallet has an NFT balance of 0 and still plays. A wallet with a handle and no NFT acquires one from the NFT contract first (read mint price on chain; do not invent it). Do not call `setHandle`. Stop if any required address has no code.
 
-Set both `NO_PROXY=127.0.0.1,localhost` and `no_proxy=127.0.0.1,localhost` before calling the RPC. If the RPC cannot be reached, stop.
+If the RPC cannot be reached, stop. Prefer a stable BSC HTTP RPC when publicnode rate-limits.
 
 ## Pasted orders
 
@@ -178,11 +179,9 @@ The locker address is not fixed. Read it from the world table `GamePassNFT`, the
 The first batch is the BNB balance and that table. The table key is empty. Its static data is one address, 20 bytes packed from the left. That address is the locker. An empty record, or an address of zero, means this world has no locker. Stop and tell the owner. Do not register and do not look for a pass to buy.
 
 ```bash
-export NO_PROXY=127.0.0.1,localhost
-export no_proxy=127.0.0.1,localhost
-RPC=http://127.0.0.1:8545
+RPC=https://bsc.publicnode.com
 MULTI=0xcA11bde05977b3631167028862bE2a173976CA11
-WORLD=0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f
+WORLD=0xfaD1cDDAD97113e4c0335FF5A815955c21b2ddca
 
 ETH=$(cast calldata "getEthBalance(address)" <player>)
 LOCKER_REC=$(cast calldata "getRecord(bytes32,bytes32[])" 0x7462646600000000000000000000000047616d65506173734e46540000000000 "[]")
@@ -232,12 +231,12 @@ Follow this order. Take the first match. A staked wallet keeps its NFT in the lo
 
 1. The wallet is **staked**, `SpawnPlanet` for that wallet is not zero, and `homeLocations.json` contains the same planet hash: the wallet has a **home**. Read [mining.md](mining.md). The mining center is that planet. Do not spawn a second home and do not move fleets.
 2. The wallet is staked, `SpawnPlanet` is not zero, and `homeLocations.json` does not contain that hash: **stop**. The home is already on chain and its coordinates were not saved. Coordinates are not recoverable from the chain. Do not search for another planet.
-3. The wallet is staked and `SpawnPlanet` is zero: there is **no home**. Read [home.md](home.md). If the player index is zero, ask for a name and wait before registering. Do not invent a name. After the home files exist, ask in that same reply whether to start 探索 and which strategy starts play, as [home.md](home.md) and [mining.md](mining.md) describe. Do not stop after only reporting the coordinates.
+3. The wallet is staked and `SpawnPlanet` is zero: there is **no home**. Read [home.md](home.md). If the player index is zero, register with this wallet's Binance / Space ID handle; do not ask for a name. After the home files exist, ask in that same reply whether to start 探索 and which strategy starts play, as [home.md](home.md) and [mining.md](mining.md) describe. Do not stop after only reporting the coordinates.
 4. The wallet is not staked and `handleOf(player)` is empty: **no Binance handle**. Stop. Do not call `setHandle`, and do not invent a handle.
 5. The wallet is not staked, has a handle, and the NFT balance is 0: **paid mint**. Ask before spending. Then stake the minted token.
 6. The wallet is not staked, has a handle, and holds an NFT: **stake**.
 
-Before staking, registering, or spawning, if the BNB balance cannot pay for one ordinary transaction, decide **not enough gas** and do not send a transaction. Registering uses the name the owner just gave. Spawning does not need its own yes once a legal home coordinate is known. A search the owner already stopped stays stopped. A home that just got saved is followed by the 探索 and strategy question, and the run starts only after they answer.
+Before staking, registering, or spawning, if the BNB balance cannot pay for one ordinary transaction, decide **not enough gas** and do not send a transaction. Registering uses the wallet's Binance / Space ID handle from `handleOf(player)`. Spawning does not need its own yes once a legal home coordinate is known. A search the owner already stopped stays stopped. A home that just got saved is followed by the 探索 and strategy question, and the run starts only after they answer.
 
 ## How to talk
 
@@ -269,7 +268,7 @@ Not enough gas. Do not send a transaction. Tell the owner this wallet needs BNB 
 
 Joined, and a home is saved. If `strategy.txt` is missing or the map run has not been started, ask the 探索 and strategy question from [mining.md](mining.md) and wait. The sentence the owner reads uses 探索. Do not end the turn with only the home coordinates. Do not ask them to confirm the home again.
 
-Joined, but no home yet. If this player is not registered, ask for a name before searching. Follow [home.md](home.md). A search the owner already stopped stays stopped until they say to continue.
+Joined, but no home yet. If this player is not registered, register with the wallet handle before searching; do not ask for a name. Follow [home.md](home.md). A search the owner already stopped stays stopped until they say to continue.
 
 ## Transactions after confirmation
 
@@ -277,10 +276,10 @@ Sign with the current wallet. A legacy transaction is fine. Do not write a priva
 
 Paid mint, only after the owner says yes:
 
-1. Read `communityTokenPrice()` and `nativePrice()` on the NFT. The NFT collection returns `100000` AIPRO, which is `100000 * 10^18` raw units, and `0.01` BNB. Stop if either value differs.
-2. Read the AIPRO balance. The payment token is `paymentToken` in `DFXStarConfig`, the address in [nutbox.md](nutbox.md). Stop if the balance is below the price, or the BNB balance cannot cover `0.01` BNB plus gas. Tell the owner which one is short. Do not mint from another wallet.
-3. Read `allowance(player, NFT)`. If it is below the price, approve the NFT for the price. Approve the NFT contract, not the locker and not the World.
-4. Call NFT `mint(uint256 referrerTokenId)` with value `nativePrice`. Pass `0` unless the owner named a referrer token id. The receipt mints the next token to this wallet. The wallet must already have a handle. Do not call `setHandle`.
+1. Read mint pricing on the NFT contract on chain (`communityTokenPrice` / `nativePrice`, or the live mint entrypoints this collection exposes). Do not invent prices from an older local deploy.
+2. Read the payment-token balance. The payment token is `paymentToken` in `DFXStarConfig`, the address in [nutbox.md](nutbox.md). Stop if the token or BNB balance cannot cover mint plus gas. Tell the owner which one is short. Do not mint from another wallet.
+3. If the mint pulls the payment token, read `allowance(player, NFT)` and approve the NFT for the on-chain price when needed. Approve the NFT contract, not the locker and not the World.
+4. Call the NFT mint entrypoint with the value and args the contract requires. The wallet must already have a Binance handle. Do not call `setHandle`.
 
 Stake:
 
@@ -292,16 +291,12 @@ The owner can take the NFT back at any time. Ask first. Call locker `withdraw(to
 `cast` is one way to do this. `<player>` and the signing account must be the current wallet. `$NFT` and `$LOCKER` are the addresses read above.
 
 ```bash
-export NO_PROXY=127.0.0.1,localhost
-export no_proxy=127.0.0.1,localhost
-RPC=http://127.0.0.1:8545
+RPC=https://bsc.publicnode.com
 
-# Paid mint. $AIPRO is the payment token. Value is nativePrice, 0.01 BNB.
-cast send --legacy --rpc-url $RPC $AIPRO "approve(address,uint256)" $NFT 100000000000000000000000
-cast send --legacy --rpc-url $RPC $NFT "mint(uint256)" 0 --value 0.01ether
-
-cast send --legacy --rpc-url $RPC $NFT "approve(address,uint256)" $LOCKER <tokenId>
-cast send --legacy --rpc-url $RPC $LOCKER "stake(uint256)" <tokenId>
+# Mint only after reading this collection's live price and mint ABI on chain.
+# Then stake:
+cast send --rpc-url $RPC $NFT "approve(address,uint256)" $LOCKER <tokenId>
+cast send --rpc-url $RPC $LOCKER "stake(uint256)" <tokenId>
 ```
 
 ## Save
@@ -320,7 +315,7 @@ The wallet folder is `<root>/<chainId>-<world>/<player lowercase>/`. `agent.json
 
 ```json
 {
-  "chainId": 31337,
+  "chainId": 56,
   "world": "<world lowercase>"
 }
 ```

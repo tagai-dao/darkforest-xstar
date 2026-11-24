@@ -17,12 +17,11 @@ import {
   mudFoundry,
   redstone,
 } from "@latticexyz/common/chains";
-
 import {
-  baseSepolia as baseSepoliaConfig,
   base as baseConfig,
-  optimism as optimismConfig,
+  baseSepolia as baseSepoliaConfig,
   bsc as bscConfig,
+  optimism as optimismConfig,
 } from "viem/chains";
 
 export const baseSepolia = {
@@ -90,15 +89,16 @@ export const optimism = {
 export const bsc = {
   ...bscConfig,
   iconUrls: [""],
-  // Empty: sync via RPC until a MUD HTTP indexer is stood up for chain 56.
+  // Prefer publicnode: official dataseeds often reject eth_getLogs (limit exceeded).
   // Leaderboard API (sldf-api) is separate and uses VITE_API_BASE_URL.
+  // HTTP indexer comes from VITE_INDEXER_URL in production.
   indexerUrl: "",
   rpcUrls: {
     ...bscConfig.rpcUrls,
     default: {
       http: [
-        "https://bsc-dataseed1.bnbchain.org",
         "https://bsc.publicnode.com",
+        "https://bsc-dataseed1.bnbchain.org",
         ...(bscConfig.rpcUrls.default.http ?? []),
       ],
       webSocket: ["wss://bsc.publicnode.com"],

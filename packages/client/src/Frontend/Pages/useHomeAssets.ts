@@ -11,15 +11,21 @@ import {
   zeroAddress,
 } from "viem";
 
+const DEAD: Address = "0x000000000000000000000000000000000000dEaD";
+
+/** Multicall3 on BSC / most EVM chains. */
+const MULTICALL3: Address = "0xcA11bde05977b3631167028862bE2a173976CA11";
+
 const communityAbi = parseAbi([
-  "function activedPools(uint256 index) view returns (address)",
+  "function rewardCalculator() view returns (address)",
+]);
+
+const calculatorAbi = parseAbi([
+  "function getCurrentRewardRate(address community) view returns (uint256)",
 ]);
 
 const poolAbi = parseAbi([
   "function getTotalStakedAmount() view returns (uint256)",
-  "function getUserStakedAmount(address user) view returns (uint256)",
-  "function getPendingExternalRewards(address user) view returns (uint256)",
-  "function getPendingCommunityRewards(address user) view returns (uint256)",
 ]);
 
 const erc20Abi = parseAbi([
@@ -30,27 +36,25 @@ const erc20Abi = parseAbi([
 const nftAbi = parseAbi([
   "function name() view returns (string)",
   "function symbol() view returns (string)",
-  "function balanceOf(address owner) view returns (uint256)",
-  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+  "function maxSupply() view returns (uint256)",
 ]);
 
-const lockerAbi = parseAbi([
-  "function nft() view returns (address)",
-  "function stakedTokenOf(address player) view returns (uint256)",
-]);
+const lockerAbi = parseAbi(["function nft() view returns (address)"]);
 
 export type PoolRow = {
   address: string;
   label: string;
   totalStaked: string;
-  userStaked?: string;
+  hourlyReward?: string;
 };
 
 export type NftRow = {
   label: string;
   symbol?: string;
-  balance?: string;
-  tokenIds: string[];
+  address?: string;
+  minted?: string;
+  maxSupply?: string;
 };
 
 export type HomeAssets = {
@@ -58,8 +62,12 @@ export type HomeAssets = {
   poolNote: string;
   tokenSymbol: string;
   tokenAddress?: string;
-  tokenBalance?: string;
-  pendingRewards?: string;
+  /** 买银累计销毁（dead 地址余额），展示用。 */
+  burnedAmount?: string;
+  /** TagAI / 行情价文案。 */
+  tokenPrice?: string;
+  /** 完全稀释市值（FDV）文案。 */
+  tokenFdv?: string;
   nfts: NftRow[];
 };
 
@@ -88,98 +96,278 @@ function tokenAmount(value: bigint): string {
   return tail ? `${head}.${tail}` : head;
 }
 
-async function readPools(
-  publicClient: PublicClient,
-  community: Address,
-  scorePool: Address | undefined,
-  owner: Address | undefined,
-): Promise<{ rows: PoolRow[]; pending?: bigint }> {
-  const found: Address[] = [];
-  for (let index = 0; index < 8; index += 1) {
-    try {
-      const pool = await publicClient.readContract({
-        address: community,
-        abi: communityAbi,
-        functionName: "activedPools",
-        args: [BigInt(index)],
-      });
-      if (pool !== zeroAddress) {
-        found.push(pool);
-      }
-    } catch {
-      // 下标越界说明后面没有矿池了。
-      break;
-    }
-  }
-  if (
-    scorePool &&
-    !found.some((pool) => pool.toLowerCase() === scorePool.toLowerCase())
-  ) {
-    found.unshift(scorePool);
-  }
-
-  const rows: PoolRow[] = [];
-  let pending = 0n;
-  for (const pool of found) {
-    const row: PoolRow = {
-      address: pool,
-      label:
-        scorePool && pool.toLowerCase() === scorePool.toLowerCase()
-          ? "DFXStar 分数池"
-          : "矿池",
-      totalStaked: "读不到",
-    };
-    try {
-      row.totalStaked = grouped(
-        await publicClient.readContract({
-          address: pool,
-          abi: poolAbi,
-          functionName: "getTotalStakedAmount",
-        }),
-      );
-    } catch {
-      // 这个池子没有分数接口时，只留地址。
-    }
-    if (owner) {
-      try {
-        row.userStaked = grouped(
-          await publicClient.readContract({
-            address: pool,
-            abi: poolAbi,
-            functionName: "getUserStakedAmount",
-            args: [owner],
-          }),
-        );
-        pending += await publicClient.readContract({
-          address: pool,
-          abi: poolAbi,
-          functionName: "getPendingCommunityRewards",
-          args: [owner],
-        });
-        pending += await publicClient.readContract({
-          address: pool,
-          abi: poolAbi,
-          functionName: "getPendingExternalRewards",
-          args: [owner],
-        });
-      } catch {
-        // 个人质押读不到时，总质押仍然保留。
-      }
-    }
-    rows.push(row);
-  }
-  return { rows, pending: owner ? pending : undefined };
+function formatUsd(n: number): string {
+  if (!Number.isFinite(n)) return "未接入";
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(2)}K`;
+  if (n >= 1) return `$${n.toFixed(2)}`;
+  if (n >= 0.0001) return `$${n.toFixed(4)}`;
+  return `$${n.toExponential(2)}`;
 }
 
-/** 首页上的矿池、代币和入场 NFT。钱包地址来自已记住的游戏目录。 */
-export function useHomeAssets(wallet: string | undefined): HomeAssets {
+function formatPriceUsd(n: number): string {
+  if (!Number.isFinite(n)) return "价格未接入";
+  if (n >= 1) return `$${n.toFixed(4)}`;
+  if (n >= 0.0001) return `$${n.toFixed(6)}`;
+  return `$${n.toExponential(2)}`;
+}
+
+type TagAiQuote = { price?: string; fdv?: string };
+
+/** Binance Web3 公开行情：价格 + FDV（USD）。 */
+async function fetchTagAiQuote(token: Address): Promise<TagAiQuote> {
+  try {
+    const url =
+      "https://web3.binance.com/bapi/defi/v4/public/wallet-direct/buw/wallet/market/token/dynamic/info/ai" +
+      `?chainId=56&contractAddress=${token}`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "binance-web3/1.1",
+        "Accept-Encoding": "identity",
+      },
+    });
+    if (!response.ok) return {};
+    const body = (await response.json()) as {
+      data?: { price?: string; fdv?: string };
+    };
+    const priceRaw = body.data?.price;
+    const fdvRaw = body.data?.fdv;
+    const priceN = priceRaw !== undefined ? Number(priceRaw) : NaN;
+    const fdvN = fdvRaw !== undefined ? Number(fdvRaw) : NaN;
+    return {
+      price: Number.isFinite(priceN) ? formatPriceUsd(priceN) : undefined,
+      fdv: Number.isFinite(fdvN) ? formatUsd(fdvN) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+type CallResult = {
+  status: "success" | "failure";
+  result?: unknown;
+};
+
+function ok<T>(row: CallResult | undefined): T | undefined {
+  if (!row || row.status !== "success") return undefined;
+  return row.result as T;
+}
+
+/**
+ * 首页链上读数：两轮 Multicall3，减少 RPC round-trip。
+ * 第一轮：池质押 / 代币 / locker.nft / community.calculator
+ * 第二轮：小时奖励 / NFT 元数据（依赖第一轮地址）
+ */
+async function loadHomeAssets(
+  publicClient: PublicClient,
+  scorePool: Address | undefined,
+  paymentToken: Address | undefined,
+  community: Address | undefined,
+  passAddress: Address | undefined,
+): Promise<HomeAssets> {
+  const next: HomeAssets = {
+    pools: [],
+    poolNote: scorePool ? "DFXStar 分数池" : "分数池还没接到这局里",
+    tokenSymbol: "AIPRO",
+    tokenAddress: paymentToken,
+    nfts: [],
+  };
+
+  // —— 第一轮：彼此独立的 view ——
+  type Slot = "stake" | "symbol" | "burn" | "lockerNft" | "calculator";
+  const round1: {
+    slot: Slot;
+    address: Address;
+    abi: readonly unknown[];
+    functionName: string;
+    args?: readonly unknown[];
+  }[] = [];
+
+  if (scorePool) {
+    round1.push({
+      slot: "stake",
+      address: scorePool,
+      abi: poolAbi,
+      functionName: "getTotalStakedAmount",
+    });
+  }
+  if (paymentToken) {
+    round1.push({
+      slot: "symbol",
+      address: paymentToken,
+      abi: erc20Abi,
+      functionName: "symbol",
+    });
+    round1.push({
+      slot: "burn",
+      address: paymentToken,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [DEAD],
+    });
+  }
+  if (passAddress) {
+    round1.push({
+      slot: "lockerNft",
+      address: passAddress,
+      abi: lockerAbi,
+      functionName: "nft",
+    });
+  }
+  if (community) {
+    round1.push({
+      slot: "calculator",
+      address: community,
+      abi: communityAbi,
+      functionName: "rewardCalculator",
+    });
+  }
+
+  const bySlot = new Map<Slot, CallResult>();
+  if (round1.length > 0) {
+    const results = (await publicClient.multicall({
+      allowFailure: true,
+      multicallAddress: MULTICALL3,
+      contracts: round1.map((c) => ({
+        address: c.address,
+        abi: c.abi,
+        functionName: c.functionName,
+        args: c.args,
+      })),
+    })) as CallResult[];
+    round1.forEach((c, i) => {
+      bySlot.set(c.slot, results[i]);
+    });
+  }
+
+  const stake = ok<bigint>(bySlot.get("stake"));
+  const symbol = ok<string>(bySlot.get("symbol"));
+  const burn = ok<bigint>(bySlot.get("burn"));
+  const passNft = configured(ok<Address>(bySlot.get("lockerNft")));
+  const calculator = configured(ok<Address>(bySlot.get("calculator")));
+
+  if (scorePool) {
+    const row: PoolRow = {
+      address: scorePool,
+      label: "DFXStar 分数池",
+      totalStaked: stake !== undefined ? grouped(stake) : "读不到",
+    };
+    next.pools = [row];
+    next.poolNote = "仅展示本局 DFXStar 分数池";
+  }
+
+  if (symbol) next.tokenSymbol = symbol;
+  if (burn !== undefined) next.burnedAmount = tokenAmount(burn);
+
+  // 行情与第二轮链上读并行
+  const quotePromise: Promise<TagAiQuote> = paymentToken
+    ? fetchTagAiQuote(paymentToken)
+    : Promise.resolve({});
+
+  // —— 第二轮：依赖第一轮地址 ——
+  type Slot2 = "rate" | "nftName" | "nftSymbol" | "nftMinted" | "nftMax";
+  const round2: {
+    slot: Slot2;
+    address: Address;
+    abi: readonly unknown[];
+    functionName: string;
+    args?: readonly unknown[];
+  }[] = [];
+
+  if (calculator && community) {
+    round2.push({
+      slot: "rate",
+      address: calculator,
+      abi: calculatorAbi,
+      functionName: "getCurrentRewardRate",
+      args: [community],
+    });
+  }
+  if (passNft) {
+    round2.push({
+      slot: "nftName",
+      address: passNft,
+      abi: nftAbi,
+      functionName: "name",
+    });
+    round2.push({
+      slot: "nftSymbol",
+      address: passNft,
+      abi: nftAbi,
+      functionName: "symbol",
+    });
+    round2.push({
+      slot: "nftMinted",
+      address: passNft,
+      abi: nftAbi,
+      functionName: "totalSupply",
+    });
+    round2.push({
+      slot: "nftMax",
+      address: passNft,
+      abi: nftAbi,
+      functionName: "maxSupply",
+    });
+  }
+
+  const bySlot2 = new Map<Slot2, CallResult>();
+  const round2Promise =
+    round2.length > 0
+      ? publicClient.multicall({
+          allowFailure: true,
+          multicallAddress: MULTICALL3,
+          contracts: round2.map((c) => ({
+            address: c.address,
+            abi: c.abi,
+            functionName: c.functionName,
+            args: c.args,
+          })),
+        })
+      : Promise.resolve([] as CallResult[]);
+
+  const [quote, round2Results] = await Promise.all([
+    quotePromise,
+    round2Promise as Promise<CallResult[]>,
+  ]);
+
+  next.tokenPrice = quote.price ?? (paymentToken ? "价格未接入" : undefined);
+  next.tokenFdv = quote.fdv ?? (paymentToken ? "未接入" : undefined);
+
+  round2.forEach((c, i) => {
+    bySlot2.set(c.slot, round2Results[i]);
+  });
+
+  const rate = ok<bigint>(bySlot2.get("rate"));
+  if (rate !== undefined && next.pools[0]) {
+    next.pools[0].hourlyReward = `${tokenAmount(rate)} / 小时`;
+  }
+
+  if (passNft) {
+    const name = ok<string>(bySlot2.get("nftName"));
+    const nftSymbol = ok<string>(bySlot2.get("nftSymbol"));
+    const minted = ok<bigint>(bySlot2.get("nftMinted"));
+    const maxSupply = ok<bigint>(bySlot2.get("nftMax"));
+    next.nfts.push({
+      label: name ?? "Game Pass NFT",
+      address: passNft,
+      symbol: nftSymbol,
+      minted: minted !== undefined ? grouped(minted) : undefined,
+      maxSupply: maxSupply !== undefined ? grouped(maxSupply) : undefined,
+    });
+  }
+
+  return next;
+}
+
+/** 首页：只展示 DFXStar 分数池、代币销毁 / 价格 / FDV、入场 NFT 发行量。 */
+export function useHomeAssets(_wallet: string | undefined): HomeAssets {
   const {
     network: { publicClient },
-    components: { DFXStarConfig, GamePassNFT, ArtifactNFT },
+    components: { DFXStarConfig, GamePassNFT },
   } = useMUD();
   const star = useComponentValue(DFXStarConfig, singletonEntity);
   const pass = useComponentValue(GamePassNFT, singletonEntity);
-  const artifact = useComponentValue(ArtifactNFT, singletonEntity);
   const [assets, setAssets] = useState<HomeAssets>(EMPTY);
 
   useEffect(() => {
@@ -188,162 +376,35 @@ export function useHomeAssets(wallet: string | undefined): HomeAssets {
     const paymentToken = configured(star?.paymentToken);
     const community = configured(star?.community);
     const passAddress = configured(pass?.addr);
-    const artifactAddress = configured(artifact?.addr);
-    const owner = configured(wallet);
 
-    const load = async () => {
-      const next: HomeAssets = {
-        pools: [],
-        poolNote: community
-          ? "链上还没有活跃矿池"
-          : "Nutbox 社区还没接到这局里",
-        tokenSymbol: "AIPRO",
-        tokenAddress: paymentToken,
-        nfts: [],
-      };
-
-      if (community) {
-        try {
-          const { rows, pending } = await readPools(
-            publicClient,
-            community,
-            scorePool,
-            owner,
-          );
-          next.pools = rows;
-          if (rows.length > 0) {
-            next.poolNote = owner
-              ? "质押数是分数，奖励是社区代币"
-              : "导入游戏数据后显示该钱包的质押";
-          }
-          if (pending !== undefined) {
-            next.pendingRewards = tokenAmount(pending);
-          }
-        } catch {
-          next.poolNote = "矿池暂时读不到";
-        }
-      }
-
-      if (paymentToken) {
-        try {
-          next.tokenSymbol = await publicClient.readContract({
-            address: paymentToken,
-            abi: erc20Abi,
-            functionName: "symbol",
+    loadHomeAssets(
+      publicClient,
+      scorePool,
+      paymentToken,
+      community,
+      passAddress,
+    )
+      .then((next) => {
+        if (!stopped) setAssets(next);
+      })
+      .catch(() => {
+        if (!stopped) {
+          setAssets({
+            ...EMPTY,
+            poolNote: "链上暂时读不到",
           });
-          if (owner) {
-            next.tokenBalance = tokenAmount(
-              await publicClient.readContract({
-                address: paymentToken,
-                abi: erc20Abi,
-                functionName: "balanceOf",
-                args: [owner],
-              }),
-            );
-          }
-        } catch {
-          // 代币读失败时仍显示地址。
         }
-      }
-
-      let aiproNft: Address | undefined;
-      if (passAddress) {
-        try {
-          aiproNft = await publicClient.readContract({
-            address: passAddress,
-            abi: lockerAbi,
-            functionName: "nft",
-          });
-        } catch {
-          // 读不到 NFT 合约地址时，NFT 那一栏就不显示。
-        }
-      }
-
-      const nftTargets = [
-        aiproNft ? { address: aiproNft, label: "AIPRO NFT" } : undefined,
-        artifactAddress
-          ? { address: artifactAddress, label: "神器" }
-          : undefined,
-      ].filter((row): row is { address: Address; label: string } => !!row);
-
-      for (const target of nftTargets) {
-        const row: NftRow = { label: target.label, tokenIds: [] };
-        try {
-          row.label = await publicClient.readContract({
-            address: target.address,
-            abi: nftAbi,
-            functionName: "name",
-          });
-          row.symbol = await publicClient.readContract({
-            address: target.address,
-            abi: nftAbi,
-            functionName: "symbol",
-          });
-          let balance = 0n;
-          if (owner) {
-            balance = await publicClient.readContract({
-              address: target.address,
-              abi: nftAbi,
-              functionName: "balanceOf",
-              args: [owner],
-            });
-            row.balance = grouped(balance);
-          }
-          const idCount = Number(balance > 8n ? 8n : balance);
-          if (owner && idCount > 0) {
-            const ids: string[] = [];
-            for (let index = 0; index < idCount; index += 1) {
-              const tokenId = await publicClient.readContract({
-                address: target.address,
-                abi: nftAbi,
-                functionName: "tokenOfOwnerByIndex",
-                args: [owner, BigInt(index)],
-              });
-              ids.push(`#${tokenId.toString()}`);
-            }
-            row.tokenIds = ids;
-          }
-          if (owner && target.address === aiproNft && passAddress) {
-            const staked = await publicClient.readContract({
-              address: passAddress,
-              abi: lockerAbi,
-              functionName: "stakedTokenOf",
-              args: [owner],
-            });
-            if (staked > 0n)
-              row.tokenIds.unshift(`质押中 #${staked.toString()}`);
-          }
-        } catch {
-          // 这一份 NFT 读不到时保留标题。
-        }
-        next.nfts.push(row);
-      }
-
-      if (!stopped) {
-        setAssets(next);
-      }
-    };
-
-    load().catch(() => {
-      if (!stopped) {
-        setAssets({
-          ...EMPTY,
-          poolNote: "链上暂时读不到",
-        });
-      }
-    });
+      });
 
     return () => {
       stopped = true;
     };
   }, [
-    artifact?.addr,
     pass?.addr,
     publicClient,
     star?.community,
     star?.paymentToken,
     star?.scoreStakingPool,
-    wallet,
   ]);
 
   return assets;

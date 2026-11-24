@@ -11,6 +11,7 @@ export type DocBlock =
   | { kind: "h2"; id: string; title: string }
   | { kind: "ul"; items: string[] }
   | { kind: "table"; headers: string[]; rows: DocRun[][] }
+  | { kind: "contracts" }
   | { kind: "energy-figure" }
   | { kind: "space-figure" }
   | { kind: "biome-figure" };
@@ -111,40 +112,7 @@ export const gameDocs: DocChapter[] = [
         text: "星球有五种：行星（Planet）可以升级，小行星带（Asteroid Field）生产银和材料，铸造厂（Foundry）用来发现神器，时空裂隙（Spacetime Rip）用来提取和计分，类星体（Quasar）是特殊星球。后面的「星球」「航行」「资源」各章写每一种怎么用。",
       },
       { kind: "h2", id: "contracts", title: "相关合约" },
-      {
-        kind: "p",
-        text: "地址随部署变化。首页上的游戏数据、矿池、AIPRO 和 NFT 卡片写着当前连着的这一局。矿池、支付代币和社区的地址以链上 DFXStarConfig 为准。",
-      },
-      {
-        kind: "table",
-        headers: ["合约", "做什么"],
-        rows: [
-          [
-            "World",
-            "这一局的世界合约。星球、舰队、升级、提取、配额、公会都通过它的系统调用结算，状态记在它的表里。",
-          ],
-          [
-            "AIPRO NFT 保管",
-            "入场的门。有 Binance handle 的钱包把一枚 AIPRO NFT 放进来，才能进行会改状态的操作。随时可以取出。",
-          ],
-          [
-            "神器 NFT",
-            "神器的所有权。神器装到星球上之后，改变防御、射程、速度或能量，也可以在一块区域里揭示或摧毁星球。",
-          ],
-          [
-            "AIPRO",
-            "矿池的支付和奖励代币。买银支付的 AIPRO 先销毁一部分，剩下的注入矿池，领取时按质押份额付给钱包。",
-          ],
-          [
-            "Nutbox 矿池",
-            "按分数记账的质押池。提取银或材料时，游戏把这次的增量加进质押。领取不减少质押。",
-          ],
-          [
-            "质押工厂与社区",
-            "工厂创建矿池。社区负责它自己的释放。游戏读到的池子是配置里的那一个。",
-          ],
-        ],
-      },
+      { kind: "contracts" },
       { kind: "h2", id: "entry", title: "入场" },
       {
         kind: "p",

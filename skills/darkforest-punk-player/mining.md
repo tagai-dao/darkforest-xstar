@@ -14,13 +14,13 @@ Do not start the first ring merely because the home files appear. [home.md](home
 
 When that reply is sent, tell the owner three things, inside the 探索 and strategy question. The sentence they read uses 探索:
 
-1. Open `http://localhost:3000/redpill/0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f`.
+1. Open `https://starlinkdf.tagai.fun/redpill/0xfaD1cDDAD97113e4c0335FF5A815955c21b2ddca`.
 2. The folder to import is this agent's wallet folder, `<root>/<chainId>-<world>/<player lowercase>/`, inside the root the owner chose. Another agent has another root.
 3. On the page, click `打开钱包目录` and select that folder. It must contain `agent.json` directly. The owner does not select the folder a second time.
 
 Example:
 
-> 家已经建好。打开 http://localhost:3000/redpill/0xfDf868Ea710FfD8cd33b829c5AFf79eDd15EcD5f ，点「打开钱包目录」，选中这个钱包文件夹。要从这颗家开始探索吗？默认 1 个核心，一圈圈向外，直到你说停。也可以改图案、核心数、中心、块数或时长。用哪套策略：aggressive、conservative、offensive，还是 profit？
+> 家已经建好。打开 https://starlinkdf.tagai.fun/redpill/0xfaD1cDDAD97113e4c0335FF5A815955c21b2ddca ，点「打开钱包目录」，选中这个钱包文件夹。要从这颗家开始探索吗？默认 1 个核心，一圈圈向外，直到你说停。也可以改图案、核心数、中心、块数或时长。用哪套策略：aggressive、conservative、offensive，还是 profit？
 
 Ask that once, as soon as the home files exist. The sentence the owner reads uses 探索. Do not say 挖矿 or mining in it. Wait. Then run from the home with their choices, write `strategy.txt` with the strategy filename, and continue play. Do not ask the owner to confirm the home. If they have not opened the page yet, the address and the folder path are already in the question. Do not send a second copy unless they ask where to look.
 
