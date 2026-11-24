@@ -15,7 +15,8 @@
     "lint-fix": "pnpm lint-fix:eslint",
     "lint-fix:eslint": "pnpm lint:eslint --fix",
     "lint:typecheck": "tsc",
-    "deploy:prod": "netlify build && netlify deploy --prod"
+    "deploy:prod": "netlify build && netlify deploy --prod",
+    "deploy:cf": "pnpm build && wrangler pages deploy dist --project-name=starlinkdf --branch=main --commit-dirty=true"
   },
   "dependencies": {
     "@langchain/core": "0.3.22",
@@ -104,6 +105,7 @@
     "uuid": "3.3.2",
     "vite": "6.2.5",
     "vitest": "3.1.1",
-    "wait-port": "1.1.0"
+    "wait-port": "1.1.0",
+    "wrangler": "^4.167.0"
   }
 }

@@ -22,6 +22,7 @@ import {
   baseSepolia as baseSepoliaConfig,
   base as baseConfig,
   optimism as optimismConfig,
+  bsc as bscConfig,
 } from "viem/chains";
 
 export const baseSepolia = {
@@ -85,6 +86,32 @@ export const optimism = {
   },
 } as MUDChain;
 
+/** BSC mainnet — World in contracts/worlds.json["56"]. */
+export const bsc = {
+  ...bscConfig,
+  iconUrls: [""],
+  // Empty: sync via RPC until a MUD HTTP indexer is stood up for chain 56.
+  // Leaderboard API (sldf-api) is separate and uses VITE_API_BASE_URL.
+  indexerUrl: "",
+  rpcUrls: {
+    ...bscConfig.rpcUrls,
+    default: {
+      http: [
+        "https://bsc-dataseed1.bnbchain.org",
+        "https://bsc.publicnode.com",
+        ...(bscConfig.rpcUrls.default.http ?? []),
+      ],
+      webSocket: ["wss://bsc.publicnode.com"],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: "BscScan",
+      url: "https://bscscan.com",
+    },
+  },
+} as MUDChain;
+
 /*
  * See https://mud.dev/guides/hello-world/add-chain-client
  * for instructions on how to add networks.
@@ -96,4 +123,5 @@ export const supportedChains: MUDChain[] = [
   baseSepolia,
   base,
   optimism,
+  bsc,
 ];

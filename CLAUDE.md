@@ -16,7 +16,7 @@ A full-chain incomplete-information space strategy game built on Lattice MUD. It
 
 ```bash
 # Root level
-pnpm install            # Install all deps (requires pnpm >=10.7.1, Node 20.19.0)
+pnpm install            # Install all deps (requires pnpm >=10.7.1, Node 22.23.5)
 pnpm dev                # Launch all processes via mprocs (anvil + contracts + client + explorer + api)
 pnpm build              # Build all packages
 pnpm test               # Run all tests (includes tsc typecheck + mud test for contracts)

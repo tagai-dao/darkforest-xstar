@@ -14,8 +14,8 @@ address = "0x0000000000000000000000000000000000000000"
 set_current_round = true # if true,should be deployed by nft contract owner
 
 [game_pass]
-# AIPRO Classic Residents。本机没有这段代码时，PostDeploy 会部署一枚本地 NFT，入场检查仍然打开。
-nft_address = "0xe86c2E52A5Ebaf4afd18020834D5c771Aff59cDE"
+# 测试用社区 NFT（BSC）。本机没有这段代码时，PostDeploy 会部署一枚本地 NFT，入场检查仍然打开。
+nft_address = "0xD0ac6355Deb37711fBf365838c755D2BC44EB32A"
 # Binance Agent ID。本机没有这段代码时，PostDeploy 会部署本地登记处。质押时 handleOf(钱包) 必须非空。
 handle_registry = "0x60B9262456dE011F7d15a54CdD8c48bAaa8B022F"
 
@@ -191,13 +191,14 @@ j_SPACE_JUNK_QUADRATIC_BASE_PRICE = 3000000000000000 # 0.003 BNB
 # Don't forget to update getJunk function in PlanetLabels.tsx
 k_PLANET_LEVEL_JUNK = [50, 55, 60, 65, 75, 100, 200, 250, 300, 500]
 
-# 下面是 AIPRO 主网社区和已经建出的 DFX 池。分叉上有代码时直接沿用。
-# 空 anvil 上这些地址没有代码，PostDeploy 会改部署本地的 Committee、工厂、HourlyTickCalculator、AIPRO 社区和积分池。
+# 测试社区（BSC）。分叉/主网上有代码时直接沿用。
+# 空 anvil 上这些地址没有代码，PostDeploy 会改部署本地的 Committee、工厂、HourlyTickCalculator、社区和积分池。
+# score_staking_pool 留空：World 部署后再用工厂建池并写回。
 [dfxstar]
-score_staking_pool = "0x62370EF15176ffdB0187b37F18eb31Da76Df29ff"
-payment_token = "0xfa81c13f979f0dff4a40b68c4aba147fa0723333"
-staking_factory = "0x77Fb65140B746e639bB512c2C25604d1924aE774"
-community = "0x67DdB10B8F15a1D87a2237d9b51b97fc00e1FC7F"
+score_staking_pool = "0x375dED0C49aEb8DdD3E9DB6A4b5c84A0adD93C9F"
+payment_token = "0x935FB3D106c259840d4abE96351867fb63123333"
+staking_factory = "0xd436Bb8fF9BdF45b85aAC0dB038F14a9Ad14610B"
+community = "0xfB710BE94918e999877b55003173C04375774d46"
 # 旧字段。PostDeploy 会改写成 BuySilverSystem 合约地址，客户端按那个地址授权。
 buy_silver_system = "0x0000000000000000000000000000000000000000"
 

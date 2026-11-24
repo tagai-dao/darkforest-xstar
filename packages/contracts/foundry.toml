@@ -36,6 +36,12 @@ eth_rpc_url = "https://mainnet.base.org"
 [profile.optimism]
 eth_rpc_url = "https://mainnet.optimism.io"
 
+# BSC 主网。mud deploy --profile=bsc 时使用。
+[profile.bsc]
+# publicnode tolerates eth_getLogs better than public dataseeds (limit exceeded)
+eth_rpc_url = "https://bsc.publicnode.com"
+chain_id = 56
+
 [fmt]
 line_length = 120
 tab_width = 2

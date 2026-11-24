@@ -1,0 +1,4 @@
+# Cloudflare Pages — local: pnpm deploy:cf
+name = "starlinkdf"
+compatibility_date = "2025-11-01"
+pages_build_output_dir = "dist"

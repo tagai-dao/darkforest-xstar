@@ -149,7 +149,8 @@ export function getNetworkConfig() {
     faucetServiceUrl: params.get("faucet") ?? chain.faucetUrl,
     worldAddress,
     initialBlockNumber,
-    disableCache: import.meta.env.PROD,
+    // Keep browser caches enabled in production; full RPC resync every visit is too slow on BSC.
+    disableCache: false,
     chain,
     indexerUrl:
       params.get("indexerUrl") ??
