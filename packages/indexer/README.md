@@ -42,7 +42,7 @@ indexer 库被清空重追、或 MySQL 水位高于 indexer 当前块时，榜�
 # 或：cd packages/api && pnpm project:reset
 ```
 
-终端会打印 chain / World / 目标库，**只有输入 `RESET` 才会删除** `players` / `player_scores` / `player_kill_stats` 以及该 World 的 `indexer_state`，并尝试从 indexer 拉一版新快照。其他输入一律取消。`./start-project.sh` 不会触发重置。
+终端会打印 chain / World / 目标库，**只有输入 `RESET` 才会删除** `df_players` / `df_player_scores` / `df_player_kill_stats` 以及该 World 的 `df_indexer_state`，并尝试从 indexer 拉一版新快照。其他输入一律取消。`./start-project.sh` 不会触发重置。
 
 ## 3. 启动只读 API
 

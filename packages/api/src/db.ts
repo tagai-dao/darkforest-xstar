@@ -15,9 +15,14 @@ interface AddressRow extends mysql.RowDataPacket {
 
 const batchSize = 500;
 
+type LeaderboardTable =
+  | "df_players"
+  | "df_player_scores"
+  | "df_player_kill_stats";
+
 async function syncTable<Value>(
   connection: PoolConnection,
-  table: "players" | "player_scores" | "player_kill_stats",
+  table: LeaderboardTable,
   records: ReadonlyMap<string, Value>,
   previous: ReadonlyMap<string, Value> | undefined,
   upsertSql: string,
@@ -54,7 +59,7 @@ export class LeaderboardDb {
 
   public async init() {
     await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS indexer_state (
+      CREATE TABLE IF NOT EXISTS df_indexer_state (
         id BIGINT PRIMARY KEY AUTO_INCREMENT,
         chain_id BIGINT NOT NULL,
         world_address VARCHAR(42) NOT NULL,
@@ -65,7 +70,7 @@ export class LeaderboardDb {
     `);
 
     await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS players (
+      CREATE TABLE IF NOT EXISTS df_players (
         address VARCHAR(42) PRIMARY KEY,
         name VARCHAR(128) NULL,
         burner VARCHAR(42) NULL,
@@ -77,22 +82,22 @@ export class LeaderboardDb {
 
     // MySQL DECIMAL 精度上限为 65；链上 uint256 最多约 78 位十进制，此处用 65 足以覆盖常见游戏数值。
     await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS player_scores (
+      CREATE TABLE IF NOT EXISTS df_player_scores (
         address VARCHAR(42) PRIMARY KEY,
         score DECIMAL(65,0) NOT NULL DEFAULT 0,
         updated_at_block BIGINT UNSIGNED NOT NULL DEFAULT 0,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_player_scores_players FOREIGN KEY (address) REFERENCES players(address) ON DELETE CASCADE
+        CONSTRAINT fk_df_player_scores_players FOREIGN KEY (address) REFERENCES df_players(address) ON DELETE CASCADE
       )
     `);
 
     await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS player_kill_stats (
+      CREATE TABLE IF NOT EXISTS df_player_kill_stats (
         address VARCHAR(42) PRIMARY KEY,
         population_destroyed DECIMAL(65,0) NOT NULL DEFAULT 0,
         updated_at_block BIGINT UNSIGNED NOT NULL DEFAULT 0,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_player_kill_stats_players FOREIGN KEY (address) REFERENCES players(address) ON DELETE CASCADE
+        CONSTRAINT fk_df_player_kill_stats_players FOREIGN KEY (address) REFERENCES df_players(address) ON DELETE CASCADE
       )
     `);
   }
@@ -107,12 +112,12 @@ export class LeaderboardDb {
     try {
       await connection.beginTransaction();
       await connection.query(
-        `INSERT INTO indexer_state (chain_id, world_address) VALUES (?, ?)
+        `INSERT INTO df_indexer_state (chain_id, world_address) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE id = id`,
         scope,
       );
       const [[state]] = await connection.query<mysql.RowDataPacket[]>(
-        `SELECT CAST(last_block AS CHAR) AS last_block FROM indexer_state
+        `SELECT CAST(last_block AS CHAR) AS last_block FROM df_indexer_state
          WHERE chain_id = ? AND world_address = ? FOR UPDATE`,
         scope,
       );
@@ -128,10 +133,10 @@ export class LeaderboardDb {
       const block = snapshot.blockNumber.toString();
       await syncTable(
         connection,
-        "players",
+        "df_players",
         snapshot.players,
         baseline?.players,
-        `INSERT INTO players (address, name, burner, created_at, updated_at_block)
+        `INSERT INTO df_players (address, name, burner, created_at, updated_at_block)
          VALUES ? ON DUPLICATE KEY UPDATE name = VALUES(name), burner = VALUES(burner),
          created_at = VALUES(created_at), updated_at_block = VALUES(updated_at_block)`,
         (address, player) => [
@@ -144,26 +149,26 @@ export class LeaderboardDb {
       );
       await syncTable(
         connection,
-        "player_scores",
+        "df_player_scores",
         snapshot.scores,
         baseline?.scores,
-        `INSERT INTO player_scores (address, score, updated_at_block)
+        `INSERT INTO df_player_scores (address, score, updated_at_block)
          VALUES ? ON DUPLICATE KEY UPDATE score = VALUES(score),
          updated_at_block = VALUES(updated_at_block)`,
         (address, score) => [address, score.toString(), block],
       );
       await syncTable(
         connection,
-        "player_kill_stats",
+        "df_player_kill_stats",
         snapshot.kills,
         baseline?.kills,
-        `INSERT INTO player_kill_stats (address, population_destroyed, updated_at_block)
+        `INSERT INTO df_player_kill_stats (address, population_destroyed, updated_at_block)
          VALUES ? ON DUPLICATE KEY UPDATE population_destroyed = VALUES(population_destroyed),
          updated_at_block = VALUES(updated_at_block)`,
         (address, kills) => [address, kills.toString(), block],
       );
       await connection.query(
-        "UPDATE indexer_state SET last_block = ? WHERE chain_id = ? AND world_address = ?",
+        "UPDATE df_indexer_state SET last_block = ? WHERE chain_id = ? AND world_address = ?",
         [block, ...scope],
       );
       await connection.commit();
@@ -193,9 +198,9 @@ export class LeaderboardDb {
         p.name AS name,
         COALESCE(s.score, 0) AS score,
         COALESCE(k.population_destroyed, 0) AS kills
-      FROM players p
-      LEFT JOIN player_scores s ON s.address = p.address
-      LEFT JOIN player_kill_stats k ON k.address = p.address
+      FROM df_players p
+      LEFT JOIN df_player_scores s ON s.address = p.address
+      LEFT JOIN df_player_kill_stats k ON k.address = p.address
       ORDER BY ${orderColumn} DESC, p.address ASC
       LIMIT ? OFFSET ?
     `,
@@ -221,9 +226,9 @@ export class LeaderboardDb {
         p.address AS address,
         COALESCE(s.score, 0) AS score,
         COALESCE(k.population_destroyed, 0) AS kills
-      FROM players p
-      LEFT JOIN player_scores s ON s.address = p.address
-      LEFT JOIN player_kill_stats k ON k.address = p.address
+      FROM df_players p
+      LEFT JOIN df_player_scores s ON s.address = p.address
+      LEFT JOIN df_player_kill_stats k ON k.address = p.address
       WHERE p.address = ?
       LIMIT 1
     `,
@@ -241,7 +246,7 @@ export class LeaderboardDb {
       `
       SELECT COUNT(*) + 1 AS rank
       FROM (
-        SELECT COALESCE(score, 0) AS metric FROM player_scores
+        SELECT COALESCE(score, 0) AS metric FROM df_player_scores
       ) ranked
       WHERE ranked.metric > ?
     `,
@@ -252,7 +257,7 @@ export class LeaderboardDb {
       `
       SELECT COUNT(*) + 1 AS rank
       FROM (
-        SELECT COALESCE(population_destroyed, 0) AS metric FROM player_kill_stats
+        SELECT COALESCE(population_destroyed, 0) AS metric FROM df_player_kill_stats
       ) ranked
       WHERE ranked.metric > ?
     `,
@@ -281,11 +286,11 @@ export class LeaderboardDb {
     try {
       await connection.beginTransaction();
       // 子表有 FK；先清子表再清 players，再清水位。
-      await connection.query("DELETE FROM player_kill_stats");
-      await connection.query("DELETE FROM player_scores");
-      await connection.query("DELETE FROM players");
+      await connection.query("DELETE FROM df_player_kill_stats");
+      await connection.query("DELETE FROM df_player_scores");
+      await connection.query("DELETE FROM df_players");
       await connection.query(
-        "DELETE FROM indexer_state WHERE chain_id = ? AND world_address = ?",
+        "DELETE FROM df_indexer_state WHERE chain_id = ? AND world_address = ?",
         [scope.chainId, world],
       );
       await connection.commit();
