@@ -14,3 +14,8 @@ procs:
   api:
     cwd: packages/api
     shell: pnpm run dev
+  # 排行榜投影：本地需先有 indexer HTTP + MySQL；生产用 packages/indexer/start-project.sh
+  # api-project:
+  #   cwd: packages/api
+  #   shell: pnpm run project:dev
+

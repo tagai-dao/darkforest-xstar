@@ -94,18 +94,9 @@ importers:
 
   packages/api:
     dependencies:
-      '@latticexyz/recs':
-        specifier: 2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f
-        version: 2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f(typescript@5.9.3)(viem@2.31.4(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.23.8))(zod@3.23.8)
-      '@latticexyz/store':
-        specifier: 2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f
-        version: 2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f(@aws-sdk/client-kms@3.699.0)(asn1.js@5.4.1)(typescript@5.9.3)(viem@2.31.4(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.23.8))(zod@3.23.8)
       '@latticexyz/store-sync':
         specifier: 2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f
         version: 2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f(@aws-sdk/client-kms@3.699.0)(@opentelemetry/api@1.9.0)(@tanstack/react-query@5.72.2(react@18.3.1))(@types/react@18.3.8)(asn1.js@5.4.1)(better-sqlite3@8.7.0)(mysql2@3.22.3(@types/node@22.19.19))(pg@8.16.3)(react@18.3.1)(typescript@5.9.3)(viem@2.31.4(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.23.8))(wagmi@2.15.5(@netlify/blobs@8.1.0)(@tanstack/query-core@5.72.2)(@tanstack/react-query@5.72.2(react@18.3.1))(@types/react@18.3.8)(bufferutil@4.0.8)(react@18.3.1)(typescript@5.9.3)(utf-8-validate@5.0.10)(viem@2.31.4(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.23.8))(zod@3.23.8))(ws@8.18.2(bufferutil@4.0.8)(utf-8-validate@5.0.10))
-      '@latticexyz/world':
-        specifier: 2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f
-        version: 2.2.23-e1c2958b99c9fe4c7189ab24938e0978ff85a75f(@aws-sdk/client-kms@3.699.0)(asn1.js@5.4.1)(typescript@5.9.3)(viem@2.31.4(bufferutil@4.0.8)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.23.8))(zod@3.23.8)
       contracts:
         specifier: workspace:*
         version: link:../contracts

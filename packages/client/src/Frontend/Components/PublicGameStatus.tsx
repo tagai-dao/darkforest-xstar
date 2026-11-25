@@ -1,4 +1,5 @@
 import { EMPTY_ADDRESS } from "@df/constants";
+import { formatWholeToken } from "@df/gamelogic";
 import type { Planet } from "@df/types";
 import { useComponentValue } from "@latticexyz/react";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
@@ -171,10 +172,9 @@ type RewardRead = {
   communityPending?: bigint;
 };
 
-// 待领是 18 位的 wei。差不到半枚时按最近的整枚 AIPRO 显示。
+// 待领是 18 位的 wei；页面只显示整枚 AIPRO。
 function wholeAipro(wei: bigint): string {
-  const unit = 10n ** 18n;
-  return ((wei + unit / 2n) / unit).toLocaleString("zh-CN");
+  return formatWholeToken(wei);
 }
 
 function whole(value: number | undefined): string {

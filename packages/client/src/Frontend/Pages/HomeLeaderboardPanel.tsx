@@ -148,8 +148,10 @@ export function HomeLeaderboardPanel({
     components: { GamePassNFT },
   } = useMUD();
   const pass = useComponentValue(GamePassNFT, singletonEntity);
-  const [mode, setMode] = useState<HomeBoardMode>("score");
-  const [rows, setRows] = useState<ListedRow[]>([]);
+  // 首页预览固定分数榜；弹窗里才切换分数 / 击杀。
+  const [modalMode, setModalMode] = useState<HomeBoardMode>("score");
+  const [scoreRows, setScoreRows] = useState<ListedRow[]>([]);
+  const [killRows, setKillRows] = useState<ListedRow[]>([]);
   const [status, setStatus] = useState("正在读取");
   const [open, setOpen] = useState(false);
 
@@ -158,32 +160,41 @@ export function HomeLeaderboardPanel({
     const load = async () => {
       setStatus("正在读取");
       try {
-        const board = await fetchHomeBoard(mode);
+        const [scoreBoard, killBoard] = await Promise.all([
+          fetchHomeBoard("score"),
+          fetchHomeBoard("kills"),
+        ]);
+        const addresses = [
+          ...new Set([
+            ...scoreBoard.map((row) => row.address),
+            ...killBoard.map((row) => row.address),
+          ]),
+        ];
         let handles = new Map<string, string>();
         try {
-          handles = await readHandles(
-            publicClient,
-            pass?.addr,
-            board.map((row) => row.address),
-          );
+          handles = await readHandles(publicClient, pass?.addr, addresses);
         } catch (handleError) {
           console.error(handleError);
         }
         if (stopped) return;
-        setRows(
+
+        const withLabel = (board: HomeBoardRow[]): ListedRow[] =>
           board.map((row) => ({
             ...row,
             label: displayHandle(
               row.address,
               handles.get(row.address.toLowerCase()),
             ),
-          })),
-        );
-        setStatus(board.length === 0 ? "还没有上榜的玩家" : "");
+          }));
+
+        setScoreRows(withLabel(scoreBoard));
+        setKillRows(withLabel(killBoard));
+        setStatus(scoreBoard.length === 0 ? "还没有上榜的玩家" : "");
       } catch (error) {
         console.error(error);
         if (!stopped) {
-          setRows([]);
+          setScoreRows([]);
+          setKillRows([]);
           setStatus("排行榜读不到");
         }
       }
@@ -192,37 +203,26 @@ export function HomeLeaderboardPanel({
     return () => {
       stopped = true;
     };
-  }, [mode, pass?.addr, publicClient]);
+  }, [pass?.addr, publicClient]);
 
   const preview =
-    previewLimit !== undefined ? rows.slice(0, previewLimit) : rows;
-  const hasMore = previewLimit !== undefined && rows.length > previewLimit;
+    previewLimit !== undefined ? scoreRows.slice(0, previewLimit) : scoreRows;
+  // 有预览截断时始终给「更多」，方便进弹窗看击杀榜。
+  const showMore = previewLimit !== undefined;
+
+  const modalRows = modalMode === "score" ? scoreRows : killRows;
 
   return (
     <>
       <Panel $framed={framed}>
-        <TitleRow>
-          {showTitle ? <Title>排行榜</Title> : <span />}
-          <Modes>
-            <ModeButton
-              type="button"
-              $active={mode === "score"}
-              onClick={() => setMode("score")}
-            >
-              分数
-            </ModeButton>
-            <ModeButton
-              type="button"
-              $active={mode === "kills"}
-              onClick={() => setMode("kills")}
-            >
-              击杀
-            </ModeButton>
-          </Modes>
-        </TitleRow>
+        {showTitle ? (
+          <TitleRow>
+            <Title>排行榜</Title>
+          </TitleRow>
+        ) : null}
         {status && <Status>{status}</Status>}
-        {preview.length > 0 && <BoardTable mode={mode} rows={preview} />}
-        {hasMore && (
+        {preview.length > 0 && <BoardTable mode="score" rows={preview} />}
+        {showMore && (
           <MoreButton type="button" onClick={() => setOpen(true)}>
             更多
           </MoreButton>
@@ -240,20 +240,24 @@ export function HomeLeaderboardPanel({
             <Modes style={{ marginTop: 12 }}>
               <ModeButton
                 type="button"
-                $active={mode === "score"}
-                onClick={() => setMode("score")}
+                $active={modalMode === "score"}
+                onClick={() => setModalMode("score")}
               >
                 分数
               </ModeButton>
               <ModeButton
                 type="button"
-                $active={mode === "kills"}
-                onClick={() => setMode("kills")}
+                $active={modalMode === "kills"}
+                onClick={() => setModalMode("kills")}
               >
                 击杀
               </ModeButton>
             </Modes>
-            {rows.length > 0 && <BoardTable mode={mode} rows={rows} />}
+            {modalRows.length > 0 ? (
+              <BoardTable mode={modalMode} rows={modalRows} />
+            ) : (
+              <Status>还没有上榜的玩家</Status>
+            )}
           </Modal>
         </Overlay>
       )}

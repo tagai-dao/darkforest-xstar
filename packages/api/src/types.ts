@@ -15,3 +15,13 @@ export type PlayerRankResponse = {
   scoreRank: number | null;
   killsRank: number | null;
 };
+
+export type LeaderboardSnapshot = {
+  blockNumber: bigint;
+  players: ReadonlyMap<
+    string,
+    { name: string; burner: string; createdAt: bigint }
+  >;
+  scores: ReadonlyMap<string, bigint>;
+  kills: ReadonlyMap<string, bigint>;
+};

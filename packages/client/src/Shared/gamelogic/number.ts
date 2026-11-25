@@ -44,6 +44,15 @@ export function formatEtherToNumber(
   }
 }
 
+/**
+ * 展示用：wei → 整枚代币（四舍五入），带千分位。
+ * Starship / AIPRO 数量一律不显示小数。
+ */
+export function formatWholeToken(wei: bigint, decimals = 18): string {
+  const unit = 10n ** BigInt(decimals);
+  return ((wei + unit / 2n) / unit).toLocaleString("zh-CN");
+}
+
 export function formatCompact(num: number): string {
   return Intl.NumberFormat("en", {
     notation: "compact",

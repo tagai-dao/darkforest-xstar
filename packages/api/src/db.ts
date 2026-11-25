@@ -1,10 +1,49 @@
-import mysql, { type Pool } from "mysql2/promise";
+import { isDeepStrictEqual } from "node:util";
+
+import mysql, { type Pool, type PoolConnection } from "mysql2/promise";
 
 import type {
   LeaderboardMode,
   LeaderboardRow,
+  LeaderboardSnapshot,
   PlayerRankResponse,
 } from "./types";
+
+interface AddressRow extends mysql.RowDataPacket {
+  address: string;
+}
+
+const batchSize = 500;
+
+async function syncTable<Value>(
+  connection: PoolConnection,
+  table: "players" | "player_scores" | "player_kill_stats",
+  records: ReadonlyMap<string, Value>,
+  previous: ReadonlyMap<string, Value> | undefined,
+  upsertSql: string,
+  toRow: (address: string, value: Value) => string[],
+): Promise<void> {
+  const changed = [...records]
+    .filter(
+      ([address, value]) => !isDeepStrictEqual(value, previous?.get(address)),
+    )
+    .map(([address, value]) => toRow(address, value));
+  for (let i = 0; i < changed.length; i += batchSize) {
+    await connection.query(upsertSql, [changed.slice(i, i + batchSize)]);
+  }
+
+  const existing = previous
+    ? [...previous.keys()]
+    : (
+        await connection.query<AddressRow[]>(`SELECT address FROM ${table}`)
+      )[0].map(({ address }) => address);
+  const removed = existing.filter((address) => !records.has(address));
+  for (let i = 0; i < removed.length; i += batchSize) {
+    await connection.query(`DELETE FROM ${table} WHERE address IN (?)`, [
+      removed.slice(i, i + batchSize),
+    ]);
+  }
+}
 
 export class LeaderboardDb {
   private readonly pool: Pool;
@@ -58,73 +97,83 @@ export class LeaderboardDb {
     `);
   }
 
-  public async upsertPlayer(input: {
-    address: string;
-    name: string;
-    burner: string;
-    createdAt: bigint;
-    blockNumber: bigint;
-  }) {
-    await this.pool.query(
-      `
-      INSERT INTO players (address, name, burner, created_at, updated_at_block)
-      VALUES (?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        name = VALUES(name),
-        burner = VALUES(burner),
-        created_at = VALUES(created_at),
-        updated_at_block = GREATEST(updated_at_block, VALUES(updated_at_block))
-    `,
-      [
-        input.address.toLowerCase(),
-        input.name,
-        input.burner.toLowerCase(),
-        input.createdAt.toString(),
-        input.blockNumber.toString(),
-      ],
-    );
-  }
+  public async applyLeaderboardSnapshot(
+    { chainId, worldAddress }: { chainId: number; worldAddress: string },
+    snapshot: LeaderboardSnapshot,
+    previous?: LeaderboardSnapshot,
+  ) {
+    const connection = await this.pool.getConnection();
+    const scope = [chainId, worldAddress.toLowerCase()];
+    try {
+      await connection.beginTransaction();
+      await connection.query(
+        `INSERT INTO indexer_state (chain_id, world_address) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE id = id`,
+        scope,
+      );
+      const [[state]] = await connection.query<mysql.RowDataPacket[]>(
+        `SELECT CAST(last_block AS CHAR) AS last_block FROM indexer_state
+         WHERE chain_id = ? AND world_address = ? FOR UPDATE`,
+        scope,
+      );
+      const lastBlock = BigInt(state.last_block);
+      if (lastBlock >= snapshot.blockNumber) {
+        await connection.commit();
+        return lastBlock === snapshot.blockNumber;
+      }
 
-  public async upsertScore(input: {
-    address: string;
-    score: bigint;
-    blockNumber: bigint;
-  }) {
-    await this.pool.query(
-      `
-      INSERT INTO player_scores (address, score, updated_at_block)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        score = VALUES(score),
-        updated_at_block = GREATEST(updated_at_block, VALUES(updated_at_block))
-    `,
-      [
-        input.address.toLowerCase(),
-        input.score.toString(),
-        input.blockNumber.toString(),
-      ],
-    );
-  }
-
-  public async upsertKills(input: {
-    address: string;
-    kills: bigint;
-    blockNumber: bigint;
-  }) {
-    await this.pool.query(
-      `
-      INSERT INTO player_kill_stats (address, population_destroyed, updated_at_block)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        population_destroyed = VALUES(population_destroyed),
-        updated_at_block = GREATEST(updated_at_block, VALUES(updated_at_block))
-    `,
-      [
-        input.address.toLowerCase(),
-        input.kills.toString(),
-        input.blockNumber.toString(),
-      ],
-    );
+      // In-memory diffs are valid only against the last committed snapshot.
+      const baseline =
+        previous?.blockNumber === lastBlock ? previous : undefined;
+      const block = snapshot.blockNumber.toString();
+      await syncTable(
+        connection,
+        "players",
+        snapshot.players,
+        baseline?.players,
+        `INSERT INTO players (address, name, burner, created_at, updated_at_block)
+         VALUES ? ON DUPLICATE KEY UPDATE name = VALUES(name), burner = VALUES(burner),
+         created_at = VALUES(created_at), updated_at_block = VALUES(updated_at_block)`,
+        (address, player) => [
+          address,
+          player.name,
+          player.burner,
+          player.createdAt.toString(),
+          block,
+        ],
+      );
+      await syncTable(
+        connection,
+        "player_scores",
+        snapshot.scores,
+        baseline?.scores,
+        `INSERT INTO player_scores (address, score, updated_at_block)
+         VALUES ? ON DUPLICATE KEY UPDATE score = VALUES(score),
+         updated_at_block = VALUES(updated_at_block)`,
+        (address, score) => [address, score.toString(), block],
+      );
+      await syncTable(
+        connection,
+        "player_kill_stats",
+        snapshot.kills,
+        baseline?.kills,
+        `INSERT INTO player_kill_stats (address, population_destroyed, updated_at_block)
+         VALUES ? ON DUPLICATE KEY UPDATE population_destroyed = VALUES(population_destroyed),
+         updated_at_block = VALUES(updated_at_block)`,
+        (address, kills) => [address, kills.toString(), block],
+      );
+      await connection.query(
+        "UPDATE indexer_state SET last_block = ? WHERE chain_id = ? AND world_address = ?",
+        [block, ...scope],
+      );
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   public async getLeaderboard(
@@ -217,5 +266,38 @@ export class LeaderboardDb {
       scoreRank: Number(scoreRankRow.rank),
       killsRank: Number(killsRankRow.rank),
     };
+  }
+
+  /**
+   * 管理员手动清榜：删掉本库排行榜行，并把该 World 的同步水位清零。
+   * 假定一库一局（见 indexer README）；不经过确认门闩，由 CLI 负责确认。
+   */
+  public async resetLeaderboard(scope: {
+    chainId: number;
+    worldAddress: string;
+  }) {
+    const connection = await this.pool.getConnection();
+    const world = scope.worldAddress.toLowerCase();
+    try {
+      await connection.beginTransaction();
+      // 子表有 FK；先清子表再清 players，再清水位。
+      await connection.query("DELETE FROM player_kill_stats");
+      await connection.query("DELETE FROM player_scores");
+      await connection.query("DELETE FROM players");
+      await connection.query(
+        "DELETE FROM indexer_state WHERE chain_id = ? AND world_address = ?",
+        [scope.chainId, world],
+      );
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  public async close() {
+    await this.pool.end();
   }
 }

@@ -1,14 +1,9 @@
+import { formatWholeToken } from "@df/gamelogic";
 import { useComponentValue } from "@latticexyz/react";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
 import { useEffect, useMemo, useState } from "react";
-import {
-  type Address,
-  formatUnits,
-  isAddress,
-  parseAbi,
-  zeroAddress,
-} from "viem";
+import { type Address, isAddress, parseAbi, zeroAddress } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
 
 const DFXSTAR_FACTORY_ABI = parseAbi([
@@ -389,7 +384,7 @@ export const DFXStarIntegrationPanel = () => {
         <div>World 是否为 Factory admin: {worldAdminLabel(worldIsAdmin)}</div>
         <div>
           你的 DFS 余额:{" "}
-          {tokenBalance !== null ? formatUnits(tokenBalance, 18) : "—"}{" "}
+          {tokenBalance !== null ? formatWholeToken(tokenBalance) : "—"}{" "}
           {tokenSymbol}
         </div>
       </div>
@@ -406,7 +401,7 @@ export const DFXStarIntegrationPanel = () => {
             待领取外部奖励 (B线):{" "}
             {pendingExternal !== null ? (
               <span className={pendingExternal > 0n ? "text-green-400" : ""}>
-                {formatUnits(pendingExternal, 18)} {tokenSymbol}
+                {formatWholeToken(pendingExternal)} {tokenSymbol}
               </span>
             ) : (
               "—"
@@ -416,7 +411,7 @@ export const DFXStarIntegrationPanel = () => {
             待领取社区奖励 (A线):{" "}
             {pendingCommunity !== null ? (
               <span className={pendingCommunity > 0n ? "text-green-400" : ""}>
-                {formatUnits(pendingCommunity, 18)} {tokenSymbol}
+                {formatWholeToken(pendingCommunity)} {tokenSymbol}
               </span>
             ) : (
               "—"

@@ -2,9 +2,9 @@ import { useComponentValue } from "@latticexyz/react";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
 import { useEffect, useState } from "react";
+import { formatWholeToken } from "@df/gamelogic";
 import {
   type Address,
-  formatUnits,
   isAddress,
   parseAbi,
   type PublicClient,
@@ -87,13 +87,6 @@ function configured(value: string | undefined): Address | undefined {
 
 function grouped(value: bigint): string {
   return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
-function tokenAmount(value: bigint): string {
-  const [whole, fraction = ""] = formatUnits(value, 18).split(".");
-  const head = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  const tail = fraction.slice(0, 4).replace(/0+$/, "");
-  return tail ? `${head}.${tail}` : head;
 }
 
 function formatUsd(n: number): string {
@@ -254,11 +247,11 @@ async function loadHomeAssets(
       totalStaked: stake !== undefined ? grouped(stake) : "读不到",
     };
     next.pools = [row];
-    next.poolNote = "仅展示本局 DFXStar 分数池";
+    next.poolNote = "";
   }
 
   if (symbol) next.tokenSymbol = symbol;
-  if (burn !== undefined) next.burnedAmount = tokenAmount(burn);
+  if (burn !== undefined) next.burnedAmount = formatWholeToken(burn);
 
   // 行情与第二轮链上读并行
   const quotePromise: Promise<TagAiQuote> = paymentToken
@@ -340,7 +333,7 @@ async function loadHomeAssets(
 
   const rate = ok<bigint>(bySlot2.get("rate"));
   if (rate !== undefined && next.pools[0]) {
-    next.pools[0].hourlyReward = `${tokenAmount(rate)} / 小时`;
+    next.pools[0].hourlyReward = `${formatWholeToken(rate)} / 小时`;
   }
 
   if (passNft) {

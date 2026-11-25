@@ -8,6 +8,8 @@
     "dev:client": "pnpm --filter 'client' run dev",
     "dev:contracts": "pnpm --filter 'contracts' dev",
     "indexer:bsc": "bash packages/indexer/start.sh",
+    "indexer:project": "bash packages/indexer/start-project.sh",
+    "indexer:project:reset": "bash packages/indexer/reset-project.sh",
     "foundry:up": "curl -L https://foundry.paradigm.xyz | bash && bash $HOME/.foundry/bin/foundryup",
     "mud:up": "pnpm mud set-version --tag main && pnpm install",
     "format": "prettier --write 'packages/**/*'",
