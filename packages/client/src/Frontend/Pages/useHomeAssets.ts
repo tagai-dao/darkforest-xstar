@@ -89,6 +89,17 @@ function grouped(value: bigint): string {
   return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+/**
+ * 矿池质押与 PlayerScore 一样是「展示 × 1000」的链上单位。
+ * 不要用 formatWholeToken（默认 18 位），94899 分会显示成 0。
+ */
+function formatScoreStake(raw: bigint): string {
+  return grouped(raw / 1000n);
+}
+
+/** 首页矿池等读数的刷新间隔。 */
+const HOME_ASSETS_POLL_MS = 30_000;
+
 function formatUsd(n: number): string {
   if (!Number.isFinite(n)) return "未接入";
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
@@ -244,7 +255,8 @@ async function loadHomeAssets(
     const row: PoolRow = {
       address: scorePool,
       label: "DFXStar 分数池",
-      totalStaked: stake !== undefined ? grouped(stake) : "读不到",
+      // 与排行榜分数同一套展示单位（链上 / 1000）。
+      totalStaked: stake !== undefined ? formatScoreStake(stake) : "读不到",
     };
     next.pools = [row];
     next.poolNote = "";
@@ -365,32 +377,41 @@ export function useHomeAssets(_wallet: string | undefined): HomeAssets {
 
   useEffect(() => {
     let stopped = false;
+    let seq = 0;
     const scorePool = configured(star?.scoreStakingPool);
     const paymentToken = configured(star?.paymentToken);
     const community = configured(star?.community);
     const passAddress = configured(pass?.addr);
 
-    loadHomeAssets(
-      publicClient,
-      scorePool,
-      paymentToken,
-      community,
-      passAddress,
-    )
-      .then((next) => {
-        if (!stopped) setAssets(next);
-      })
-      .catch(() => {
-        if (!stopped) {
-          setAssets({
-            ...EMPTY,
-            poolNote: "链上暂时读不到",
-          });
-        }
-      });
+    const refresh = () => {
+      const mine = ++seq;
+      void loadHomeAssets(
+        publicClient,
+        scorePool,
+        paymentToken,
+        community,
+        passAddress,
+      )
+        .then((next) => {
+          // 只接受最新一次 multicall，避免慢请求把新质押盖回 0。
+          if (!stopped && mine === seq) setAssets(next);
+        })
+        .catch(() => {
+          if (!stopped && mine === seq) {
+            setAssets({
+              ...EMPTY,
+              poolNote: "链上暂时读不到",
+            });
+          }
+        });
+    };
+
+    refresh();
+    const timer = window.setInterval(refresh, HOME_ASSETS_POLL_MS);
 
     return () => {
       stopped = true;
+      window.clearInterval(timer);
     };
   }, [
     pass?.addr,
