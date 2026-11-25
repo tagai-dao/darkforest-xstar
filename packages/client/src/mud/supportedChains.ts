@@ -90,7 +90,7 @@ export const bsc = {
   ...bscConfig,
   iconUrls: [""],
   // Prefer publicnode: official dataseeds often reject eth_getLogs (limit exceeded).
-  // Leaderboard API (sldf-api) is separate and uses VITE_API_BASE_URL.
+  // Leaderboard API (df-api) is separate and uses VITE_API_BASE_URL.
   // HTTP indexer comes from VITE_INDEXER_URL in production.
   indexerUrl: "",
   rpcUrls: {

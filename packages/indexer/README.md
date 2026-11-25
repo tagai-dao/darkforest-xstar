@@ -57,7 +57,7 @@ pnpm start
 | 公网                           | 上游                   | 用途            |
 | ------------------------------ | ---------------------- | --------------- |
 | `darkforest-indexer.tagai.fun` | `127.0.0.1:3101`       | 客户端同步      |
-| `sldf-api.tagai.fun`           | `packages/api` 的 PORT | 首页排行榜 HTTP |
+| `df-api.tagai.fun`             | `packages/api` 的 PORT | 首页排行榜 HTTP |
 
 ## 4. 客户端
 
@@ -65,7 +65,7 @@ pnpm start
 
 ```bash
 VITE_INDEXER_URL=https://darkforest-indexer.tagai.fun
-VITE_API_BASE_URL=https://sldf-api.tagai.fun
+VITE_API_BASE_URL=https://df-api.tagai.fun
 ```
 
 ## 环境变量要点
