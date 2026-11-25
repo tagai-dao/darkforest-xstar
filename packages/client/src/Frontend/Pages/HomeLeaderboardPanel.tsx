@@ -13,8 +13,8 @@ import {
 
 import dfstyles from "../Styles/dfstyles";
 import {
-  displayHandle,
   displayMetric,
+  displayPlayerName,
   fetchHomeBoard,
   type HomeBoardMode,
   type HomeBoardRow,
@@ -70,31 +70,68 @@ const Status = styled.p`
   font-size: 14px;
 `;
 
+/** 名次、分数收窄，玩家列吃剩余宽度。 */
 const Table = styled.table`
   width: 100%;
   margin-top: 12px;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 14px;
 
   th {
-    padding: 6px 8px;
+    padding: 6px 6px;
     color: ${dfstyles.colors.subtext};
     font-weight: 500;
     text-align: left;
   }
 
   td {
-    padding: 8px;
+    padding: 8px 6px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    word-break: break-all;
+    vertical-align: top;
   }
 
-  td:first-child,
-  td:last-child,
-  th:first-child,
-  th:last-child {
+  th:nth-child(1),
+  td:nth-child(1) {
+    width: 40px;
     text-align: right;
-    width: 88px;
+    white-space: nowrap;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: auto;
+    overflow-wrap: anywhere;
+  }
+
+  th:nth-child(3),
+  td:nth-child(3) {
+    width: 64px;
+    text-align: right;
+    white-space: nowrap;
+  }
+`;
+
+const PlayerName = styled.div`
+  color: ${dfstyles.colors.text};
+`;
+
+const AddressButton = styled.button`
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: ${dfstyles.colors.subtext};
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  word-break: break-all;
+
+  &:hover {
+    color: ${dfstyles.colors.dfgreen};
+    text-decoration: underline;
   }
 `;
 
@@ -128,7 +165,7 @@ const Modal = styled.div`
   border: 1px solid ${dfstyles.colors.dfgreen};
 `;
 
-type ListedRow = HomeBoardRow & { label: string };
+type ListedRow = HomeBoardRow & { name: string };
 
 type Props = {
   /** 预览条数；不传则显示全部。 */
@@ -178,17 +215,17 @@ export function HomeLeaderboardPanel({
         }
         if (stopped) return;
 
-        const withLabel = (board: HomeBoardRow[]): ListedRow[] =>
+        const withName = (board: HomeBoardRow[]): ListedRow[] =>
           board.map((row) => ({
             ...row,
-            label: displayHandle(
+            name: displayPlayerName(
               row.address,
               handles.get(row.address.toLowerCase()),
             ),
           }));
 
-        setScoreRows(withLabel(scoreBoard));
-        setKillRows(withLabel(killBoard));
+        setScoreRows(withName(scoreBoard));
+        setKillRows(withName(killBoard));
         setStatus(scoreBoard.length === 0 ? "还没有上榜的玩家" : "");
       } catch (error) {
         console.error(error);
@@ -221,7 +258,9 @@ export function HomeLeaderboardPanel({
           </TitleRow>
         ) : null}
         {status && <Status>{status}</Status>}
-        {preview.length > 0 && <BoardTable mode="score" rows={preview} />}
+        {preview.length > 0 && (
+          <BoardTable mode="score" rows={preview} variant="preview" />
+        )}
         {showMore && (
           <MoreButton type="button" onClick={() => setOpen(true)}>
             更多
@@ -254,7 +293,7 @@ export function HomeLeaderboardPanel({
               </ModeButton>
             </Modes>
             {modalRows.length > 0 ? (
-              <BoardTable mode={modalMode} rows={modalRows} />
+              <BoardTable mode={modalMode} rows={modalRows} variant="modal" />
             ) : (
               <Status>还没有上榜的玩家</Status>
             )}
@@ -268,9 +307,11 @@ export function HomeLeaderboardPanel({
 function BoardTable({
   mode,
   rows,
+  variant,
 }: {
   mode: HomeBoardMode;
   rows: ListedRow[];
+  variant: "preview" | "modal";
 }) {
   return (
     <Table>
@@ -285,12 +326,46 @@ function BoardTable({
         {rows.map((row) => (
           <tr key={row.address}>
             <td>{row.rank}</td>
-            <td title={row.address}>{row.label}</td>
+            <td>
+              {variant === "preview" ? (
+                <PlayerName>{row.name}</PlayerName>
+              ) : (
+                <ModalPlayer name={row.name} address={row.address} />
+              )}
+            </td>
             <td>{displayMetric(metricOf(row, mode))}</td>
           </tr>
         ))}
       </tbody>
     </Table>
+  );
+}
+
+/** 弹窗：名字 + 完整地址；点地址复制。 */
+function ModalPlayer({ name, address }: { name: string; address: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return (
+    <>
+      <PlayerName>{name}</PlayerName>
+      <AddressButton
+        type="button"
+        title={copied ? "已复制" : "点击复制地址"}
+        onClick={() => void copyAddress()}
+      >
+        {copied ? "已复制" : address}
+      </AddressButton>
+    </>
   );
 }
 
