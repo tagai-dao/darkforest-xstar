@@ -6,6 +6,32 @@ Mine only after the wallet has joined and a home planet is saved in `homeLocatio
 
 The repository does not contain a mining script. Write the example below to a temporary file, fill in the owner's choices, and run it. Do not commit that temporary file.
 
+Owners and agents often rewrite the explore loop. Whatever pattern or worker layout they use, **chunk merge is not optional**. Read **Merging chunks (required)** before shipping a custom explorer. A program that only appends side-16 lines and never folds the log is incomplete.
+
+## Merging chunks (required)
+
+`knownBoard.ndjson` must stay a folded map, not an endless list of side-16 squares. This rule applies to the example in this file and to any custom 探索 algorithm.
+
+**Why.** Unmerged lines make the file huge. The page reads by byte offset and only reloads from the start when the file gets shorter. Without merge, import and draw slow down, and later runs re-hash squares that a parent chunk already covers.
+
+**In-memory fold (same as `addToChunkMap` in `packages/client/src/Backend/Miner/ChunkUtils.ts`).**
+
+1. Chunks are aligned: side length is a power of two from `16` to `16384`, and the bottom-left is a multiple of that side.
+2. Four stored chunks of the **same** side whose siblings fill one parent of side `2 * side` become that parent. Sibling bottoms are the four corners of the parent square (`floor(x / (2s)) * 2s`, `floor(y / (2s)) * 2s`, then `+0` / `+s` on each axis).
+3. The merged bottom-left is the minimum of the four (the parent origin). Planet lists are concatenated. Chunk Perlin is the average of the four, kept to three decimal places.
+4. Remove the four children, insert the parent, and repeat while the new chunk still has three siblings. Stop at side `16384`.
+
+**While hashing.** Load the log once at start, fold it into memory, and use that map to skip covered side-16 squares. Fold new finished squares into memory too. Appended log lines may still be the raw side-16 square; the merge on disk happens on the rewrite below.
+
+**When chunks are many / on every stop.** After flushing append buffers (and on SIGINT / normal stop), write the **fully merged** in-memory map to `knownBoard.ndjson.tmp` in the same folder, then:
+
+- Rename the temporary file over `knownBoard.ndjson` **only when the temporary file is shorter** than the current log.
+- If it is not shorter, delete the temporary file and leave the appended log.
+- A run that hashed nothing does not rewrite the log.
+- Stop any still-running hasher before this rewrite.
+
+Reimplement these rules in the custom program. Equivalence with `addToChunkMap` plus the shorter-file rewrite is what matters. Do not leave a long run as only unmerged side-16 appends.
+
 ## First ring, then the page, then the question
 
 The home chunk is the side-16 square that contains the home. Its bottom-left corner is `floor(x / 16) * 16`, `floor(y / 16) * 16`. The first ring is that chunk plus the eight side-16 chunks that touch it by a side or a corner. Offsets from the home chunk are `-16`, `0`, and `16` on each axis, except `0, 0`, which is the home chunk itself.
@@ -69,11 +95,9 @@ The four patterns are the classes used by `ExplorePane`, in `packages/client/src
 
 The parent keeps one worker alive per chosen core for the whole run. Each worker receives one side-16 square, hashes all 256 coordinates, and returns that square. The parent then gives it the next square. Do not split one square across cores with `count % cores`, and do not start a new process per square.
 
-Skip a side-16 square that sits inside a chunk already in `knownBoard.ndjson`, and continue with the pattern's next square. A stored chunk covers a square when that square's bottom-left lies inside it. Read the file once at the start, fold any four aligned siblings in memory, and use that map for the rest of the run. Do not read the log again per square, and do not rewrite it before hashing starts. Also skip a chunk inside the inner circle or outside the world. Take the chunk center, subtract half the side from the absolute value of each axis, and square-sum those two numbers. That is the squared distance from the origin to the chunk's nearest corner. Skip the chunk when that distance is below the live inner-circle radius, or when it is at or beyond the world radius `100000`. The inner circle starts at `75000` and shrinks. Read it the same way as [home.md](home.md). Do not hash a chunk inside the inner circle. Fleets cannot enter it.
+Skip a side-16 square that sits inside a chunk already in `knownBoard.ndjson`, and continue with the pattern's next square. A stored chunk covers a square when that square's bottom-left lies inside it. Follow **Merging chunks (required)** for the start-of-run fold, in-memory updates, and the stop rewrite. Do not read the log again per square, and do not rewrite it before hashing starts. Also skip a chunk inside the inner circle or outside the world. Take the chunk center, subtract half the side from the absolute value of each axis, and square-sum those two numbers. That is the squared distance from the origin to the chunk's nearest corner. Skip the chunk when that distance is below the live inner-circle radius, or when it is at or beyond the world radius `100000`. The inner circle starts at `75000` and shrinks. Read it the same way as [home.md](home.md). Do not hash a chunk inside the inner circle. Fleets cannot enter it.
 
-Four stored chunks of the same side whose bottom-left corners are `2 * side` apart become one chunk of double that side. The new bottom-left is the minimum of the four. Planets are the four lists joined. Perlin is the average of the four, then kept to three decimal places. Repeat while the new chunk still has three siblings, and stop at side `16384`. This is the same fold as `addToChunkMap` in `packages/client/src/Backend/Miner/ChunkUtils.ts`. During the run this fold changes only the in-memory map, so a square already covered is not hashed again. The line appended for a new square is still that side-16 square, not the merged parent.
-
-Hold those side-16 lines in a buffer. Append the buffer with one write when it holds 32 lines, or when 500ms have passed with any lines waiting, whichever comes first. Keep one file handle open for those appends. A crash loses only the lines still in that buffer. On stop, including SIGINT, wait for the squares already handed to workers, flush the buffer, and close the handle. Then write the merged map once to `knownBoard.ndjson.tmp` in the same folder. The page reads this log by byte offset and reads it again from the start only when the file gets shorter. Rename the temporary file over the log only when it is shorter. When it is not shorter, delete the temporary file and leave the appended log. A run that hashes nothing does not rewrite the log. If a previous run is still hashing, stop that process before this rewrite.
+Hold those side-16 lines in a buffer. Append the buffer with one write when it holds 32 lines, or when 500ms have passed with any lines waiting, whichever comes first. Keep one file handle open for those appends. A crash loses only the lines still in that buffer. On stop, including SIGINT, wait for the squares already handed to workers, flush the buffer, close the handle, then run the merged rewrite from **Merging chunks (required)**.
 
 The log is one file in the wallet folder:
 
@@ -484,4 +508,4 @@ async function main(): Promise<void> {
 }
 ```
 
-After it is running, tell the owner the folder, how many cores are hashing, and that finished squares are appended in batches. The script prints a line when a batch hits disk, with the running total. Pass that total on when the owner asks, or when the run stops. Do not send one message per square. If the owner says stop, send SIGINT and wait until the script prints `done`. That stop writes the remaining buffer and then rewrites the merged log once. Delete `packages/client/darkforest-mine.ts` after the run. Do not invent fleet-move transactions.
+After it is running, tell the owner the folder, how many cores are hashing, and that finished squares are appended in batches. The script prints a line when a batch hits disk, with the running total. Pass that total on when the owner asks, or when the run stops. Do not send one message per square. If the owner says stop, send SIGINT and wait until the script prints `done`. That stop writes the remaining buffer and then rewrites the merged log once, as **Merging chunks (required)** demands. A custom explorer must do the same merge on stop even if it does not use this example. Delete `packages/client/darkforest-mine.ts` after the run. Do not invent fleet-move transactions.

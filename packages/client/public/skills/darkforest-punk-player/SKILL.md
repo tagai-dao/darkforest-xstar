@@ -1,7 +1,7 @@
 ---
 name: darkforest-punk-player
-version: 1.1.0
-description: Join Dark Forest on BSC (chain 56), stake a game-pass NFT, spawn a home, explore, and play with a named strategy file. When speaking to the owner, call map hashing 探索. Use when the owner wants an agent to start playing, stake the game-pass NFT, spawn a home, explore, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_REVERT_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, DARKFOREST_BUY_JUNK, DARKFOREST_FIND_ARTIFACT, DARKFOREST_USE_ARTIFACT, DARKFOREST_CLEAR_JUNK, DARKFOREST_CLAIM_REWARDS, or DARKFOREST_CLAIM_COMMUNITY.
+version: 1.1.1
+description: Join Dark Forest on BSC (chain 56), stake a game-pass NFT, spawn a home, explore, and play with a named strategy file. When speaking to the owner, call map hashing 探索. Every explore program must merge knownBoard chunks as they grow. Use when the owner wants an agent to start playing, stake the game-pass NFT, spawn a home, explore, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_REVERT_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, DARKFOREST_BUY_JUNK, DARKFOREST_FIND_ARTIFACT, DARKFOREST_USE_ARTIFACT, DARKFOREST_CLEAR_JUNK, DARKFOREST_CLAIM_REWARDS, or DARKFOREST_CLAIM_COMMUNITY.
 ---
 
 # Dark Forest player
@@ -23,7 +23,7 @@ The owner does not know the chain, contracts, or price. Do not ask for them. The
 
 This is the live BSC deployment. Keep these addresses. Do not switch chains. Do not deploy contracts. The five Nutbox addresses are in [nutbox.md](nutbox.md).
 
-This map uses planet hash key `20261119`, space key `20261120`, biome key `20261121`, and scale `8192`. At the start of a run, verify the World, locker, NFT, handle registry, and pool on chain before opening a wallet save. A matching folder name does not prove that its files belong to this map. If `SpawnPlanet` for this wallet is zero and the folder already contains `homeLocations.json` or `knownBoard.ndjson`, stop and ask the owner for an empty directory. Do not use those files. Create fresh files only after the current chain and wallet state have been read. Keep stopped mining and strategy processes stopped until the owner explicitly starts them for this run.
+This map uses planet hash key `20261119`, space key `20261120`, biome key `20261121`, and scale `8192`. At the start of a run, verify the World, locker, NFT, handle registry, and pool on chain before opening a wallet save. A matching folder name does not prove that its files belong to this map. If `SpawnPlanet` for this wallet is zero and the folder already contains `homeLocations.json` or `knownBoard.ndjson`, stop and ask the owner for an empty directory. Do not use those files. Create fresh files only after the current chain and wallet state have been read. Keep stopped mining and strategy processes stopped until the owner explicitly starts them for this run. Any 探索 code path — default or custom — must merge `knownBoard.ndjson` as [mining.md](mining.md) requires; do not ship an explorer that only appends unmerged side-16 lines.
 
 After an agent restart, treat any earlier chain snapshot, transaction receipt, staked NFT, registered name, home, and in-memory signer as unverified. Pin a fresh block and read the current `GamePassNFT` World record through the verified Multicall3; check the locker, NFT, handle registry, and pool against the current deployment before making a game decision. Derive the player address from a signer that is **still live**, then read `isPlayerInActiveSeason(player)` and `SpawnPlanet` from this deployment. A socket path or a saved address by itself does not prove that its old signer process survived the restart. Do not resume an old transaction plan or copy another map's board or action log into this save. The current chain state decides what is live.
 
@@ -322,7 +322,7 @@ The wallet folder is `<root>/<chainId>-<world>/<player lowercase>/`. `agent.json
 
 `<world>` is the World in the table above. These two fields tell the page which game the folder belongs to. Do not put a private key in either file.
 
-The map is one file next to those two, named `knownBoard.ndjson`. Each line is one chunk the page draws, and mining keeps that file merged: four aligned chunks become one larger line. Do not write one file per chunk under `knownBoard/`.
+The map is one file next to those two, named `knownBoard.ndjson`. Each line is one chunk the page draws. **Merging that file is mandatory for every 探索 program**, including one the owner or agent rewrote from scratch. Appending side-16 lines alone is not enough: when chunks pile up, four aligned siblings must fold into larger lines, and a stop (or a long run) must rewrite the merged map. Skipping merge leaves a huge log, slows the page, and re-hashes covered squares. The fold rules and the safer write path are in [mining.md](mining.md) under **Merging chunks (required)**. Do not write one file per chunk under `knownBoard/`.
 
 When the wallet folder is created, also copy `aggressive.md`, `conservative.md`, `offensive.md`, and `profit.md` from this skill directory into `<wallet>/strategies/`. If that folder already exists, copy only filenames that are missing. Do not overwrite a strategy file that is already there. `strategy.txt` is not written until the owner picks a filename. Playing with that file is [play.md](play.md).
 
