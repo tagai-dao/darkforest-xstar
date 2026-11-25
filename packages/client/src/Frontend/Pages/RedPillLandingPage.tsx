@@ -1860,11 +1860,7 @@ export function RedPillLandingPage() {
       setImporting(true);
       setImportNotice(undefined);
       const network = getNetworkConfig();
-      const result = await loadSelectedGame(
-        handle,
-        { chainId: network.chain.id, world: network.worldAddress },
-        () => undefined,
-      );
+      const result = await loadSelectedGame(handle, network, () => undefined);
       if (!result.ok) {
         const sentence =
           result.reason === "ended"

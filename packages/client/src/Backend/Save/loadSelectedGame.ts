@@ -1,5 +1,6 @@
-import { mudFoundry } from "@latticexyz/common/chains";
 import { createPublicClient, type Hex, http } from "viem";
+
+import type { NetworkConfig } from "../../mud/getNetworkConfig";
 
 import { BOARD_LOG_NAME, parseBoardLog } from "./BoardLog";
 import {
@@ -110,13 +111,21 @@ function uint256FromStatic(data: Hex): bigint {
   return BigInt(data);
 }
 
-async function readSpawnPlanet(world: string, player: string): Promise<bigint> {
+type GameNetwork = Pick<NetworkConfig, "chain" | "provider" | "worldAddress">;
+
+async function readSpawnPlanet(
+  network: GameNetwork,
+  player: string,
+): Promise<bigint> {
   const client = createPublicClient({
-    chain: mudFoundry,
-    transport: http("http://localhost:8545"),
+    chain: network.chain,
+    transport: http(network.provider.jsonRpcUrl),
   });
+  if ((await client.getChainId()) !== network.chain.id) {
+    throw new Error("RPC chain does not match the selected game");
+  }
   const record = await client.readContract({
-    address: world as Hex,
+    address: network.worldAddress as Hex,
     abi: worldAbi,
     functionName: "getRecord",
     args: [SPAWN_PLANET_TABLE as Hex, [addressKey(player)]],
@@ -145,7 +154,7 @@ async function walletDirectories(
 
 export async function loadSelectedGame(
   root: DirectoryHandle,
-  liveGame: { chainId: number; world: string },
+  network: GameNetwork,
   onProgress: (progress: LoadProgress) => void,
 ): Promise<LoadedGame | RejectedGame> {
   onProgress({ done: 0, total: 0, label: "正在查看目录" });
@@ -221,7 +230,10 @@ export async function loadSelectedGame(
   }
 
   // 链 ID 和 World 对得上才是这一局；对不上的存档不再使用。
-  const status = decideGameStatus(game, liveGame);
+  const status = decideGameStatus(game, {
+    chainId: network.chain.id,
+    world: network.worldAddress,
+  });
   if (status === "ended") {
     return { ok: false, reason: "ended", ...endedGameNotice };
   }
@@ -230,7 +242,7 @@ export async function loadSelectedGame(
   if (save.homeLocations.length > 0) {
     let spawnPlanet: bigint;
     try {
-      spawnPlanet = await readSpawnPlanet(liveGame.world, save.agent.address);
+      spawnPlanet = await readSpawnPlanet(network, save.agent.address);
     } catch {
       return {
         ok: false,
