@@ -10,7 +10,7 @@ ENV_FILE="${1:-$ROOT/.env}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing $ENV_FILE"
-  echo "Copy packages/indexer/.env.example and set DATABASE_URL."
+  echo "Copy packages/indexer/.env.example and set DB_HOST/DB_NAME/DB_USER/DB_PASSWORD."
   exit 1
 fi
 
@@ -19,7 +19,10 @@ set -a
 source "$ENV_FILE"
 set +a
 
-: "${DATABASE_URL:?DATABASE_URL required}"
+: "${DB_HOST:?DB_HOST required}"
+: "${DB_NAME:?DB_NAME required}"
+: "${DB_USER:?DB_USER required}"
+# DB_PASSWORD may be empty.
 
 export INDEXER_URL="${INDEXER_URL:-http://127.0.0.1:${PORT:-3001}}"
 export WORLD_CHAIN_ID="${WORLD_CHAIN_ID:-56}"

@@ -25,7 +25,7 @@ chmod +x start.sh start-project.sh
 store-indexer 起来之后：
 
 ```bash
-# .env 里配好 DATABASE_URL
+# .env 里配好 DB_HOST / DB_NAME / DB_USER / DB_PASSWORD
 ./start-project.sh
 ```
 
@@ -48,7 +48,7 @@ indexer 库被清空重追、或 MySQL 水位高于 indexer 当前块时，榜�
 
 ```bash
 cd packages/api
-# .env 只需 PORT + DATABASE_URL（同一套 MySQL）
+# .env：PORT + DB_HOST / DB_NAME / DB_USER / DB_PASSWORD（与投影同一套库）
 pnpm start
 ```
 
@@ -77,4 +77,4 @@ VITE_API_BASE_URL=https://sldf-api.tagai.fun
 | `STORE_ADDRESS`   | World 地址                                    |
 | `MAX_BLOCK_RANGE` | 默认示例 `500`；过大易被 RPC `limit exceeded` |
 | `PORT`            | store-indexer HTTP，默认 `3001`               |
-| `DATABASE_URL`    | 投影 + 只读 API 共用的 MySQL                  |
+| `DB_HOST` 等      | 投影 + 只读 API 的 MySQL（代码里拼连接串）    |

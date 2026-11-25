@@ -60,11 +60,27 @@ function resolveWorld(chainId: number): {
   return { address: fromFile.address, initialBlockNumber };
 }
 
+/**
+ * 用拆开的 DB_* 拼 mysql 连接串（密码做 URL 编码）。
+ * 仍可用 DATABASE_URL 覆盖，方便临时调试。
+ */
+function loadDatabaseUrl(): string {
+  const override = process.env.DATABASE_URL?.trim();
+  if (override) return override;
+
+  const host = required("DB_HOST");
+  const name = required("DB_NAME");
+  const user = required("DB_USER");
+  const password = process.env.DB_PASSWORD ?? "";
+  const port = process.env.DB_PORT?.trim() || "3306";
+  return `mysql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(name)}`;
+}
+
 /** 只读 API：不碰 RPC，只读 MySQL。 */
 export function loadServerConfig() {
   return {
     port: Number(process.env.PORT ?? 4100),
-    databaseUrl: required("DATABASE_URL"),
+    databaseUrl: loadDatabaseUrl(),
   };
 }
 
@@ -81,7 +97,7 @@ export function loadProjectConfig() {
     indexerUrl,
     worldAddress: world.address,
     initialBlockNumber: world.initialBlockNumber,
-    databaseUrl: required("DATABASE_URL"),
+    databaseUrl: loadDatabaseUrl(),
   };
 }
 
