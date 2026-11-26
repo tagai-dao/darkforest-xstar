@@ -90,7 +90,7 @@ export function BuyJunkOrderPanel({
         );
 
   return (
-    <Shell>
+    <Shell data-guide-panel="buy-junk">
       <TitleRow>
         <div>购买垃圾额度</div>
         <ActionButton type="button" onClick={onClose}>
@@ -124,6 +124,7 @@ export function BuyJunkOrderPanel({
                   <td>
                     <ActionButton
                       type="button"
+                      data-guide-target="buy-junk-tier"
                       disabled={quote.owned}
                       onClick={() =>
                         onCopy(

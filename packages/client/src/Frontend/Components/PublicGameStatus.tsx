@@ -222,7 +222,13 @@ function saveCollapsed(collapsed: boolean): void {
   }
 }
 
-export function PublicGameStatus({ homeReady }: { homeReady: boolean }) {
+export function PublicGameStatus({
+  homeReady,
+  onOpenGuide,
+}: {
+  homeReady: boolean;
+  onOpenGuide: () => void;
+}) {
   const uiManager = useUIManager();
   const [innerRadius, setInnerRadius] = useState<number | undefined>();
   const [tick, setTick] = useState<number | undefined>();
@@ -434,8 +440,12 @@ export function PublicGameStatus({ homeReady }: { homeReady: boolean }) {
           <RefreshButton type="button" disabled={refreshing} onClick={refresh}>
             {refreshing ? "刷新中" : "刷新"}
           </RefreshButton>
+          <RefreshButton type="button" onClick={onOpenGuide}>
+            新手指引
+          </RefreshButton>
           <CollapseButton
             type="button"
+            data-guide-target={collapsed ? "expand-status" : undefined}
             aria-expanded={!collapsed}
             onClick={toggleCollapsed}
           >
@@ -449,6 +459,7 @@ export function PublicGameStatus({ homeReady }: { homeReady: boolean }) {
             <div>总用户 {whole(facts.users)}</div>
             <OpenButton
               type="button"
+              data-guide-target="owned-planets"
               onClick={() => {
                 setArtifactsOpen(false);
                 setJunkBuyOpen(false);
@@ -473,6 +484,7 @@ export function PublicGameStatus({ homeReady }: { homeReady: boolean }) {
               </span>
               <ClaimButton
                 type="button"
+                data-guide-target="buy-junk"
                 disabled={facts.junkLimit === undefined}
                 onClick={() => {
                   setPlanetsOpen(false);

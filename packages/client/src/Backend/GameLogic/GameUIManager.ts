@@ -1090,6 +1090,7 @@ export class GameUIManager extends EventEmitter {
               label: artifact ? "已复制运送单，直接粘贴给 agent" : undefined,
             });
           });
+          uiEmitter.emit(UIEmitterEvent.MoveOrderCreated);
         }
 
         if (

@@ -15,6 +15,10 @@ import {
   UpperLeft,
   WindowWrapper,
 } from "../Components/GameWindowComponents";
+import {
+  NewPlayerGuide,
+  useNewPlayerGuide,
+} from "../Components/NewPlayerGuide";
 import { PublicGameStatus } from "../Components/PublicGameStatus";
 import { SelectedVoyageDisplay } from "../Components/SelectedVoyageDisplay";
 import ControllableCanvas from "../Game/ControllableCanvas";
@@ -71,6 +75,7 @@ export function GameWindowLayout({
   spectate,
   showPublicStatus = false,
   homeReady = false,
+  guideWallet,
   actions = [],
   onReturnHome,
 }: {
@@ -79,10 +84,12 @@ export function GameWindowLayout({
   spectate?: boolean;
   showPublicStatus?: boolean;
   homeReady?: boolean;
+  guideWallet?: string;
   actions?: ActionRecord[];
   onReturnHome?: () => void;
 }) {
   const uiManager = useUIManager();
+  const { guideOpen, openGuide, closeGuide } = useNewPlayerGuide(guideWallet);
   const modalManager = uiManager.getModalManager();
   const modalPositions = modalManager.getModalPositions();
 
@@ -362,8 +369,18 @@ export function GameWindowLayout({
   return (
     <WindowWrapper>
       <DocsCorner fixed />
-      {showPublicStatus && <PublicGameStatus homeReady={homeReady} />}
+      {showPublicStatus && (
+        <PublicGameStatus homeReady={homeReady} onOpenGuide={openGuide} />
+      )}
       {showPublicStatus && <ActionHistory actions={actions} />}
+      {showPublicStatus && guideOpen && (
+        <NewPlayerGuide
+          uiManager={uiManager}
+          walletAddress={guideWallet}
+          homeReady={homeReady}
+          onClose={closeGuide}
+        />
+      )}
       <TopBarPaneContainer>
         {paneVisible && (
           <BorderlessPane>

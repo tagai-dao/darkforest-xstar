@@ -20,6 +20,7 @@ import {
   MOVE_UP,
 } from "../Utils/ShortcutConstants";
 import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
+import { bindCanvasPointerEvents } from "./canvasPointerEvents";
 import Viewport from "./Viewport";
 
 const CanvasWrapper = styled.div`
@@ -223,51 +224,10 @@ export default function ControllableCanvas() {
     evtRef,
   ]);
 
-  // attach event listeners
   useEffect(() => {
-    if (!evtRef.current) {
-      return;
-    }
-    const canvas = evtRef.current;
-
-    const uiEmitter: UIEmitter = UIEmitter.getInstance();
-
-    function onMouseEvent(
-      emitEventName: UIEmitterEvent,
-      mouseEvent: MouseEvent,
-    ) {
-      const rect = canvas.getBoundingClientRect();
-      const canvasX = mouseEvent.clientX - rect.left;
-      const canvasY = mouseEvent.clientY - rect.top;
-      uiEmitter.emit(emitEventName, { x: canvasX, y: canvasY });
-    }
-
-    const onMouseDown = (e: MouseEvent) => {
-      onMouseEvent(UIEmitterEvent.CanvasMouseDown, e);
-    };
-    // this is the root of the mousemove event
-    const onMouseMove = (e: MouseEvent) => {
-      onMouseEvent(UIEmitterEvent.CanvasMouseMove, e);
-    };
-    const onMouseUp = (e: MouseEvent) => {
-      onMouseEvent(UIEmitterEvent.CanvasMouseUp, e);
-    };
-    // TODO convert this to mouseleave
-    const onMouseOut = () => {
-      uiEmitter.emit(UIEmitterEvent.CanvasMouseOut);
-    };
-
-    canvas.addEventListener("mousedown", onMouseDown);
-    canvas.addEventListener("mousemove", onMouseMove);
-    canvas.addEventListener("mouseup", onMouseUp);
-    canvas.addEventListener("mouseout", onMouseOut);
-    return () => {
-      canvas.removeEventListener("mousedown", onMouseDown);
-      canvas.removeEventListener("mousemove", onMouseMove);
-      canvas.removeEventListener("mouseup", onMouseUp);
-      canvas.removeEventListener("mouseout", onMouseOut);
-    };
-  }, [evtRef]);
+    const canvas = canvasRef.current;
+    if (canvas) return bindCanvasPointerEvents(canvas);
+  }, []);
 
   // Keyboard movement handlers with continuous movement supportAdd commentMore actions
   const isUpPressed = useIsDown(MOVE_UP);
@@ -319,7 +279,7 @@ export default function ControllableCanvas() {
       style={{ cursor: targeting ? "crosshair" : undefined }}
     >
       <canvas ref={glRef} width={width} height={height} />
-      <canvas ref={canvasRef} width={width} height={height} />
+      <canvas data-guide-map ref={canvasRef} width={width} height={height} />
       <canvas ref={bufferRef} id="buffer" />
     </CanvasWrapper>
   );

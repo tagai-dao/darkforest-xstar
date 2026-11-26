@@ -31,6 +31,7 @@ export const enum UIEmitterEvent {
   SendInitiated = "SendInitiated",
   SendCancelled = "SendCancelled",
   SendCompleted = "SendCompleted",
+  MoveOrderCreated = "MoveOrderCreated",
   MoveOrderCopied = "MoveOrderCopied",
 
   DepositArtifact = "DepositArtifact",

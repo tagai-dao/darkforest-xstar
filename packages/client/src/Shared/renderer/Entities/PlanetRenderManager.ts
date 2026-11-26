@@ -53,7 +53,7 @@ const { whiteA, barbsA, gold, pendingJunkA } = engineConsts.colors;
 
 /** 能量数字和能量环同一套颜色。自己占领但还没 addJunk 时用琥珀色。 */
 function energyMarkColor(planet: Planet, mine: boolean): RGBAVec {
-  if (mine && planet.addJunkTick === 0) {
+  if (mine && (planet.addJunkTick === 0 || planet.junkOwner !== planet.owner)) {
     return pendingJunkA;
   }
   if (mine) {

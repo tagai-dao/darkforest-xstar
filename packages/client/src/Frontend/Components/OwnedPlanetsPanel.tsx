@@ -232,7 +232,9 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
     (planet: Planet) => <PlanetThumb planet={planet} />,
     (planet: Planet) =>
       isLocatable(planet) ? (
-        <PlanetLink planet={planet}>{getPlanetName(planet)}</PlanetLink>
+        <PlanetLink planet={planet} guideTarget>
+          {getPlanetName(planet)}
+        </PlanetLink>
       ) : (
         <span>坐标未公开</span>
       ),
@@ -273,10 +275,14 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <Shell>
+    <Shell data-guide-panel="owned-planets">
       <TitleRow>
         <div>占领星球 {planets.length}</div>
-        <CloseButton type="button" onClick={onClose}>
+        <CloseButton
+          type="button"
+          data-guide-target="close-owned-planets"
+          onClick={onClose}
+        >
           关闭
         </CloseButton>
       </TitleRow>

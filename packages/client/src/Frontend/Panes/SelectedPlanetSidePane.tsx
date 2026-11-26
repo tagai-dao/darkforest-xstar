@@ -183,12 +183,14 @@ function DepartureSliders({ planet }: { planet: LocatablePlanet }) {
 
   return (
     <Sliders>
-      <PercentRow
-        label="出发能量"
-        percent={energyPercent}
-        amount={departureEnergy(planet.energy, energyPercent)}
-        onChange={setEnergy}
-      />
+      <div data-guide-target="departure-energy">
+        <PercentRow
+          label="出发能量"
+          percent={energyPercent}
+          amount={departureEnergy(planet.energy, energyPercent)}
+          onChange={setEnergy}
+        />
+      </div>
       {planet.silver > 0 && (
         <PercentRow
           label="出发银"
@@ -431,7 +433,7 @@ function UpgradeCopy({ planet }: { planet: LocatablePlanet }) {
   };
 
   return (
-    <BuyBox>
+    <BuyBox data-guide-target="upgrade">
       <SectionTitle>升级</SectionTitle>
       {planetFull ? (
         <Amount>已满级</Amount>
@@ -519,7 +521,11 @@ function JunkCopy({ planet }: { planet: LocatablePlanet }) {
       <SectionTitle>垃圾配额</SectionTitle>
       <TierLine>
         <TierPrice>{junkIsMine ? "已经登记" : "占领后还没登记"}</TierPrice>
-        <CopyScore type="button" onClick={copyAdd}>
+        <CopyScore
+          type="button"
+          data-guide-target={junkIsMine ? undefined : "add-junk"}
+          onClick={copyAdd}
+        >
           复制 addJunk
         </CopyScore>
       </TierLine>
@@ -683,7 +689,7 @@ function SilverBuyCopy({ planet }: { planet: LocatablePlanet }) {
   };
 
   return (
-    <BuyBox>
+    <BuyBox data-guide-target="buy-silver">
       <SectionTitle>购买银</SectionTitle>
       {frontier > planet.planetLevel && (
         <Amount>

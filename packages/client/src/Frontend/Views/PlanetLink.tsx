@@ -10,9 +10,11 @@ import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 export function PlanetLink({
   planet,
   children,
+  guideTarget,
 }: {
   planet: Planet;
   children: React.ReactNode;
+  guideTarget?: boolean;
 }) {
   const uiManager = useUIManager();
   const uiEmitter = UIEmitter.getInstance();
@@ -20,6 +22,7 @@ export function PlanetLink({
   return (
     <Link
       color={dfstyles.colors.text}
+      data-guide-planet={guideTarget ? planet.locationId : undefined}
       onClick={() => {
         if (isLocatable(planet)) {
           uiManager?.setSelectedPlanet(planet);

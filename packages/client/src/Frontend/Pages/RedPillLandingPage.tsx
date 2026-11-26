@@ -1980,6 +1980,12 @@ export function RedPillLandingPage() {
                     spectate={spectate}
                     showPublicStatus={spectate}
                     homeReady={homeReady}
+                    guideWallet={
+                      initRenderState === InitRenderState.COMPLETE &&
+                      folderLoad.kind === "idle"
+                        ? folderSave?.agent.address
+                        : undefined
+                    }
                     actions={actionLog}
                     onReturnHome={spectate ? leaveGame : undefined}
                   />
