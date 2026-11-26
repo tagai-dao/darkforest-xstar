@@ -314,15 +314,22 @@ export function asActionRecord(value: unknown): ActionRecord | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
   }
-  const record = value as ActionRecord & { at?: string };
-  if (typeof record.action !== "string" || record.action === "") {
+  const { action, time, at, strategy, detail, tx } = value as Record<
+    string,
+    unknown
+  >;
+  if (typeof action !== "string" || action === "") {
     return undefined;
   }
-  // 有的记录把时间写在 at 上。页面只认 time。
-  if (!record.time && typeof record.at === "string") {
-    record.time = record.at;
-  }
-  return record;
+  const recordedTime = typeof time === "string" ? time : undefined;
+  return {
+    action,
+    time: recordedTime || (typeof at === "string" ? at : undefined),
+    strategy: typeof strategy === "string" ? strategy : undefined,
+    detail:
+      typeof detail === "string" ? detail : JSON.stringify(detail ?? undefined),
+    tx: typeof tx === "string" ? tx : undefined,
+  };
 }
 
 /**

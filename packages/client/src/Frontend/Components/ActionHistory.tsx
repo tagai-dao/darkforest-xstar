@@ -217,8 +217,12 @@ export function actionTextParts(text: string): ActionTextPart[] {
   const coordinate = /\((-?\d+),\s*(-?\d+)\)/g;
   const parts: ActionTextPart[] = [];
   let last = 0;
-  for (const match of text.matchAll(coordinate)) {
-    const index = match.index ?? 0;
+  for (
+    let match = coordinate.exec(text);
+    match;
+    match = coordinate.exec(text)
+  ) {
+    const index = match.index;
     if (index > last) {
       parts.push({ kind: "text", value: text.slice(last, index) });
     }

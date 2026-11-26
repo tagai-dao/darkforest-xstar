@@ -23,6 +23,46 @@ describe("action log", () => {
     expect(asActionRecord(parsed.values[0])?.time).toBe("2026-11-06T04:51:48Z");
   });
 
+  it("renders imported structured details alongside valid coordinate links", () => {
+    const entries = [
+      {
+        action: "move",
+        detail: { from: "(79908, 14)", energy: 1200 },
+        strategy: { name: "aggressive.md" },
+        time: 123,
+        at: "2026-11-06T04:51:48Z",
+        tx: {},
+      },
+      { action: "upgrade", detail: "upgraded (79954, -137)" },
+      { action: "tick", detail: null },
+    ];
+    const log = entries.map((entry) => JSON.stringify(entry)).join("\n");
+    const parsed = parseCompleteJsonLines(`${log}\n`);
+    const records = parsed.values.map(asActionRecord);
+    const parts = records.map((record) =>
+      actionTextParts(record?.detail ?? ""),
+    );
+
+    expect(records[0]).toMatchObject({
+      action: "move",
+      detail: '{"from":"(79908, 14)","energy":1200}',
+      time: "2026-11-06T04:51:48Z",
+    });
+    expect(records[0]?.strategy).toBeUndefined();
+    expect(records[0]?.tx).toBeUndefined();
+    expect(parts[0]).toContainEqual({
+      kind: "coord",
+      x: 79908,
+      y: 14,
+      label: "(79908, 14)",
+    });
+    expect(parts[1]).toEqual([
+      { kind: "text", value: "upgraded " },
+      { kind: "coord", x: 79954, y: -137, label: "(79954, -137)" },
+    ]);
+    expect(parts[2]).toEqual([]);
+  });
+
   it("labels an action with the local time", () => {
     const source = "2026-11-05T08:34:00.000Z";
     const date = new Date(source);
