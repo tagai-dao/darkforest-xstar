@@ -73,17 +73,17 @@ library MoveLib {
     Planet memory from,
     MaterialMove[] memory mats
   ) public returns (MoveData memory, Planet memory) {
-    // bytes32 fromId = bytes32(from.planetHash);
     for (uint256 i; i < mats.length; i++) {
       uint8 rid = mats[i].resourceId;
       uint256 amt = mats[i].amount;
       if (amt == 0) continue;
 
       uint256 currentAmount = from.getMaterial(MaterialType(rid));
-      if (currentAmount < amt) revert Errors.NotEnoughMaterial(); // add to your Errors.sol if not present
+      if (currentAmount < amt) revert Errors.NotEnoughMaterial();
       from.setMaterial(MaterialType(rid), currentAmount - amt);
-      // record the moved amount on the move (FK = move.id, resourceId)
-      MoveMaterial.setAmount(move.id, rid, amt);
+
+      uint256 loadedAmount = MoveMaterial.getAmount(move.id, rid);
+      MoveMaterial.setAmount(move.id, rid, loadedAmount + amt);
     }
 
     return (move, from);

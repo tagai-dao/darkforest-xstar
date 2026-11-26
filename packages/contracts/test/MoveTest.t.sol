@@ -7,6 +7,8 @@ import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { Ticker, TickerData, PendingMove, PendingMoveData, Move, MoveData } from "../src/codegen/index.sol";
 import { Planet as PlanetTable, Counter, TempConfigSet } from "../src/codegen/index.sol";
 import { PlayerKillStats } from "../src/codegen/tables/PlayerKillStats.sol";
+import { MoveMaterial } from "../src/codegen/tables/MoveMaterial.sol";
+import { Errors } from "../src/interfaces/errors.sol";
 import { PlanetType, SpaceType, MaterialType } from "../src/codegen/common.sol";
 import { Planet } from "../src/lib/Planet.sol";
 import { Proof } from "../src/lib/SnarkProof.sol";
@@ -88,36 +90,100 @@ contract MoveTest is BaseTest {
 
   function testMoveWithMaterials() public {
     vm.warp(block.timestamp + 1000);
-    Planet memory planet1 = IWorld(worldAddress).df__readPlanet(1);
-    Planet memory planet2 = IWorld(worldAddress).df__readPlanet(2);
+    IWorld world = IWorld(worldAddress);
+    bytes32 source = bytes32(uint256(1));
+    bytes32 destination = bytes32(uint256(2));
+    uint256 capacity = world.df__readPlanet(2).silverCap;
 
-    // give planet1 some materials of type 1
+    vm.startPrank(admin);
+    world.df__addMaterial(1, MaterialType(1), 100);
+    world.df__addMaterial(1, MaterialType(2), 120);
+    world.df__addMaterial(2, MaterialType(2), capacity - 25);
+    vm.stopPrank();
+
+    MaterialMove[] memory materials = new MaterialMove[](3);
+    materials[0] = MaterialMove({ resourceId: 1, amount: 40 });
+    materials[1] = MaterialMove({ resourceId: 2, amount: 75 });
+    materials[2] = MaterialMove({ resourceId: 1, amount: 60 });
+    _sendMaterialFleet(materials);
+
+    MoveData memory outbound = _queuedMove(2, 0);
+    assertEq(PlanetMaterial.get(source, 1), 0);
+    assertEq(PlanetMaterial.get(source, 2), 45);
+    assertEq(MoveMaterial.getAmount(outbound.id, 1), 100);
+    assertEq(MoveMaterial.getAmount(outbound.id, 2), 75);
+    assertEq(PlanetMaterial.get(destination, 1), 0);
+    assertEq(PlanetMaterial.get(destination, 2), capacity - 25);
+
+    Planet memory arrival = world.df__readPlanetAt(2, outbound.arrivalTick);
+    assertEq(arrival.materialStorage.getMaterial(2, MaterialType(1)), 100);
+    assertEq(arrival.materialStorage.getMaterial(2, MaterialType(2)), capacity);
+
+    vm.warp(_getTimestampAtTick(outbound.arrivalTick));
+    _sendMaterialFleet(new MaterialMove[](0));
+
+    assertEq(PlanetMaterial.get(destination, 1), 100);
+    assertEq(PlanetMaterial.get(destination, 2), capacity);
+    assertEq(PlanetMaterialStorage.get(source), (1 << 1) | (1 << 2), "material kinds are still recorded");
+    assertEq(PlanetMaterialStorage.get(destination), (1 << 1) | (1 << 2));
+    assertEq(PendingMove.getNumber(destination), 1);
+    assertGt(_queuedMove(2, 0).id, outbound.id);
+  }
+
+  function testRepeatedMaterialsRevertAtomicallyWhenTotalExceedsStock() public {
+    vm.warp(block.timestamp + 1000);
     vm.prank(admin);
-    IWorld(worldAddress).df__addMaterial(planet1.planetHash, MaterialType(1), 100);
-    assertEq(PlanetMaterial.get(bytes32(planet1.planetHash), uint8(1)), 100);
-    assertEq(PlanetMaterialStorage.get(bytes32(planet1.planetHash)), 1 << uint8(1));
+    IWorld(worldAddress).df__addMaterial(1, MaterialType(1), 100);
 
-    Proof memory proof;
-    MoveInput memory input;
-    input.fromPlanetHash = planet1.planetHash;
-    input.toPlanetHash = planet2.planetHash;
-    input.distance = 80;
+    MaterialMove[] memory materials = new MaterialMove[](2);
+    materials[0] = MaterialMove({ resourceId: 1, amount: 60 });
+    materials[1] = MaterialMove({ resourceId: 1, amount: 41 });
+    uint64 moveCount = Counter.getMove();
+
+    vm.expectRevert(Errors.NotEnoughMaterial.selector);
+    _sendMaterialFleet(materials);
+
+    assertEq(PlanetMaterial.get(bytes32(uint256(1)), 1), 100);
+    assertEq(Counter.getMove(), moveCount);
+    assertEq(MoveMaterial.getAmount(moveCount + 1, 1), 0);
+    assertEq(PendingMove.getNumber(bytes32(uint256(2))), 0);
+  }
+
+  function testRecallHalvesTotalMaterialCargoOnce() public {
+    vm.warp(block.timestamp + 1000);
+    IWorld world = IWorld(worldAddress);
+    bytes32 source = bytes32(uint256(1));
+    bytes32 destination = bytes32(uint256(2));
+
+    vm.prank(admin);
+    world.df__addMaterial(1, MaterialType(1), 103);
+
+    MaterialMove[] memory materials = new MaterialMove[](3);
+    materials[0] = MaterialMove({ resourceId: 1, amount: 41 });
+    materials[1] = MaterialMove({ resourceId: 1, amount: 61 });
+    materials[2] = MaterialMove({ resourceId: 1, amount: 1 });
+    _sendMaterialFleet(materials);
+
+    MoveData memory outbound = _queuedMove(2, 0);
+    assertEq(PlanetMaterial.get(source, 1), 0);
+    assertEq(MoveMaterial.getAmount(outbound.id, 1), 103);
+
+    vm.warp(_getTimestampAtTick(outbound.departureTick + 5));
     vm.prank(user1);
-    IWorld(worldAddress).df__move(proof, input, 100000, 1000, 0, _mats(MaterialMove({ resourceId: 1, amount: 100 })));
-    PendingMoveData memory pendingMove = PendingMove.get(bytes32(planet2.planetHash));
-    uint256 index = _getIndexAt(pendingMove, 0);
-    MoveData memory move1 = Move.get(bytes32(planet2.planetHash), uint8(index));
-    planet2 = IWorld(worldAddress).df__readPlanetAt(2, move1.arrivalTick);
-    assertEq(planet2.materialStorage.getMaterial(planet2.planetHash, MaterialType(1)), 100);
+    world.df__revertMove(outbound.id, destination);
 
-    vm.warp(_getTimestampAtTick(move1.arrivalTick));
-    vm.prank(user1);
-    IWorld(worldAddress).df__move(proof, input, 100000, 1000, 0, new MaterialMove[](0));
-    assertEq(PlanetMaterial.get(bytes32(planet2.planetHash), uint8(1)), 100);
-    assertEq(PlanetMaterialStorage.get(bytes32(planet2.planetHash)), 1 << uint8(1));
+    MoveData memory returning = _queuedMove(1, 0);
+    assertEq(returning.id, outbound.id);
+    assertEq(PendingMove.getNumber(destination), 0);
+    assertEq(MoveMaterial.getAmount(returning.id, 1), 51);
+    assertEq(PlanetMaterial.get(source, 1), 0);
 
-    assertEq(PlanetMaterialStorage.get(bytes32(planet1.planetHash)), 0);
-    assertEq(PlanetMaterial.get(bytes32(planet1.planetHash), uint8(1)), 0);
+    vm.warp(_getTimestampAtTick(returning.arrivalTick));
+    _sendMaterialFleet(new MaterialMove[](0));
+
+    assertEq(PlanetMaterial.get(source, 1), 51);
+    assertEq(PlanetMaterial.get(destination, 1), 0);
+    assertEq(PendingMove.getNumber(source), 0);
   }
 
   function testPendingMove() public {
@@ -275,6 +341,21 @@ contract MoveTest is BaseTest {
     assertEq(latestPlanet2.owner, user1);
     assertEq(latestPlanet2.population, move2.population + _getPopulationAtTick(planet2, move2.arrivalTick));
     assertEq(latestPlanet2.silver, move2.silver + planet2.silver);
+  }
+
+  function _sendMaterialFleet(MaterialMove[] memory materials) internal {
+    Proof memory proof;
+    MoveInput memory input;
+    input.fromPlanetHash = 1;
+    input.toPlanetHash = 2;
+    input.distance = 80;
+    vm.prank(user1);
+    IWorld(worldAddress).df__move(proof, input, 100000, 1000, 0, materials);
+  }
+
+  function _queuedMove(uint256 planetHash, uint8 queuePosition) internal view returns (MoveData memory) {
+    bytes32 key = bytes32(planetHash);
+    return Move.get(key, _getIndexAt(PendingMove.get(key), queuePosition));
   }
 
   function _getIndexAt(PendingMoveData memory pendingMove, uint8 i) internal pure returns (uint8) {
