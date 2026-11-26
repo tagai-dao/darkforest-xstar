@@ -11,34 +11,10 @@ import {
   zeroAddress,
 } from "viem";
 
-import dfstyles from "../../Styles/dfstyles";
-
-const TableWrap = styled.div`
-  overflow-x: auto;
-  margin: 0 0 18px;
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 15px;
-
-  th,
-  td {
-    padding: 10px 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    text-align: left;
-    vertical-align: top;
-  }
-
-  th {
-    color: ${dfstyles.colors.subtext};
-    font-weight: 500;
-  }
-`;
+import { DocTable, DocTableFrame } from "./DocTable";
 
 const AddrLink = styled.a`
-  color: ${dfstyles.colors.dfgreen};
+  color: var(--doc-accent);
   word-break: break-all;
   text-decoration: none;
 
@@ -137,18 +113,18 @@ export function ContractsDocTable() {
   const chainId = publicClient.chain?.id ?? 56;
 
   return (
-    <TableWrap>
-      <Table>
+    <DocTableFrame>
+      <DocTable>
         <thead>
           <tr>
-            <th>合约</th>
-            <th>地址</th>
+            <th scope="col">合约</th>
+            <th scope="col">地址</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.label}>
-              <td>{row.label}</td>
+              <th scope="row">{row.label}</th>
               <td>
                 {row.address ? (
                   <AddrLink
@@ -166,7 +142,7 @@ export function ContractsDocTable() {
             </tr>
           ))}
         </tbody>
-      </Table>
-    </TableWrap>
+      </DocTable>
+    </DocTableFrame>
   );
 }

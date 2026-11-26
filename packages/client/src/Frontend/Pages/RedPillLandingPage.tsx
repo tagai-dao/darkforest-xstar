@@ -238,7 +238,7 @@ export function RedPillLandingPage() {
   const grantedFolderRef = useRef<FileSystemDirectoryHandle | undefined>(
     undefined,
   );
-  const homeAssets = useHomeAssets(folderCard?.address);
+  const homeAssets = useHomeAssets(!gameManager);
   const boardCursorRef = useRef<BoardCursor>({
     offset: 0,
     homeModified: 0,
@@ -1786,7 +1786,7 @@ export function RedPillLandingPage() {
     }
   }, [gameManager, folderLoad]);
 
-  if (syncSign === false) {
+  if (!syncSign && gameManager) {
     return (
       <LoadingContent>
         <Spinner />
@@ -1957,6 +1957,7 @@ export function RedPillLandingPage() {
             assets={homeAssets}
             notice={importNotice}
             importing={importing}
+            syncing={!syncSign}
             onImport={() => {
               void openWalletFolder(false);
             }}

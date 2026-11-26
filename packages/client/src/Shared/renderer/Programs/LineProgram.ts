@@ -1,12 +1,11 @@
 import { AttribType, UniformType } from "@df/types";
 
-import { engineConsts } from "../EngineConsts";
 import { glsl } from "../EngineUtils";
 
 const a = {
   position: "a_position",
   color: "a_color",
-  dist: "a_dist", // cumulative dist so far
+  dist: "a_dist", // repeats along the line and fraction of a repeat filled
 };
 const u = {
   matrix: "u_matrix", // matrix to convert from world coords to clipspace
@@ -28,13 +27,13 @@ export const LINE_PROGRAM_DEFINITION = {
       name: a.position,
     },
     color: {
-      dim: 3,
+      dim: 4,
       type: AttribType.UByte,
       normalize: true,
       name: a.color,
     },
     dist: {
-      dim: 1,
+      dim: 2,
       type: AttribType.Float,
       normalize: false,
       name: a.dist,
@@ -43,12 +42,12 @@ export const LINE_PROGRAM_DEFINITION = {
   vertexShader: glsl`
     in vec4 ${a.position};
     in vec4 ${a.color};
-    in float ${a.dist};
+    in vec2 ${a.dist};
 
     uniform mat4 ${u.matrix};
 
     out vec4 ${v.color};
-    out float ${v.dist};
+    out vec2 ${v.dist};
 
     void main() {
       gl_Position = ${u.matrix} * ${a.position};
@@ -62,14 +61,10 @@ export const LINE_PROGRAM_DEFINITION = {
     out vec4 outColor;
 
     in vec4 ${v.color};
-    in float ${v.dist};
+    in vec2 ${v.dist};
 
     void main() {
-      // solid in the 0 regions
-      float interval = ${v.dist} / ${engineConsts.dashLength.toFixed(1)};
-      float modulo = interval - 2.0 * floor(interval / 2.0);
-      bool isGap = modulo > 1.0;
-
+      bool isGap = fract(${v.dist}.x) > ${v.dist}.y;
       outColor = isGap ? vec4(0.0, 0.0, 0.0, 0.0) : ${v.color};
     }
   `,

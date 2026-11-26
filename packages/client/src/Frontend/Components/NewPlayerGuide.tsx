@@ -14,29 +14,105 @@ import { createPortal } from "react-dom";
 import styled, { keyframes } from "styled-components";
 
 import type { GameUIManager } from "../../Backend/GameLogic/GameUIManager";
-import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
+import UIEmitter, {
+  type GuidedOrderKind,
+  type OrderCopyResult,
+  UIEmitterEvent,
+} from "../Utils/UIEmitter";
 
 const STORAGE_PREFIX = "df.newPlayerGuide.seen.";
-const seenWallets = new Set<string>();
+const seenGuides = new Set<string>();
 const { barbsA, pendingJunkA, whiteA } = engineConsts.colors;
 
-export function useNewPlayerGuide(walletAddress?: string) {
+function hasSeenGuide(key: string) {
+  if (seenGuides.has(key)) return true;
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function recordGuideSeen(key: string) {
+  seenGuides.add(key);
+  try {
+    window.localStorage.setItem(key, "1");
+  } catch {
+    // 当前页面仍可用内存记录展示状态。
+  }
+}
+
+function resourceGuideKey(uiManager: GameUIManager, wallet: string) {
+  return `${STORAGE_PREFIX}resources.${uiManager.getContractAddress().toLowerCase()}.${wallet}`;
+}
+
+function findResourcePlanet(uiManager: GameUIManager, type: PlanetType) {
+  let discovered: LocatablePlanet | undefined;
+  for (const planet of uiManager.getPlanetMap().values()) {
+    if (planet.planetType !== type || planet.destroyed || !isLocatable(planet))
+      continue;
+    if (uiManager.isOwnedByMe(planet)) return planet;
+    discovered ??= planet;
+  }
+  return discovered;
+}
+
+function hasDiscoveredResourcePlanets(uiManager: GameUIManager) {
+  let foundAsteroid = false;
+  let foundRift = false;
+  for (const planet of uiManager.getPlanetMap().values()) {
+    if (planet.destroyed || !isLocatable(planet)) continue;
+    if (planet.planetType === PlanetType.SILVER_MINE) foundAsteroid = true;
+    if (planet.planetType === PlanetType.TRADING_POST) foundRift = true;
+    if (foundAsteroid && foundRift) return true;
+  }
+  return false;
+}
+
+export function useNewPlayerGuide(
+  uiManager: GameUIManager,
+  walletAddress?: string,
+) {
   const wallet = walletAddress?.toLowerCase();
-  const [guideOpen, setGuideOpen] = useState(false);
-  const openGuide = useCallback(() => setGuideOpen(true), []);
-  const closeGuide = useCallback(() => setGuideOpen(false), []);
+  const [guideStart, setGuideStart] = useState<number>();
+  const [deferResources, setDeferResources] = useState(false);
+  const openGuide = useCallback(() => setGuideStart(0), []);
+  const closeGuide = useCallback(() => {
+    if (
+      guideStart === 0 &&
+      wallet &&
+      !hasSeenGuide(resourceGuideKey(uiManager, wallet)) &&
+      hasDiscoveredResourcePlanets(uiManager)
+    ) {
+      setDeferResources(true);
+    }
+    setGuideStart(undefined);
+  }, [guideStart, uiManager, wallet]);
 
   useEffect(() => {
-    if (!wallet || seenWallets.has(wallet)) return;
-    try {
-      if (window.localStorage.getItem(STORAGE_PREFIX + wallet)) return;
-    } catch {
-      // 当前页面仍可用内存记录展示状态。
-    }
-    openGuide();
+    if (wallet && !hasSeenGuide(STORAGE_PREFIX + wallet)) openGuide();
   }, [wallet, openGuide]);
 
-  return { guideOpen, openGuide, closeGuide };
+  useEffect(() => {
+    if (
+      !wallet ||
+      guideStart !== undefined ||
+      deferResources ||
+      !hasSeenGuide(STORAGE_PREFIX + wallet) ||
+      hasSeenGuide(resourceGuideKey(uiManager, wallet))
+    )
+      return;
+    const checkMap = () => {
+      if (!hasDiscoveredResourcePlanets(uiManager)) return;
+      window.clearInterval(timer);
+      setGuideStart(RESOURCE_GUIDE_START);
+    };
+    const timer = window.setInterval(checkMap, 1500);
+    checkMap();
+    return () => window.clearInterval(timer);
+  }, [deferResources, guideStart, uiManager, wallet]);
+
+  return { guideStart, openGuide, closeGuide };
 }
 
 const steps = [
@@ -48,7 +124,8 @@ const steps = [
   {
     id: "register",
     title: "登记星球",
-    text: "点击「复制 addJunk」，把命令粘贴给 agent。登记成功后数字会变白，星球按类型恢复能量或生产资源。",
+    text: "点击「复制 addJunk」生成登记单。登记成功后数字会变白，星球按类型恢复能量或生产资源。",
+    order: "add-junk",
     control: '[data-guide-target="add-junk"]',
     findPlanet: "选择一颗能量数字呈琥珀色的己方星球。",
     unavailable: "需要一颗己方已占领、尚未登记的星球。",
@@ -64,14 +141,18 @@ const steps = [
   {
     id: "move",
     title: "拖动出兵",
-    text: "从箭头指向的出发星按住鼠标，拖到另一颗星球上松开。拖到己方是支援，拖到无主或敌方星球可尝试占领。出兵单复制后，粘贴给 agent。",
+    text: "按住出发星，拖到另一颗星球上松开，页面会复制出兵单。拖到己方是支援，拖到无主或敌方星球可尝试占领。",
+    order: "move",
     findPlanet: "找到一颗有能量的己方星球，按住它拖到目标星球。",
     unavailable: "当前没有可用于出发的己方星球。",
   },
   {
     id: "silver",
     title: "购买银",
-    text: "点击一档银量，把购银单粘贴给 agent。按钮下方显示 AIPRO 价格。",
+    purpose:
+      "银可用于升级行星的范围、速度或防御，也可以运到自己的时空裂隙换分。",
+    text: "点击一档银量，复制购银单。按钮下方显示 AIPRO 价格。",
+    order: "buy-silver",
     control: '[data-guide-target="buy-silver"] button:not(:disabled)',
     findPlanet: "选择一颗有空余银容量、已登记的己方 1 级或以上星球。",
     unavailable:
@@ -80,28 +161,69 @@ const steps = [
   {
     id: "quota",
     title: "扩充垃圾额度",
-    text: "查看各档的 BNB 价格，选一档复制购买命令，再粘贴给 agent。",
+    purpose:
+      "提高额度上限后，可以登记更多已占领的星球，让它们恢复能量或生产资源。",
+    text: "查看各档的 BNB 价格，选一档复制购买命令。",
+    order: "buy-junk",
     control: '[data-guide-target="buy-junk-tier"]:not(:disabled)',
     unavailable: "没有可选的额度档位，或当前额度还在同步。",
   },
   {
     id: "upgrade",
     title: "用银升级行星",
-    text: "选择范围、速度或防御分支，点击「复制升级」，再把命令粘贴给 agent。",
+    text: "选择范围、速度或防御分支，点击「复制升级」。",
+    order: "upgrade",
     control: '[data-guide-target="upgrade"] button:not(:disabled)',
     findPlanet: "选择一颗已登记、有银可用的己方 1 级或以上普通行星。",
     unavailable:
       "当前未找到可用的升级按钮。升级要求己方普通行星已登记、等级至少为 1 且有足够的银。",
   },
+  {
+    id: "asteroid",
+    title: "小行星带与材料",
+    planetType: PlanetType.SILVER_MINE,
+    purpose:
+      "占领并登记小行星带后，它会生产银和材料。不同生物群系产出的材料不同。",
+    text: "在右侧查看银和材料。出发时，用「出发银」和「带走材料」设置要运走的数量。",
+    findPlanet: "点击箭头指向的小行星带，打开右侧详情。",
+    unavailable:
+      "地图上还没找到可定位的小行星带。让 agent 继续探索，发现后就能在地图上查看。",
+  },
+  {
+    id: "rift",
+    title: "时空裂隙与换分",
+    planetType: PlanetType.TRADING_POST,
+    purpose:
+      "在自己的时空裂隙提取银或材料，会增加游戏分数，也会增加你在奖池里的质押。",
+    text: "把银或材料运到自己已登记的裂隙。舰队到达后，在右侧选择提取量，再点「复制换分」。不同材料的换分倍率不同。",
+    findPlanet: "点击箭头指向的时空裂隙，查看右侧详情。",
+    unavailable:
+      "地图上还没找到可定位的时空裂隙。让 agent 继续探索，发现后就能在地图上查看。",
+    control: '[data-guide-target="convert-score"]:not(:disabled)',
+    order: "convert-score",
+  },
+  {
+    id: "rewards",
+    title: "领取 AIPRO 游戏奖励",
+    purpose:
+      "奖池里的 AIPRO 按质押份额分配。提取银或材料增加的质押，可以用来获得这份游戏奖励。",
+    text: "有待领取的奖励时，点「相关信息」中「游戏奖励」旁的「领取」，把命令粘贴给 agent。",
+    control: '[data-guide-target="claim-game-rewards"]:not(:disabled)',
+    order: "claim-rewards",
+  },
 ] satisfies {
   id: string;
   title: string;
   text: string;
+  purpose?: string;
+  order?: GuidedOrderKind;
   control?: string;
   findPlanet?: string;
   unavailable?: string;
+  planetType?: PlanetType;
 }[];
 
+const RESOURCE_GUIDE_START = steps.findIndex((step) => step.id === "asteroid");
 type Step = (typeof steps)[number];
 type Bounds = { left: number; top: number; width: number; height: number };
 type Anchor = { bounds: Bounds; hint?: string; arrow: boolean };
@@ -150,7 +272,8 @@ function mapBounds(uiManager: GameUIManager, candidates: LocatablePlanet[]) {
       y: y - map.top,
     });
     if (
-      uiManager.isOverOwnPlanet(clickCoords)?.locationId !== planet.locationId
+      uiManager.getVisiblePlanetAtCoords(clickCoords)?.locationId !==
+      planet.locationId
     )
       continue;
     const size = Math.max(
@@ -202,6 +325,7 @@ function findAnchor(
   step: Step,
   uiManager: GameUIManager,
   owned: LocatablePlanet[],
+  resource: LocatablePlanet | undefined,
   reveal: (element: Element) => void,
 ): Anchor | undefined {
   const control = (
@@ -215,8 +339,36 @@ function findAnchor(
     const bounds = boundsOf(element);
     if (bounds) return { bounds, hint, arrow: true };
   };
+  const nearby = (selector: string, hint?: string): Anchor | undefined => {
+    const element = document.querySelector(selector);
+    const bounds = element && boundsOf(element);
+    if (bounds) return { bounds, hint, arrow: false };
+  };
 
   const selected = uiManager.getSelectedPlanet();
+  const expand = '[data-guide-target="expand-status"]';
+  const status = "[data-public-status]";
+  if (step.planetType !== undefined) {
+    if (selected?.planetType === step.planetType) {
+      const action = step.control && control(step.control);
+      return (
+        action ||
+        nearby('[data-guide-panel="planet-details"]') ||
+        nearby(status)
+      );
+    }
+    const bounds = resource && mapBounds(uiManager, [resource]);
+    if (bounds) return { bounds, hint: step.findPlanet, arrow: true };
+    if (resource) {
+      return (
+        control(
+          '[data-guide-target="close-owned-planets"]',
+          "先关闭星球列表，再点击地图上的目标星球。",
+        ) ?? nearby(status, "点击地图上的目标星球，查看右侧详情。")
+      );
+    }
+    return nearby(status, step.unavailable);
+  }
   if (
     step.control &&
     (step.id !== "energy" || (selected && suitablePlanet(step.id, selected)))
@@ -225,8 +377,13 @@ function findAnchor(
     if (action) return action;
   }
 
-  const expand = '[data-guide-target="expand-status"]';
-  const status = "[data-public-status]";
+  if (step.id === "rewards") {
+    return (
+      control(expand, "展开「相关信息」，查看游戏奖励。") ??
+      nearby('[data-guide-target="game-rewards"]') ??
+      nearby(status)
+    );
+  }
   if (step.id === "quota") {
     const panel = document.querySelector('[data-guide-panel="buy-junk"]');
     if (!panel) {
@@ -402,55 +559,96 @@ export function NewPlayerGuide({
   uiManager,
   walletAddress,
   homeReady,
+  startAt,
   onClose,
 }: {
   uiManager: GameUIManager;
   walletAddress?: string;
   homeReady: boolean;
+  startAt: number;
   onClose: () => void;
 }) {
   const card = useRef<HTMLElement>(null);
   const headingId = useId();
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(startAt);
   const [anchor, setAnchor] = useState<Anchor>();
   const [position, setPosition] = useState<ReturnType<typeof placeCard>>();
   const [mapPressed, setMapPressed] = useState(false);
+  const [copyResult, setCopyResult] = useState<OrderCopyResult>();
   const step = steps[index];
+  const handoff = copyResult?.kind === step.order ? copyResult : undefined;
+  const awaitingAgent = handoff !== undefined;
 
   useEffect(() => {
     if (!walletAddress) return;
     const wallet = walletAddress.toLowerCase();
-    seenWallets.add(wallet);
-    try {
-      window.localStorage.setItem(STORAGE_PREFIX + wallet, "1");
-    } catch {
-      // 当前页面仍可用内存记录展示状态。
+    if (index >= RESOURCE_GUIDE_START) {
+      const key = resourceGuideKey(uiManager, wallet);
+      if (
+        !hasSeenGuide(key) &&
+        (startAt === RESOURCE_GUIDE_START ||
+          hasDiscoveredResourcePlanets(uiManager))
+      ) {
+        recordGuideSeen(key);
+      }
+    } else if (!hasSeenGuide(STORAGE_PREFIX + wallet)) {
+      recordGuideSeen(STORAGE_PREFIX + wallet);
     }
-  }, [walletAddress]);
+  }, [index, startAt, uiManager, walletAddress]);
 
   useLayoutEffect(() => {
+    if (awaitingAgent) return;
     let revealed: Element | undefined;
     let lastRead = -Infinity;
     let owned: LocatablePlanet[] = [];
+    let resource: LocatablePlanet | undefined;
+    let focused: string | undefined;
     const measure = () => {
       const now = performance.now();
       if (now - lastRead >= 500) {
         lastRead = now;
-        owned =
-          step.id === "quota"
-            ? []
-            : uiManager
-                .getAllOwnedPlanets()
-                .filter(
-                  (planet): planet is LocatablePlanet =>
-                    isLocatable(planet) &&
-                    !planet.destroyed &&
-                    !planet.frozen &&
-                    uiManager.isOwnedByMe(planet),
-                );
+        if (step.planetType !== undefined) {
+          const current =
+            resource && uiManager.getPlanetMap().get(resource.locationId);
+          resource =
+            current &&
+            isLocatable(current) &&
+            !current.destroyed &&
+            current.planetType === step.planetType
+              ? current
+              : findResourcePlanet(uiManager, step.planetType);
+        } else if (step.id !== "quota" && step.id !== "rewards") {
+          owned = uiManager
+            .getAllOwnedPlanets()
+            .filter(
+              (planet): planet is LocatablePlanet =>
+                isLocatable(planet) &&
+                !planet.destroyed &&
+                !planet.frozen &&
+                uiManager.isOwnedByMe(planet),
+            );
+        }
       }
 
-      const next = findAnchor(step, uiManager, owned, (element) => {
+      if (resource && resource.locationId !== focused) {
+        try {
+          const viewport = uiManager.getViewport();
+          if (!viewport.mousedownCoords) {
+            viewport.focus(
+              resource.location.coords,
+              Math.max(
+                96,
+                uiManager.getRadiusOfPlanetLevel(resource.planetLevel) * 36,
+              ),
+            );
+            focused = resource.locationId;
+          }
+        } catch {
+          // 等画布初始化后再定位。
+        }
+      }
+
+      const next = findAnchor(step, uiManager, owned, resource, (element) => {
         if (revealed === element) return;
         revealed = element;
         element.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -466,7 +664,7 @@ export function NewPlayerGuide({
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
-  }, [step, uiManager]);
+  }, [awaitingAgent, step, uiManager]);
 
   useLayoutEffect(() => {
     const element = card.current;
@@ -498,6 +696,7 @@ export function NewPlayerGuide({
   }, [anchor]);
 
   const advance = useCallback(() => {
+    setCopyResult(undefined);
     if (index === steps.length - 1) onClose();
     else setIndex(index + 1);
   }, [index, onClose]);
@@ -523,8 +722,8 @@ export function NewPlayerGuide({
       if (step.id === "select" && planet && uiManager.isOwnedByMe(planet))
         advance();
     };
-    const move = () => {
-      if (step.id === "move") advance();
+    const orderCopied = (result: OrderCopyResult) => {
+      if (result.kind && result.kind === step.order) setCopyResult(result);
     };
     const adjustEnergy = (event: Event) => {
       if (step.id !== "energy" || !(event.target instanceof Element)) return;
@@ -543,17 +742,6 @@ export function NewPlayerGuide({
       )
         advance();
     };
-    const click = (event: MouseEvent) => {
-      if (step.id === "energy") {
-        adjustEnergy(event);
-      } else if (
-        step.control &&
-        event.target instanceof Element &&
-        event.target.closest(step.control)
-      ) {
-        advance();
-      }
-    };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.stopImmediatePropagation();
@@ -561,14 +749,14 @@ export function NewPlayerGuide({
     };
 
     emitter.on(UIEmitterEvent.GamePlanetSelected, select);
-    emitter.on(UIEmitterEvent.MoveOrderCreated, move);
-    document.addEventListener("click", click);
+    emitter.on(UIEmitterEvent.MoveOrderCopied, orderCopied);
+    document.addEventListener("click", adjustEnergy);
     document.addEventListener("input", adjustEnergy);
     window.addEventListener("keyup", closeOnEscape, true);
     return () => {
       emitter.off(UIEmitterEvent.GamePlanetSelected, select);
-      emitter.off(UIEmitterEvent.MoveOrderCreated, move);
-      document.removeEventListener("click", click);
+      emitter.off(UIEmitterEvent.MoveOrderCopied, orderCopied);
+      document.removeEventListener("click", adjustEnergy);
       document.removeEventListener("input", adjustEnergy);
       window.removeEventListener("keyup", closeOnEscape, true);
     };
@@ -580,11 +768,13 @@ export function NewPlayerGuide({
     : "先让 agent 注册并出生。地图同步后，就能点击己方星球打开详情。";
   const text =
     choosePlanet && !anchor?.arrow ? selectHint : (anchor?.hint ?? step.text);
+  const showArrow = anchor?.arrow && !awaitingAgent;
+  const nextLabel = index === steps.length - 1 ? "完成" : "下一步";
 
   return createPortal(
     <Overlay data-game-guide data-map-pressed={mapPressed || undefined}>
-      {anchor?.arrow && <Spotlight aria-hidden="true" style={anchor.bounds} />}
-      {anchor?.arrow && position && (
+      {showArrow && <Spotlight aria-hidden="true" style={anchor.bounds} />}
+      {showArrow && position && (
         <Arrow
           aria-hidden="true"
           style={{
@@ -607,15 +797,39 @@ export function NewPlayerGuide({
       >
         <Header>
           <span>
-            新手指引 · {index + 1} / {steps.length}
+            新手指引 · {index - startAt + 1} / {steps.length - startAt}
           </span>
           <Action type="button" onClick={onClose}>
             关闭
           </Action>
         </Header>
         <Body aria-live="polite">
-          <Title id={headingId}>{step.title}</Title>
-          <p>{text}</p>
+          <Title id={headingId}>
+            {handoff ? "粘贴命令给 agent" : step.title}
+          </Title>
+          {handoff ? (
+            <>
+              <p>
+                {handoff.copied
+                  ? "命令已复制。请切换到 agent，把命令粘贴并发送。"
+                  : "请手动复制下面的命令，粘贴给 agent 并发送。"}
+              </p>
+              {!handoff.copied && (
+                <CommandText
+                  aria-label="待复制的命令"
+                  value={handoff.text}
+                  readOnly
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+              )}
+              <p>等 agent 确认执行成功后，再点「{nextLabel}」。</p>
+            </>
+          ) : (
+            <>
+              {step.purpose && <p>{step.purpose}</p>}
+              <p>{text}</p>
+            </>
+          )}
           {choosePlanet && (
             <Legend aria-label="星球能量数字颜色">
               <span style={{ color: `rgb(${barbsA.slice(0, 3).join(",")})` }}>
@@ -631,20 +845,23 @@ export function NewPlayerGuide({
               </span>
             </Legend>
           )}
-          {step.id === "move" && anchor?.arrow && !anchor.hint && (
+          {step.id === "move" && showArrow && !anchor.hint && (
             <p>没有生成出兵单时，试试更近的目标，或加大出发能量。</p>
           )}
         </Body>
         <Footer>
           <Action
             type="button"
-            disabled={index === 0}
-            onClick={() => setIndex(index - 1)}
+            disabled={index === startAt}
+            onClick={() => {
+              if (handoff) setCopyResult(undefined);
+              else setIndex(index - 1);
+            }}
           >
             上一步
           </Action>
           <NextAction type="button" onClick={advance}>
-            {index === steps.length - 1 ? "完成" : "下一步"}
+            {nextLabel}
           </NextAction>
         </Footer>
       </Card>
@@ -746,6 +963,21 @@ const Body = styled.div`
     margin-top: 4px;
     color: #a8bbcb;
   }
+`;
+
+const CommandText = styled.textarea`
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 74px;
+  margin: 6px 0;
+  padding: 5px 7px;
+  border: 1px solid #43566a;
+  background: #152130;
+  color: inherit;
+  font: 12px/1.4 monospace;
+  resize: none;
+  pointer-events: auto;
 `;
 
 const Legend = styled.div`

@@ -57,4 +57,36 @@ export class WebGLManager {
   public getTexIdx(): number {
     return this.texIdx++;
   }
+
+  public uploadTexture(
+    source: TexImageSource,
+    flipY: boolean,
+    premultiplyAlpha: boolean,
+  ): void {
+    const { gl } = this;
+    const previousFlipY = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL) as boolean;
+    const previousPremultiplyAlpha = gl.getParameter(
+      gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,
+    ) as boolean;
+
+    // Pixel unpack settings belong to the context and survive renderer rebuilds.
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flipY);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultiplyAlpha);
+    try {
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        source,
+      );
+    } finally {
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, previousFlipY);
+      gl.pixelStorei(
+        gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,
+        previousPremultiplyAlpha,
+      );
+    }
+  }
 }

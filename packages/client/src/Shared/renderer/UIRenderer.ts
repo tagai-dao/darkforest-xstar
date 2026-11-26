@@ -1,6 +1,6 @@
 import { getRange, isLocatable } from "@df/gamelogic";
 import { isUnconfirmedMoveTx } from "@df/serde";
-import type { Planet, RGBVec, UIRendererType, WorldCoords } from "@df/types";
+import type { Planet, RGBAVec, UIRendererType, WorldCoords } from "@df/types";
 import {
   ArtifactType,
   RendererType,
@@ -13,8 +13,11 @@ import { engineConsts } from "./EngineConsts";
 import type { Renderer } from "./Renderer";
 import type { GameGLManager } from "./WebGL/GameGLManager";
 
-const { orangeA, red, redA, white, whiteA, purpleA, blueA, pinkA, sensaichaA } =
+const { orangeA, redA, white, purpleA, blueA, pinkA, sensaichaA } =
   engineConsts.colors;
+const ORIGIN = { x: 0, y: 0 };
+const SELECTION_COLOR: RGBAVec = [110, 236, 223, 245];
+const HOVER_COLOR: RGBAVec = [192, 218, 244, 215];
 
 export class UIRenderer implements UIRendererType {
   renderer: Renderer;
@@ -26,12 +29,49 @@ export class UIRenderer implements UIRendererType {
   }
 
   queueBorders() {
-    const { circleRenderer, context: gameUIManager } = this.renderer;
-    const radius = gameUIManager.getWorldRadius();
-    whiteA[3] = 255;
-    circleRenderer.queueCircleWorld({ x: 0, y: 0 }, radius, whiteA, 2);
-    const innerRadius = gameUIManager.getInnerRadius();
-    circleRenderer.queueCircleWorld({ x: 0, y: 0 }, innerRadius, whiteA, 2);
+    const { circleRenderer, context } = this.renderer;
+    const viewport = this.renderer.getViewport();
+    const { viewportWidth, viewportHeight } = viewport;
+    const center = viewport.worldToCanvasCoords(ORIGIN);
+    const nearX = Math.max(-center.x, 0, center.x - viewportWidth);
+    const nearY = Math.max(-center.y, 0, center.y - viewportHeight);
+    const near = Math.hypot(nearX, nearY);
+    const far = Math.hypot(
+      Math.max(Math.abs(center.x), Math.abs(center.x - viewportWidth)),
+      Math.max(Math.abs(center.y), Math.abs(center.y - viewportHeight)),
+    );
+
+    const inner = context.getInnerRadius();
+    if (Number.isFinite(inner) && inner > 0) {
+      const edge = viewport.worldToCanvasDist(inner);
+      if (edge > near) {
+        circleRenderer.queueCircleWorld(ORIGIN, inner, [112, 54, 38, 32]);
+      }
+      if (edge >= near - 10 && edge <= far + 10) {
+        circleRenderer.queueCircleWorld(ORIGIN, inner, [255, 121, 87, 42], 8);
+        circleRenderer.queueCircleWorld(ORIGIN, inner, [224, 122, 87, 126], 1);
+        circleRenderer.queueCircleWorld(
+          ORIGIN,
+          inner,
+          [255, 187, 147, 240],
+          2,
+          1,
+          true,
+        );
+      }
+    }
+
+    const outer = context.getWorldRadius();
+    const edge = viewport.worldToCanvasDist(outer);
+    if (
+      Number.isFinite(outer) &&
+      outer > 0 &&
+      edge >= near - 10 &&
+      edge <= far + 10
+    ) {
+      circleRenderer.queueCircleWorld(ORIGIN, outer, [89, 164, 242, 44], 7);
+      circleRenderer.queueCircleWorld(ORIGIN, outer, [144, 203, 255, 225], 2);
+    }
   }
 
   /**
@@ -175,14 +215,11 @@ export class UIRenderer implements UIRendererType {
       } else {
         const myPlanet = uiManager.getPlanetWithCoords(from);
         if (myPlanet && isLocatable(myPlanet) && to !== from) {
-          whiteA[3] = 255;
-          lR.queueLineWorld(
+          this.queueLaunchVector(
             from,
             to,
-            uiManager.isAbandoning() ? orangeA : whiteA,
-            2,
-            RenderZIndex.Voyages,
-            true,
+            uiManager.isAbandoning() ? orangeA : SELECTION_COLOR,
+            toPlanet,
           );
 
           let effectiveEnergy = myPlanet.energy;
@@ -209,8 +246,7 @@ export class UIRenderer implements UIRendererType {
             !uiManager.getHoveringOverPlanet() &&
             !uiManager.isSendingShip(myPlanet.locationId)
           ) {
-            const color = myAtk > 0 ? whiteA : redA;
-            color[3] = 255;
+            const color = myAtk > 0 ? SELECTION_COLOR : redA;
             tR.queueTextWorld(
               `Energy: ${Math.round(myAtk)}`,
               { x: to.x, y: to.y },
@@ -222,29 +258,109 @@ export class UIRenderer implements UIRendererType {
     }
 
     const preview = uiManager.getAttackPreview();
-    if (preview) {
-      whiteA[3] = 255;
-      lR.queueLineWorld(
+    if (
+      preview &&
+      !(
+        from &&
+        to &&
+        from.x === preview.from.x &&
+        from.y === preview.from.y &&
+        to.x === preview.to.x &&
+        to.y === preview.to.y
+      )
+    ) {
+      this.queueLaunchVector(
         preview.from,
         preview.to,
-        whiteA,
-        2,
-        RenderZIndex.Voyages,
-        true,
+        SELECTION_COLOR,
+        uiManager.getPlanetWithCoords(preview.to),
       );
     }
   }
 
-  private queueRectAtPlanet(
+  private queueLaunchVector(
+    from: WorldCoords,
+    to: WorldCoords,
+    color: RGBAVec,
+    destination?: Planet,
+  ) {
+    const { context, lineRenderer } = this.renderer;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance === 0) return;
+
+    const scale = this.renderer.getViewport().scale;
+    const ux = dx / distance;
+    const uy = dy / distance;
+    const inset = destination
+      ? Math.min(
+          distance * 0.42,
+          context.getRadiusOfPlanetLevel(destination.planetLevel) * 1.2 +
+            scale * 4,
+        )
+      : 0;
+    const tip = { x: to.x - ux * inset, y: to.y - uy * inset };
+    const tail = Math.min(scale * 10, (distance - inset) * 0.28);
+    const base = { x: tip.x - ux * tail, y: tip.y - uy * tail };
+    const wing = tail * 0.52;
+    const z = RenderZIndex.Voyages;
+    lineRenderer.queueLineWorld(
+      from,
+      tip,
+      [color[0], color[1], color[2], 48],
+      5,
+      z,
+    );
+    lineRenderer.queueLineWorld(from, tip, color, 1, z, true);
+    lineRenderer.queueLineWorld(
+      { x: base.x - uy * wing, y: base.y + ux * wing },
+      tip,
+      color,
+      1,
+      z,
+    );
+    lineRenderer.queueLineWorld(
+      { x: base.x + uy * wing, y: base.y - ux * wing },
+      tip,
+      color,
+      1,
+      z,
+    );
+  }
+
+  private queuePlanetBrackets(
     planet: Planet,
     coords: WorldCoords,
-    color: RGBVec,
+    color: RGBAVec,
   ) {
-    const { context: uiManager, rectRenderer } = this.renderer;
-    const sideLength =
-      2.3 * uiManager.getRadiusOfPlanetLevel(planet.planetLevel);
-
-    rectRenderer.queueRectCenterWorld(coords, sideLength, sideLength, color, 2);
+    const { context, lineRenderer } = this.renderer;
+    const scale = this.renderer.getViewport().scale;
+    const radius = Math.max(
+      1.2 * context.getRadiusOfPlanetLevel(planet.planetLevel),
+      scale * 8,
+    );
+    const shoulder = Math.min(radius * 0.38, scale * 15);
+    for (const horizontal of [-1, 1]) {
+      for (const vertical of [-1, 1]) {
+        const corner = {
+          x: coords.x + horizontal * radius,
+          y: coords.y + vertical * radius,
+        };
+        lineRenderer.queueLineWorld(
+          corner,
+          { x: corner.x - horizontal * shoulder, y: corner.y },
+          color,
+          1,
+        );
+        lineRenderer.queueLineWorld(
+          corner,
+          { x: corner.x, y: corner.y - vertical * shoulder },
+          color,
+          1,
+        );
+      }
+    }
   }
 
   queueSelectedRect() {
@@ -255,8 +371,7 @@ export class UIRenderer implements UIRendererType {
       return;
     }
 
-    redA[3] = 255;
-    this.queueRectAtPlanet(selectedPlanet, selectedCoords, red);
+    this.queuePlanetBrackets(selectedPlanet, selectedCoords, SELECTION_COLOR);
   }
 
   queueHoveringRect() {
@@ -269,8 +384,10 @@ export class UIRenderer implements UIRendererType {
     }
     if (!hoverPlanet) {
       rectRenderer.queueRectCenterWorld(hoverCoords, 1, 1, white, 2);
-    } else {
-      this.queueRectAtPlanet(hoverPlanet, hoverCoords, white);
+    } else if (
+      hoverPlanet.locationId !== uiManager.getSelectedPlanet()?.locationId
+    ) {
+      this.queuePlanetBrackets(hoverPlanet, hoverCoords, HOVER_COLOR);
     }
   }
 

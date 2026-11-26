@@ -8,15 +8,26 @@ const TableCell = styled.div`
   padding: 2px 4px;
 `;
 
-const Header = styled(TableCell)`
+const Header = styled.div`
   padding: 2px 4px;
-  font-weight: normal;
-  color: ${dfstyles.colors.text};
+`;
+
+const SortButton = styled.button`
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
   user-select: none;
   cursor: pointer;
 
   &:hover {
     text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 1px solid #8bdfff;
+    outline-offset: 2px;
   }
 `;
 
@@ -47,6 +58,7 @@ export function SortableTable<T>({
   alignments,
   paginated,
   sortable,
+  getRowKey,
 }: {
   rows: T[];
   headers: React.ReactNode[];
@@ -56,6 +68,7 @@ export function SortableTable<T>({
   paginated?: boolean;
   // 没有标题，或明确标成不可排序的列，不画排序图标。
   sortable?: boolean[];
+  getRowKey?: (row: T) => React.Key;
 }): JSX.Element {
   const [sortByColumn, setSortByColumn] = useState<number | undefined>(
     undefined,
@@ -97,33 +110,45 @@ export function SortableTable<T>({
   );
 
   return (
-    <Table
+    <Table<T>
       paginated={paginated}
       headerStyle={{
-        backgroundColor: dfstyles.colors.background,
+        backgroundColor: `var(--sortable-table-header-background, ${dfstyles.colors.background})`,
         position: "sticky",
         top: 0,
       }}
       rows={sortedRows}
+      getRowKey={getRowKey}
       headers={headers.map((originalHeader, i) => {
         const active = sortByColumn === i;
-        const showIcon =
+        const canSort =
+          Boolean(sortFunctions[i]) &&
           sortable?.[i] !== false &&
           originalHeader !== "" &&
           originalHeader !== undefined &&
           originalHeader !== null;
         return (
-          <Header key={i} onClick={() => onColumnTitleClicked(i)}>
-            <HeaderInner $active={active}>
-              {originalHeader}
-              {showIcon && <SortIcon active={active} reverse={reverse} />}
-            </HeaderInner>
+          <Header key={i}>
+            {canSort ? (
+              <SortButton
+                type="button"
+                aria-pressed={active}
+                onClick={() => onColumnTitleClicked(i)}
+              >
+                <HeaderInner $active={active}>
+                  {originalHeader}
+                  <SortIcon active={active} reverse={reverse} />
+                </HeaderInner>
+              </SortButton>
+            ) : (
+              originalHeader
+            )}
           </Header>
         );
       })}
       columns={columns.map(
         (originalColumn) =>
-          function Column(t, i) {
+          function Column(t: T, i: number) {
             return <TableCell>{originalColumn(t, i)}</TableCell>;
           },
       )}

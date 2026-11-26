@@ -4,6 +4,9 @@ import { distL2 } from "../../Backend/Utils/Coordinates";
 import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 
 export function bindCanvasPointerEvents(canvas: HTMLCanvasElement) {
+  const view = canvas.ownerDocument.defaultView;
+  if (!view) return () => undefined;
+
   const emitter = UIEmitter.getInstance();
   let activePointer: { id: number; start: CanvasCoords } | undefined;
 
@@ -19,12 +22,20 @@ export function bindCanvasPointerEvents(canvas: HTMLCanvasElement) {
     if (!event.isPrimary || event.button !== 0) return;
     const start = position(event);
     activePointer = { id: event.pointerId, start };
-    canvas.setPointerCapture(event.pointerId);
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // 捕获失败时，仍由窗口接收这次手势的移动与松手。
+    }
     emitter.emit(UIEmitterEvent.CanvasMouseDown, start);
   };
   const pointerMove = (event: PointerEvent) => {
-    if (event.isPrimary)
+    if (
+      event.isPrimary &&
+      (event.target === canvas || activePointer?.id === event.pointerId)
+    ) {
       emitter.emit(UIEmitterEvent.CanvasMouseMove, position(event));
+    }
   };
   const pointerUp = (event: PointerEvent) => {
     if (activePointer?.id !== event.pointerId) return;
@@ -50,24 +61,28 @@ export function bindCanvasPointerEvents(canvas: HTMLCanvasElement) {
     if (activePointer === undefined && event.isPrimary)
       emitter.emit(UIEmitterEvent.CanvasMouseOut);
   };
-  const cancelPointer = (event: PointerEvent) => {
-    if (activePointer?.id !== event.pointerId) return;
+  const resetPointer = () => {
+    if (!activePointer) return;
     activePointer = undefined;
     emitter.emit(UIEmitterEvent.CanvasMouseOut);
   };
+  const cancelPointer = (event: PointerEvent) => {
+    if (activePointer?.id === event.pointerId) resetPointer();
+  };
 
   canvas.addEventListener("pointerdown", pointerDown);
-  canvas.addEventListener("pointermove", pointerMove);
-  canvas.addEventListener("pointerup", pointerUp);
   canvas.addEventListener("pointerleave", pointerLeave);
-  canvas.addEventListener("pointercancel", cancelPointer);
-  canvas.addEventListener("lostpointercapture", cancelPointer);
+  view.addEventListener("pointermove", pointerMove, true);
+  view.addEventListener("pointerup", pointerUp, true);
+  view.addEventListener("pointercancel", cancelPointer, true);
+  view.addEventListener("blur", resetPointer);
   return () => {
     canvas.removeEventListener("pointerdown", pointerDown);
-    canvas.removeEventListener("pointermove", pointerMove);
-    canvas.removeEventListener("pointerup", pointerUp);
     canvas.removeEventListener("pointerleave", pointerLeave);
-    canvas.removeEventListener("pointercancel", cancelPointer);
-    canvas.removeEventListener("lostpointercapture", cancelPointer);
+    view.removeEventListener("pointermove", pointerMove, true);
+    view.removeEventListener("pointerup", pointerUp, true);
+    view.removeEventListener("pointercancel", cancelPointer, true);
+    view.removeEventListener("blur", resetPointer);
+    resetPointer();
   };
 }

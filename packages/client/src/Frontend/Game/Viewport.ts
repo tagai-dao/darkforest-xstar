@@ -469,6 +469,7 @@ class Viewport {
     const uiEmitter = UIEmitter.getInstance();
 
     uiEmitter.emit(UIEmitterEvent.WorldMouseOut);
+    this.mousedownCoords = undefined;
     this.isPanning = false;
     this.mouseLastCoords = undefined;
   }

@@ -15,7 +15,10 @@ import {
 } from "../../Backend/GameLogic/moveOrder";
 import Viewport from "../Game/Viewport";
 import { useUIManager } from "../Utils/AppHooks";
-import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
+import UIEmitter, {
+  type GuidedOrderKind,
+  UIEmitterEvent,
+} from "../Utils/UIEmitter";
 import { BuyJunkOrderPanel } from "./BuyJunkOrderPanel";
 import {
   collectOwnedArtifacts,
@@ -36,11 +39,15 @@ const Panel = styled.div`
   min-width: 240px;
   max-width: 360px;
   padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.82);
-  color: #d7ffe4;
-  font-family: "Start Press 2P", sans-serif;
-  font-size: 10px;
+  background: linear-gradient(155deg, rgb(19 32 51 / 97%), rgb(10 17 29 / 97%));
+  border: 1px solid #2b4058;
+  border-radius: 9px;
+  box-shadow: 0 12px 32px rgb(2 5 12 / 36%);
+  color: #dce8f6;
+  font-family: system-ui, "PingFang SC", sans-serif;
+  font-size: 12px;
   line-height: 1.7;
+  font-variant-numeric: tabular-nums;
 `;
 
 const HomeNotice = styled.div`
@@ -63,10 +70,22 @@ const TitleRow = styled.div`
   display: flex;
   align-items: baseline;
   gap: 10px;
+
+  &[data-expanded="true"] {
+    margin-bottom: 8px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid #26374c;
+  }
 `;
 
 const Title = styled.div`
-  font-size: 13px;
+  color: #f0f6ff;
+  font-size: 14px;
+  font-weight: 700;
+`;
+
+const BoundaryRadius = styled.div`
+  color: #ffbf9b;
 `;
 
 const RewardLine = styled.div`
@@ -123,16 +142,49 @@ const ClaimButton = styled.button`
 const JunkLine = styled(RewardLine)``;
 
 const OpenButton = styled.button`
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  background: none;
-  border: none;
-  color: inherit;
+  padding: 4px 8px;
+  background: #14263b;
+  border: 1px solid #2c435d;
+  border-radius: 5px;
+  color: #d8eafb;
   font: inherit;
   cursor: pointer;
-  padding: 0;
   text-align: left;
-  text-decoration: underline;
+
+  span {
+    margin-left: auto;
+    color: #a6d8f3;
+  }
+
+  &::after {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-right: 1px solid #8fb9d3;
+    border-top: 1px solid #8fb9d3;
+    transform: rotate(45deg);
+  }
+
+  &:hover,
+  &[aria-expanded="true"] {
+    background: #203b55;
+    border-color: #496984;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #8bdfff;
+    outline-offset: 1px;
+  }
+`;
+
+const AssetButtons = styled.div`
+  display: grid;
+  gap: 5px;
+  margin-block: 6px;
 `;
 
 type MaterialLine = {
@@ -326,12 +378,13 @@ export function PublicGameStatus({
     });
   };
 
-  const copyOrder = (text: string, label: string) => {
+  const copyOrder = (text: string, label: string, kind?: GuidedOrderKind) => {
     void copyText(text).then((copied) => {
       UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
         text,
         copied,
         label,
+        kind,
       });
     });
   };
@@ -435,8 +488,8 @@ export function PublicGameStatus({
   return (
     <>
       <Panel data-public-status>
-        <TitleRow>
-          <Title>相关信息</Title>
+        <TitleRow data-expanded={!collapsed}>
+          <Title>游戏信息</Title>
           <RefreshButton type="button" disabled={refreshing} onClick={refresh}>
             {refreshing ? "刷新中" : "刷新"}
           </RefreshButton>
@@ -454,30 +507,34 @@ export function PublicGameStatus({
         </TitleRow>
         {!collapsed && (
           <>
-            <div>收缩圈半径 {innerRadius ?? "..."}</div>
+            <BoundaryRadius>收缩圈半径 {innerRadius ?? "..."}</BoundaryRadius>
             <div>当前 tick {tick ?? "..."}</div>
             <div>总用户 {whole(facts.users)}</div>
-            <OpenButton
-              type="button"
-              data-guide-target="owned-planets"
-              onClick={() => {
-                setArtifactsOpen(false);
-                setJunkBuyOpen(false);
-                setPlanetsOpen(true);
-              }}
-            >
-              占领星球 {facts.planetCount}
-            </OpenButton>
-            <OpenButton
-              type="button"
-              onClick={() => {
-                setPlanetsOpen(false);
-                setJunkBuyOpen(false);
-                setArtifactsOpen(true);
-              }}
-            >
-              拥有神器 {facts.artifacts.length}
-            </OpenButton>
+            <AssetButtons>
+              <OpenButton
+                type="button"
+                data-guide-target="owned-planets"
+                aria-expanded={planetsOpen}
+                onClick={() => {
+                  setArtifactsOpen(false);
+                  setJunkBuyOpen(false);
+                  setPlanetsOpen((open) => !open);
+                }}
+              >
+                占领星球 <span>{facts.planetCount}</span>
+              </OpenButton>
+              <OpenButton
+                type="button"
+                aria-expanded={artifactsOpen}
+                onClick={() => {
+                  setPlanetsOpen(false);
+                  setJunkBuyOpen(false);
+                  setArtifactsOpen((open) => !open);
+                }}
+              >
+                拥有神器 <span>{facts.artifacts.length}</span>
+              </OpenButton>
+            </AssetButtons>
             <JunkLine>
               <span>
                 垃圾额度 {whole(facts.junkUsed)} / {whole(facts.junkLimit)}
@@ -496,12 +553,13 @@ export function PublicGameStatus({
               </ClaimButton>
             </JunkLine>
             <div>分数 {whole(facts.score)}</div>
-            <RewardLine>
+            <RewardLine data-guide-target="game-rewards">
               <span>
                 游戏奖励：{reward ? wholeAipro(reward.game) : "..."} AIPRO
               </span>
               <ClaimButton
                 type="button"
+                data-guide-target="claim-game-rewards"
                 disabled={!reward || reward.game === 0n}
                 onClick={() => {
                   if (!reward || reward.game === 0n) {
@@ -513,6 +571,7 @@ export function PublicGameStatus({
                       pendingWei: reward.game,
                     }),
                     "已复制游戏奖励领取单，直接粘贴给 agent",
+                    "claim-rewards",
                   );
                 }}
               >
@@ -581,7 +640,7 @@ export function PublicGameStatus({
       {junkBuyOpen && (
         <BuyJunkOrderPanel
           junkLimit={facts.junkLimit}
-          onCopy={copyOrder}
+          onCopy={(text, label) => copyOrder(text, label, "buy-junk")}
           onClose={() => setJunkBuyOpen(false)}
         />
       )}

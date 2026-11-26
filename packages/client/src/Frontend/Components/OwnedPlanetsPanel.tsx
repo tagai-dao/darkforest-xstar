@@ -1,3 +1,4 @@
+import { MAX_ARTIFACT_TYPE, MIN_ARTIFACT_TYPE } from "@df/constants";
 import { formatNumber, isLocatable } from "@df/gamelogic";
 import { getPlanetName } from "@df/procedural";
 import type { ArtifactId, LocationId, Planet } from "@df/types";
@@ -6,12 +7,18 @@ import { useEffect, useState } from "react";
 import styled from "styled-components";
 
 import { PlanetThumb } from "../Panes/PlanetDexPane";
-import dfstyles from "../Styles/dfstyles";
 import { useUIManager } from "../Utils/AppHooks";
 import { PlanetLink } from "../Views/PlanetLink";
 import { SortableTable } from "../Views/SortableTable";
 import { ArtifactHelp } from "./ArtifactHelp";
+import { ArtifactImage } from "./ArtifactImage";
 import { ArtifactUseActions } from "./ArtifactUseActions";
+import {
+  GameListPanel,
+  ListButton,
+  ListEmpty,
+  ListTable,
+} from "./GameListPanel";
 import type { OwnedArtifactLine } from "./ownedArtifacts";
 
 export const PLANET_TYPE_NAME: Record<number, string> = {
@@ -46,50 +53,121 @@ const TYPE_ORDER = [
 
 type Traffic = { hostile: number; friendly: number };
 
-const Shell = styled.div`
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 7;
-  width: min(760px, calc(100vw - 420px));
-  max-height: calc(100vh - 32px);
-  overflow: auto;
-  padding: 12px;
-  background: ${dfstyles.colors.background};
-  color: ${dfstyles.colors.text};
-  border: 1px solid ${dfstyles.colors.borderDark};
-`;
-
-const TitleRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-`;
-
 const Filters = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #28394e;
 `;
 
-const FilterButton = styled.button<{ active: boolean }>`
-  cursor: pointer;
-  color: ${dfstyles.colors.text};
-  background: ${({ active }) =>
-    active ? dfstyles.colors.backgroundlighter : "transparent"};
-  border: 1px solid ${dfstyles.colors.borderDark};
-  padding: 4px 8px;
-`;
-
-const CloseButton = styled.button`
-  cursor: pointer;
-  color: ${dfstyles.colors.text};
+const FilterButton = styled(ListButton)`
   background: transparent;
-  border: 1px solid ${dfstyles.colors.borderDark};
-  padding: 4px 8px;
+  border-color: #283e55;
+  color: #b4c6dc;
+  font-size: 12px;
+
+  &[aria-pressed="true"] {
+    background: #203b55;
+    border-color: #4d7596;
+    color: #e2f6ff;
+  }
+
+  span {
+    margin-left: 5px;
+    color: #9dc0db;
+  }
 `;
+
+const Identity = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 116px;
+  color: #edf5ff;
+  font-weight: 650;
+`;
+
+const Thumbnail = styled.div`
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border: 1px solid #2d435b;
+  border-radius: 6px;
+  background: #131f31;
+`;
+
+const Coordinates = styled.span`
+  white-space: nowrap;
+  color: #a9bdd5;
+  font-size: 12px;
+`;
+
+const Tag = styled.span<{ $color?: string }>`
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgb(128 166 207 / 12%);
+  color: ${({ $color }) => $color ?? "#b7cce4"};
+  font-size: 11px;
+  white-space: nowrap;
+`;
+
+const StatusList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+`;
+
+const Muted = styled.span`
+  color: #a9bdd5;
+  font-size: 12px;
+`;
+
+const Resource = styled.span<{ $silver?: boolean }>`
+  color: ${({ $silver }) => ($silver ? "#f2d398" : "#e5f4ff")};
+  font-weight: 650;
+  white-space: nowrap;
+`;
+
+const Energy = styled.div`
+  display: grid;
+  min-width: 76px;
+  gap: 4px;
+
+  progress {
+    width: 100%;
+    height: 4px;
+    appearance: none;
+    overflow: hidden;
+    border: 0;
+    border-radius: 4px;
+    background: #263a50;
+    color: #77c8ef;
+  }
+
+  progress::-webkit-progress-bar {
+    background: #263a50;
+  }
+
+  progress::-webkit-progress-value {
+    background: #77c8ef;
+  }
+
+  progress::-moz-progress-bar {
+    background: #77c8ef;
+  }
+`;
+
+const PLANET_COLORS: Record<number, string> = {
+  [PlanetType.SILVER_MINE]: "#f2d398",
+  [PlanetType.RUINS]: "#d0bcff",
+  [PlanetType.TRADING_POST]: "#8ee3cf",
+  [PlanetType.SILVER_BANK]: "#a5d5ff",
+};
 
 /** 这个地址还持有的星球。地址大小写不一致也算同一人。 */
 export function heldByAccount(planets: Planet[], account: string): Planet[] {
@@ -123,36 +201,55 @@ function trafficFor(
   return traffic;
 }
 
-function statusText(planet: Planet, traffic: Traffic | undefined): string {
-  const parts: string[] = [];
-  if (planet.energyCap > 0) {
-    const percent = Math.min(
-      100,
-      Math.round((planet.energy / planet.energyCap) * 100),
-    );
-    parts.push(percent >= 98 ? `能量满 ${percent}%` : `成长 ${percent}%`);
-  }
+function PlanetStatus({
+  planet,
+  traffic,
+}: {
+  planet: Planet;
+  traffic?: Traffic;
+}) {
   const upgraded = planet.upgradeState.reduce((sum, rank) => sum + rank, 0);
-  if (upgraded > 0) {
-    parts.push(`已升级 ${upgraded}`);
-  }
-  if (traffic && traffic.hostile > 0) {
-    parts.push(`来袭 ${traffic.hostile}`);
-  }
-  if (traffic && traffic.friendly > 0) {
-    parts.push(`己方航行 ${traffic.friendly}`);
-  }
-  const materials = planet.materials.filter(
+  const materials = (planet.materials ?? []).filter(
     (material) => material.materialId !== 0 && material.materialAmount > 0,
   );
-  if (materials.length > 0) {
-    parts.push(
-      materials
-        .map((material) => MATERIAL_NAME[material.materialId] ?? "材料")
-        .join("/"),
-    );
-  }
-  return parts.join(" ");
+  const hostile = traffic?.hostile ?? 0;
+  const friendly = traffic?.friendly ?? 0;
+  if (!hostile && !friendly && !upgraded && !materials.length)
+    return <Muted>—</Muted>;
+
+  return (
+    <StatusList>
+      {hostile > 0 && <Tag $color="#ffad9d">来袭 {hostile}</Tag>}
+      {friendly > 0 && <Tag $color="#98e7d3">己方航行 {friendly}</Tag>}
+      {upgraded > 0 && <Tag $color="#d0bcff">已升级 {upgraded}</Tag>}
+      {materials.map(({ materialId, materialAmount }) => (
+        <Tag key={materialId}>
+          {MATERIAL_NAME[materialId] ?? "材料"} {formatNumber(materialAmount)}
+        </Tag>
+      ))}
+    </StatusList>
+  );
+}
+
+function PlanetEnergy({ planet }: { planet: Planet }) {
+  const percent =
+    planet.energyCap > 0
+      ? Math.max(0, Math.round((planet.energy / planet.energyCap) * 100))
+      : undefined;
+  return (
+    <Energy>
+      <Resource title={percent === undefined ? undefined : `能量 ${percent}%`}>
+        {formatNumber(planet.energy)}
+      </Resource>
+      {percent !== undefined && (
+        <progress
+          max={100}
+          value={Math.min(percent, 100)}
+          aria-label={`能量 ${percent}%`}
+        />
+      )}
+    </Energy>
+  );
 }
 
 export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
@@ -162,12 +259,8 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
   const [category, setCategory] = useState<number | "all">("all");
 
   useEffect(() => {
-    let stopped = false;
-    let previous = "";
+    let previous: string | undefined;
     const read = () => {
-      if (stopped) {
-        return;
-      }
       const account = uiManager.getAccount()?.toLowerCase();
       if (account) {
         let tick = 0;
@@ -190,7 +283,25 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
         const signature = held
           .map((planet) => {
             const move = nextTraffic.get(String(planet.locationId));
-            return `${planet.locationId}:${Math.round(planet.energy)}:${Math.round(planet.silver)}:${move?.hostile ?? 0}:${move?.friendly ?? 0}`;
+            const materials = (planet.materials ?? [])
+              .map(
+                ({ materialId, materialAmount }) =>
+                  `${materialId}:${materialAmount}`,
+              )
+              .join(",");
+            return [
+              planet.locationId,
+              isLocatable(planet),
+              planet.planetType,
+              planet.planetLevel,
+              Math.round(planet.energy),
+              planet.energyCap,
+              Math.round(planet.silver),
+              planet.upgradeState.join(","),
+              move?.hostile ?? 0,
+              move?.friendly ?? 0,
+              materials,
+            ].join(":");
           })
           .join("|");
         if (signature !== previous) {
@@ -198,14 +309,15 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
           setPlanets(held);
           setTraffic(nextTraffic);
         }
+      } else if (previous !== "") {
+        previous = "";
+        setPlanets([]);
+        setTraffic(new Map());
       }
-      // 数字没变就不重画。变了就在下一帧继续看。
-      requestAnimationFrame(read);
     };
     read();
-    return () => {
-      stopped = true;
-    };
+    const timer = window.setInterval(read, 500);
+    return () => window.clearInterval(timer);
   }, [uiManager]);
 
   const counts = new Map<number, number>();
@@ -217,9 +329,8 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
       ? planets
       : planets.filter((planet) => planet.planetType === category);
 
-  const headers = ["", "名称", "坐标", "类型", "等级", "状态", "能量", "银"];
+  const headers = ["星球", "坐标", "类型", "等级", "动态与材料", "能量", "银"];
   const alignments: Array<"r" | "c" | "l"> = [
-    "c",
     "l",
     "l",
     "l",
@@ -229,28 +340,45 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
     "r",
   ];
   const columns = [
-    (planet: Planet) => <PlanetThumb planet={planet} />,
-    (planet: Planet) =>
-      isLocatable(planet) ? (
-        <PlanetLink planet={planet} guideTarget>
-          {getPlanetName(planet)}
-        </PlanetLink>
-      ) : (
-        <span>坐标未公开</span>
-      ),
-    (planet: Planet) =>
-      isLocatable(planet)
-        ? `(${Math.round(planet.location.coords.x)}, ${Math.round(planet.location.coords.y)})`
-        : "未知",
-    (planet: Planet) => PLANET_TYPE_NAME[planet.planetType] ?? "未知",
+    (planet: Planet) => (
+      <Identity>
+        <Thumbnail aria-hidden="true">
+          <PlanetThumb planet={planet} />
+        </Thumbnail>
+        {isLocatable(planet) ? (
+          <PlanetLink planet={planet} guideTarget>
+            {getPlanetName(planet)}
+          </PlanetLink>
+        ) : (
+          <span>{getPlanetName(planet)}</span>
+        )}
+      </Identity>
+    ),
+    (planet: Planet) => (
+      <Coordinates>
+        {isLocatable(planet)
+          ? `(${Math.round(planet.location.coords.x)}, ${Math.round(planet.location.coords.y)})`
+          : "坐标未公开"}
+      </Coordinates>
+    ),
+    (planet: Planet) => (
+      <Tag $color={PLANET_COLORS[planet.planetType]}>
+        {PLANET_TYPE_NAME[planet.planetType] ?? "未知"}
+      </Tag>
+    ),
     (planet: Planet) => planet.planetLevel,
-    (planet: Planet) =>
-      statusText(planet, traffic.get(String(planet.locationId))),
-    (planet: Planet) => formatNumber(planet.energy),
-    (planet: Planet) => formatNumber(planet.silver),
+    (planet: Planet) => (
+      <PlanetStatus
+        planet={planet}
+        traffic={traffic.get(String(planet.locationId))}
+      />
+    ),
+    (planet: Planet) => <PlanetEnergy planet={planet} />,
+    (planet: Planet) => (
+      <Resource $silver>{formatNumber(planet.silver)}</Resource>
+    ),
   ];
   const sortFunctions = [
-    () => 0,
     (left: Planet, right: Planet) =>
       getPlanetName(left).localeCompare(getPlanetName(right)),
     (left: Planet, right: Planet) => {
@@ -275,55 +403,77 @@ export function OwnedPlanetsPanel({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <Shell data-guide-panel="owned-planets">
-      <TitleRow>
-        <div>占领星球 {planets.length}</div>
-        <CloseButton
-          type="button"
-          data-guide-target="close-owned-planets"
-          onClick={onClose}
-        >
-          关闭
-        </CloseButton>
-      </TitleRow>
-      <Filters>
-        <FilterButton
-          type="button"
-          active={category === "all"}
-          onClick={() => setCategory("all")}
-        >
-          全部 {planets.length}
-        </FilterButton>
-        {TYPE_ORDER.filter((type) => (counts.get(type) ?? 0) > 0).map(
-          (type) => (
+    <GameListPanel
+      title="占领星球"
+      count={`${planets.length} 颗`}
+      width={830}
+      guidePanel="owned-planets"
+      guideClose="close-owned-planets"
+      onClose={onClose}
+      toolbar={
+        planets.length > 0 && (
+          <Filters role="group" aria-label="按星球类型筛选">
             <FilterButton
-              key={type}
               type="button"
-              active={category === type}
-              onClick={() => setCategory(type)}
+              aria-pressed={category === "all"}
+              onClick={() => setCategory("all")}
             >
-              {PLANET_TYPE_NAME[type]} {counts.get(type)}
+              全部<span>{planets.length}</span>
             </FilterButton>
-          ),
-        )}
-      </Filters>
+            {TYPE_ORDER.filter(
+              (type) => counts.has(type) || category === type,
+            ).map((type) => (
+              <FilterButton
+                key={type}
+                type="button"
+                aria-pressed={category === type}
+                onClick={() => setCategory(type)}
+              >
+                {PLANET_TYPE_NAME[type]}
+                <span>{counts.get(type) ?? 0}</span>
+              </FilterButton>
+            ))}
+          </Filters>
+        )
+      }
+    >
       {shown.length === 0 ? (
-        <div>这一类还没有星球。</div>
+        <ListEmpty>
+          {planets.length === 0 ? "暂无占领的星球" : "该类型暂无星球"}
+        </ListEmpty>
       ) : (
-        <SortableTable
-          key={category}
-          rows={shown}
-          headers={headers}
-          columns={columns}
-          sortFunctions={sortFunctions}
-          alignments={alignments}
-        />
+        <ListTable $minWidth={695}>
+          <SortableTable
+            rows={shown}
+            getRowKey={(planet) => planet.locationId}
+            headers={headers}
+            columns={columns}
+            sortFunctions={sortFunctions}
+            alignments={alignments}
+          />
+        </ListTable>
       )}
-    </Shell>
+    </GameListPanel>
   );
 }
 
 const RARITY_ORDER = ["", "未知", "普通", "稀有", "史诗", "传说", "神话"];
+const RARITY_COLORS: Record<string, string> = {
+  稀有: "#a3d5ff",
+  史诗: "#d0bcff",
+  传说: "#f3d399",
+  神话: "#ffb1d6",
+};
+
+const ArtifactLocation = styled.div`
+  min-width: 108px;
+
+  button {
+    display: grid;
+    justify-items: start;
+    gap: 2px;
+  }
+`;
 
 /** 和占领星球同一块弹窗。点位置时，镜头移到放着这件神器的星球。 */
 export function OwnedArtifactsPanel({
@@ -334,69 +484,85 @@ export function OwnedArtifactsPanel({
   onClose: () => void;
 }) {
   const uiManager = useUIManager();
-  const place = (line: OwnedArtifactLine) => {
-    if (!line.planetId) return line.place;
-    const planet = uiManager.getPlanetWithId(line.planetId as LocationId);
-    if (!planet || !isLocatable(planet)) return line.place;
-    return <PlanetLink planet={planet}>{line.place}</PlanetLink>;
-  };
-  // 名称后面跟一个“？”，悬浮看这件神器的作用和用法。
-  // 神器编号从已同步的神器里取，不放进 line，免得改动列表数据的结构。
-  const nameWithHelp = (line: OwnedArtifactLine) => {
+  const rows = artifacts.map((line) => {
     const artifact = uiManager.getArtifactWithId(line.id as ArtifactId);
-    return (
-      <>
-        {line.name}
-        <ArtifactHelp artifactIndex={artifact?.artifactIndex} />
-      </>
-    );
-  };
-  // 在钱包里的神器先存回星球才能充能或激活。
-  const use = (line: OwnedArtifactLine) => {
-    if (!line.planetId) return "在钱包，先放回星球";
-    const planet = uiManager.getPlanetWithId(line.planetId as LocationId);
-    if (!planet || !isLocatable(planet)) return "坐标还未知";
-    const artifact = uiManager.getArtifactWithId(line.id as ArtifactId);
-    if (!artifact) return "神器还没同步";
-    return <ArtifactUseActions planet={planet} artifact={artifact} />;
-  };
+    const body = line.planetId
+      ? uiManager.getPlanetWithId(line.planetId as LocationId)
+      : undefined;
+    const planet = isLocatable(body) ? body : undefined;
+    return { line, artifact, planet };
+  });
 
   return (
-    <ArtifactShell>
-      <TitleRow>
-        <div>拥有神器 {artifacts.length}</div>
-        <CloseButton type="button" onClick={onClose}>
-          关闭
-        </CloseButton>
-      </TitleRow>
-      {artifacts.length === 0 ? (
-        <div>还没有神器。</div>
+    <GameListPanel
+      title="拥有神器"
+      count={`${rows.length} 件`}
+      width={920}
+      onClose={onClose}
+    >
+      {rows.length === 0 ? (
+        <ListEmpty>暂无拥有的神器</ListEmpty>
       ) : (
-        <SortableTable
-          rows={artifacts}
-          headers={["名称", "稀有度", "位置", "使用"]}
-          columns={[
-            (line) => nameWithHelp(line),
-            (line) => line.rarity || "未知",
-            (line) => place(line),
-            (line) => use(line),
-          ]}
-          sortFunctions={[
-            (left, right) => left.name.localeCompare(right.name),
-            (left, right) =>
-              RARITY_ORDER.indexOf(right.rarity) -
-              RARITY_ORDER.indexOf(left.rarity),
-            (left, right) => left.place.localeCompare(right.place),
-            () => 0,
-          ]}
-          alignments={["l", "l", "l", "l"]}
-          sortable={[true, true, true, false]}
-        />
+        <ListTable $minWidth={600}>
+          <SortableTable
+            rows={rows}
+            getRowKey={({ line }) => line.id}
+            headers={["神器", "稀有度", "所在位置", "操作"]}
+            columns={[
+              ({ line, artifact }) => (
+                <Identity>
+                  {artifact &&
+                    artifact.artifactType >= MIN_ARTIFACT_TYPE &&
+                    artifact.artifactType <= MAX_ARTIFACT_TYPE && (
+                      <Thumbnail aria-hidden="true">
+                        <ArtifactImage artifact={artifact} size={24} />
+                      </Thumbnail>
+                    )}
+                  <span>
+                    {line.name}
+                    <ArtifactHelp artifactIndex={artifact?.artifactIndex} />
+                  </span>
+                </Identity>
+              ),
+              ({ line }) => (
+                <Tag $color={RARITY_COLORS[line.rarity]}>
+                  {line.rarity || "未知"}
+                </Tag>
+              ),
+              ({ line, planet }) =>
+                planet ? (
+                  <ArtifactLocation>
+                    <PlanetLink planet={planet}>
+                      <span>{getPlanetName(planet)}</span>
+                      <Coordinates>{line.place}</Coordinates>
+                    </PlanetLink>
+                  </ArtifactLocation>
+                ) : (
+                  <Muted>{line.place}</Muted>
+                ),
+              ({ line, planet, artifact }) => {
+                if (line.place === "在钱包")
+                  return <Muted>放回星球后可使用</Muted>;
+                if (!planet) return <Muted>星球坐标未知</Muted>;
+                if (!artifact) return <Muted>神器待同步</Muted>;
+                return (
+                  <ArtifactUseActions planet={planet} artifact={artifact} />
+                );
+              },
+            ]}
+            sortFunctions={[
+              (left, right) => left.line.name.localeCompare(right.line.name),
+              (left, right) =>
+                RARITY_ORDER.indexOf(right.line.rarity) -
+                RARITY_ORDER.indexOf(left.line.rarity),
+              (left, right) => left.line.place.localeCompare(right.line.place),
+              () => 0,
+            ]}
+            alignments={["l", "l", "l", "l"]}
+            sortable={[true, true, true, false]}
+          />
+        </ListTable>
       )}
-    </ArtifactShell>
+    </GameListPanel>
   );
 }
-
-const ArtifactShell = styled(Shell)`
-  width: min(980px, calc(100vw - 360px));
-`;

@@ -6889,6 +6889,7 @@ export class GameManager extends EventEmitter {
       speedMultiplier: 100,
       defMultiplier: 100,
     },
+    distanceMultiplier = 1,
   ): number {
     const from = this.getPlanetWithId(fromId);
     if (!from) {
@@ -6899,7 +6900,7 @@ export class GameManager extends EventEmitter {
       range: (from.range * upgrade.rangeMultiplier) / 100,
       energyCap: (from.energyCap * upgrade.energyCapMultiplier) / 100,
     };
-    const dist = this.getDist(fromId, toId);
+    const dist = this.getDist(fromId, toId) * distanceMultiplier;
     const range = upgradedPlanet.range * this.getRangeBuff(abandoning);
     const rangeSteps = dist / range;
 

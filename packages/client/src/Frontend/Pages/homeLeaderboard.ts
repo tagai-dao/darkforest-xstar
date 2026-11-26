@@ -56,3 +56,21 @@ export async function fetchHomeBoard(
   const payload = (await response.json()) as { rows?: HomeBoardRow[] };
   return payload.rows ?? [];
 }
+
+export type HomeBoards = {
+  score: HomeBoardRow[];
+  kills: HomeBoardRow[];
+  unavailable?: boolean;
+};
+
+export async function fetchHomeBoards(): Promise<HomeBoards> {
+  try {
+    const [score, kills] = await Promise.all([
+      fetchHomeBoard("score"),
+      fetchHomeBoard("kills"),
+    ]);
+    return { score, kills };
+  } catch {
+    return { score: [], kills: [], unavailable: true };
+  }
+}

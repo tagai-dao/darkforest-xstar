@@ -1,13 +1,13 @@
 import { EMPTY_ADDRESS } from "@df/constants";
-import { formatNumber, hasOwner } from "@df/gamelogic";
+import { formatNumber, hasOwner, isLocatable } from "@df/gamelogic";
 import { getOwnerColorVec } from "@df/procedural";
 import type {
-  LocationId,
   MaterialType,
   Planet,
-  Player,
   QueuedArrival,
+  RGBAVec,
   VoyageRendererType,
+  WorldCoords,
 } from "@df/types";
 import {
   ArtifactType,
@@ -19,6 +19,7 @@ import {
 import { getMaterialColor } from "@frontend/Panes/PlanetMaterialsPane";
 
 import { engineConsts } from "../EngineConsts";
+import { fleetRoutes, type FleetTier, getFleetTier } from "../FleetSprites";
 import type { Renderer } from "../Renderer";
 import type { GameGLManager } from "../WebGL/GameGLManager";
 
@@ -56,21 +57,21 @@ function getVoyageColor(
 /* responsible for calling renderers in order to draw voyages */
 export class VoyageRenderer implements VoyageRendererType {
   renderer: Renderer;
+  private departureEnergy = new WeakMap<QueuedArrival, number>();
 
   rendererType = RendererType.Voyager;
   constructor(gl: GameGLManager) {
     this.renderer = gl.renderer;
   }
 
-  drawFleet(
+  private drawVoyage(
     voyage: QueuedArrival,
-    _player: Player | undefined,
     isMyVoyage: boolean,
     isShipVoyage: boolean,
     isSupportVoyage: boolean,
+    emphasis: number,
   ) {
     const {
-      now: nowMs,
       context: gameUIManager,
       circleRenderer: cR,
       textRenderer: tR,
@@ -83,102 +84,109 @@ export class VoyageRenderer implements VoyageRendererType {
     const toLoc = gameUIManager.getLocationOfPlanet(voyage.toPlanet);
     const toPlanet = gameUIManager.getPlanetWithId(voyage.toPlanet);
 
-    if (!fromPlanet || !toLoc) {
-      // not enough info to draw anything
-      return;
-    } else if (!fromLoc && fromPlanet && toLoc && toPlanet) {
-      // can draw a ring around dest, but don't know source location
-      const myMove = voyage.player === gameUIManager.getAccount();
-      const shipMove = voyage.player === EMPTY_ADDRESS;
-      const supportMove =
-        gameUIManager.inSameGuildAtTick(
-          voyage.player,
-          toPlanet.owner,
-          voyage.arrivalTick,
-        ) && voyage.player !== toPlanet.owner;
+    if (!fromPlanet || !toLoc || !toPlanet) return;
 
-      // console.log("PUNK");
-      // console.log("supportMove");
-      // console.log(supportMove);
+    const { proportion, timeLeft } = this.getVoyageTiming(voyage);
+    const color = getVoyageColor(
+      fromPlanet,
+      toPlanet,
+      isMyVoyage,
+      isShipVoyage,
+      isSupportVoyage,
+    );
+    const emphasized = emphasis > 0;
 
-      const now = nowMs / 1000;
-
-      const timeLeft = Math.floor(
-        gameUIManager.convertTickToMs(voyage.arrivalTick) / 1000 - now,
-      );
-
-      const radius = (timeLeft * fromPlanet.speed) / 100;
-
-      const color = getVoyageColor(
-        fromPlanet,
-        toPlanet,
-        myMove,
-        shipMove,
-        supportMove,
-      );
-
-      const text = shipMove ? "Ship" : `${Math.floor(voyage.energyArriving)}`;
-
-      cR.queueCircleWorld(toLoc.coords, radius, color, 0.7, 1, true);
-      tR.queueTextWorld(
-        `${text} in ${Math.floor(timeLeft)}s`,
-        { x: toLoc.coords.x, y: toLoc.coords.y + radius },
-        color,
-        undefined,
-        TextAlign.Center,
-        TextAnchor.Bottom,
-      );
-    } else if (fromLoc && fromPlanet && toLoc && toPlanet) {
-      // know source and destination locations
-
-      const departureTime = gameUIManager.convertTickToMs(voyage.departureTick);
-      const arrivalTime = gameUIManager.convertTickToMs(voyage.arrivalTick);
-
-      let proportion = (nowMs - departureTime) / (arrivalTime - departureTime);
-
-      proportion = Math.max(proportion, 0.01);
-      proportion = Math.min(proportion, 0.99);
-
-      const shipsLocationX =
-        (1 - proportion) * fromLoc.coords.x + proportion * toLoc.coords.x;
-      const shipsLocationY =
-        (1 - proportion) * fromLoc.coords.y + proportion * toLoc.coords.y;
-      const shipsLocation = { x: shipsLocationX, y: shipsLocationY };
-
-      const timeLeftSeconds = Math.floor((arrivalTime - nowMs) / 1000);
-
-      const voyageColor = getVoyageColor(
-        fromPlanet,
-        toPlanet,
-        isMyVoyage,
-        isShipVoyage,
-        isSupportVoyage,
-      );
-
-      // alpha calculation
-      const viewport = this.renderer.getViewport();
-      const dx = fromLoc.coords.x - toLoc.coords.x;
-      const dy = fromLoc.coords.y - toLoc.coords.y;
-      const distWorld = Math.sqrt(dx ** 2 + dy ** 2);
-      const dist = viewport.worldToCanvasDist(distWorld);
-      let alpha = 255;
-      if (dist < 300) {
-        alpha = (dist / 300) * 255;
+    if (!fromLoc) {
+      const text = isShipVoyage ? "Ship" : formatNumber(voyage.energyArriving);
+      if (timeLeft !== undefined && timeLeft > 0) {
+        const radius = (timeLeft * fromPlanet.speed) / 100;
+        cR.queueCircleWorld(toLoc.coords, radius, color, 1, 1, true);
+        tR.queueTextWorld(
+          `${text} in ${timeLeft}s`,
+          { x: toLoc.coords.x, y: toLoc.coords.y + radius },
+          color,
+          0,
+          TextAlign.Center,
+          TextAnchor.Bottom,
+        );
+      } else {
+        tR.queueTextWorld(
+          `${text} in --`,
+          toLoc.coords,
+          color,
+          0,
+          TextAlign.Center,
+          TextAnchor.Bottom,
+        );
+      }
+    } else {
+      let departureEnergy = this.departureEnergy.get(voyage);
+      if (
+        departureEnergy === undefined &&
+        !(isShipVoyage && voyage.energyArriving === 0) &&
+        isLocatable(fromPlanet) &&
+        isLocatable(toPlanet)
+      ) {
+        const estimate = gameUIManager.estimateVoyageDepartureEnergy(
+          voyage,
+          toPlanet,
+        );
+        if (Number.isFinite(estimate)) {
+          departureEnergy = estimate;
+          this.departureEnergy.set(voyage, estimate);
+        }
       }
 
-      voyageColor[3] = alpha;
-      const fleetRadius = 4;
+      const tier = getFleetTier(departureEnergy ?? voyage.energyArriving);
+      this.drawVoyagePath(fromLoc.coords, toLoc.coords, color, tier, emphasis);
+
+      const shipsLocation = this.getFleetPosition(
+        fromLoc.coords,
+        toLoc.coords,
+        proportion,
+      );
+      const viewport = this.renderer.getViewport();
+      const position = viewport.worldToCanvasCoords(shipsLocation);
+      const { viewportWidth, viewportHeight } = viewport;
+      const margin = 112;
+      if (
+        position.x < -margin ||
+        position.y < -margin ||
+        position.x > viewportWidth + margin ||
+        position.y > viewportHeight + margin
+      ) {
+        return;
+      }
+
+      const origin = viewport.worldToCanvasCoords(fromLoc.coords);
+      const destination = viewport.worldToCanvasCoords(toLoc.coords);
+      const shortRoute =
+        Math.hypot(destination.x - origin.x, destination.y - origin.y) < 8;
+      let fleetRadius = 4;
+      if (shortRoute) {
+        cR.queueCircleWorldCenterOnly(shipsLocation, fleetRadius, color);
+      } else {
+        fleetRadius =
+          this.renderer.overlay2dRenderer.drawFleetMarker(
+            position,
+            origin,
+            destination,
+            color,
+            tier,
+            emphasized,
+            gameUIManager.getIsHighPerfMode(),
+          ) ?? fleetRadius;
+      }
+      const alpha = emphasized ? 255 : 214;
       const artifactSizePixels = 20;
-      cR.queueCircleWorldCenterOnly(shipsLocation, fleetRadius, voyageColor);
       if (voyage.artifactId) {
         const artifact = gameUIManager.getArtifactWithId(voyage.artifactId);
         if (artifact) {
           // const viewport = this.renderer.getViewport();
-          const screenCoords = viewport.worldToCanvasCoords(shipsLocation);
           const distanceFromCenterOfFleet =
             fleetRadius * 1.5 + artifactSizePixels;
-          const x = distanceFromCenterOfFleet + screenCoords.x;
-          const y = screenCoords.y;
+          const x = distanceFromCenterOfFleet + position.x;
+          const y = position.y;
 
           const k = 40;
           const size = (k * 20.0) / (1.0 * viewport.worldToCanvasDist(20));
@@ -195,40 +203,40 @@ export class VoyageRenderer implements VoyageRendererType {
         }
       }
 
-      // queue text
+      // Leave a fixed screen-space gap around the fleet at every zoom.
+      const above = viewport.canvasToWorldCoords({
+        x: position.x,
+        y: position.y - fleetRadius - 3,
+      });
+      const below = viewport.canvasToWorldCoords({
+        x: position.x,
+        y: position.y + fleetRadius + 3,
+      });
       tR.queueTextWorld(
-        `${timeLeftSeconds.toString()}s`,
-        {
-          x: shipsLocationX,
-          y: shipsLocationY - 0.5,
-        },
+        timeLeft === undefined ? "--" : `${timeLeft}s`,
+        below,
         [...white, alpha],
         0,
         TextAlign.Center,
         TextAnchor.Top,
       );
+      let cargoRow = 0;
       if (voyage.energyArriving > 0) {
         tR.queueTextWorld(
-          `${formatNumber(voyage.energyArriving)}`,
-          {
-            x: shipsLocationX,
-            y: shipsLocationY + 0.5,
-          },
+          formatNumber(voyage.energyArriving),
+          above,
           [...white, alpha],
-          -0,
+          cargoRow--,
           TextAlign.Center,
           TextAnchor.Bottom,
         );
       }
       if (voyage.silverMoved > 0) {
         tR.queueTextWorld(
-          `${formatNumber(voyage.silverMoved)}`,
-          {
-            x: shipsLocationX,
-            y: shipsLocationY + 0.5,
-          },
+          formatNumber(voyage.silverMoved),
+          above,
           [...gold, alpha],
-          -1,
+          cargoRow--,
           TextAlign.Center,
           TextAnchor.Bottom,
         );
@@ -236,7 +244,6 @@ export class VoyageRenderer implements VoyageRendererType {
 
       // Display materials if being moved
       if (voyage.materialsMoved && voyage.materialsMoved.length > 0) {
-        let materialOffset = 0;
         for (const mat of voyage.materialsMoved) {
           const materialColor = getMaterialColor(
             mat.materialId as MaterialType,
@@ -248,24 +255,52 @@ export class VoyageRenderer implements VoyageRendererType {
 
           tR.queueTextWorld(
             `${formatNumber(mat.materialAmount, 0)}`,
-            {
-              x: shipsLocationX,
-              y: shipsLocationY + 0.5,
-            },
+            above,
             [r, g, b, alpha],
-            (voyage.silverMoved ? -2 : -1) - materialOffset,
+            cargoRow--,
             TextAlign.Center,
             TextAnchor.Bottom,
           );
-          materialOffset++;
         }
       }
     }
   }
 
+  private getVoyageTiming(voyage: QueuedArrival) {
+    const { context, now, currentTick } = this.renderer;
+    const departure = context.convertTickToMs(voyage.departureTick);
+    const arrival = context.convertTickToMs(voyage.arrivalTick);
+    const duration = arrival - departure;
+    const wallClock = Number.isFinite(duration) && duration > 0;
+    const tickDuration = voyage.arrivalTick - voyage.departureTick;
+    let progress = 0;
+    if (wallClock) progress = (now - departure) / duration;
+    else if (tickDuration > 0)
+      progress = (currentTick - voyage.departureTick) / tickDuration;
+    return {
+      proportion: Math.max(0.01, Math.min(0.99, progress)),
+      timeLeft: wallClock
+        ? Math.max(0, Math.ceil((arrival - now) / 1000))
+        : undefined,
+    };
+  }
+
+  private getFleetPosition(
+    from: WorldCoords,
+    to: WorldCoords,
+    proportion: number,
+  ): WorldCoords {
+    return {
+      x: from.x + (to.x - from.x) * proportion,
+      y: from.y + (to.y - from.y) * proportion,
+    };
+  }
+
   queueVoyages(): void {
     const { context: gameUIManager, currentTick } = this.renderer;
     const voyages = gameUIManager.getAllVoyages();
+    const account = gameUIManager.getAccount();
+    const playerAddress = gameUIManager.getPlayer()?.address;
     const selectedVoyage = (
       gameUIManager as unknown as {
         getSelectedVoyage?: () => QueuedArrival | undefined;
@@ -298,18 +333,16 @@ export class VoyageRenderer implements VoyageRendererType {
       }
     }
 
-    // Draw unselected voyages first
-    for (const voyage of unselectedVoyages) {
+    for (const voyage of [...unselectedVoyages, ...selectedVoyages]) {
       const isMyVoyage =
-        voyage.player === gameUIManager.getAccount() ||
-        gameUIManager.getArtifactWithId(voyage.artifactId)?.controller ===
-          gameUIManager.getPlayer()?.address;
+        voyage.player === account ||
+        (playerAddress !== undefined &&
+          gameUIManager.getArtifactWithId(voyage.artifactId)?.controller ===
+            playerAddress);
       const isShipVoyage = voyage.player === EMPTY_ADDRESS;
-      const sender = gameUIManager.getPlayer(voyage.player);
-
       const toPlanet = gameUIManager.getPlanetWithId(voyage.toPlanet);
-
       if (!toPlanet) continue;
+
       const isSupportVoyage =
         gameUIManager.inSameGuildAtTick(
           voyage.player,
@@ -317,143 +350,66 @@ export class VoyageRenderer implements VoyageRendererType {
           voyage.arrivalTick,
         ) && voyage.player !== toPlanet.owner;
 
-      const isHovered = Boolean(
-        hoveredVoyage && hoveredVoyage.eventId === voyage.eventId,
-      );
-
-      this.drawVoyagePath(
-        voyage.fromPlanet,
-        voyage.toPlanet,
-        true,
+      const isSelected = selectedVoyage?.eventId === voyage.eventId;
+      const isHovered = hoveredVoyage?.eventId === voyage.eventId;
+      const emphasis = isSelected ? 1 : Number(isHovered) * 0.6;
+      this.drawVoyage(
+        voyage,
         isMyVoyage,
         isShipVoyage,
         isSupportVoyage,
-        false, // not selected
-        isHovered,
+        emphasis,
       );
-
-      this.drawFleet(voyage, sender, isMyVoyage, isShipVoyage, isSupportVoyage);
     }
 
-    // Draw selected voyages last (so they appear on top)
-    for (const voyage of selectedVoyages) {
-      const isMyVoyage =
-        voyage.player === gameUIManager.getAccount() ||
-        gameUIManager.getArtifactWithId(voyage.artifactId)?.controller ===
-          gameUIManager.getPlayer()?.address;
-      const isShipVoyage = voyage.player === EMPTY_ADDRESS;
-      const sender = gameUIManager.getPlayer(voyage.player);
-
-      const toPlanet = gameUIManager.getPlanetWithId(voyage.toPlanet);
-
-      if (!toPlanet) continue;
-      const isSupportVoyage =
-        gameUIManager.inSameGuildAtTick(
-          voyage.player,
-          toPlanet.owner,
-          voyage.arrivalTick,
-        ) && voyage.player !== toPlanet.owner;
-
-      const isHovered = Boolean(
-        hoveredVoyage && hoveredVoyage.eventId === voyage.eventId,
-      );
+    for (const { intent } of gameUIManager.getUnconfirmedMoves()) {
+      const origin = gameUIManager.getLocationOfPlanet(intent.from);
+      const destination = gameUIManager.getLocationOfPlanet(intent.to);
+      if (!origin || !destination) continue;
 
       this.drawVoyagePath(
-        voyage.fromPlanet,
-        voyage.toPlanet,
-        true,
-        isMyVoyage,
-        isShipVoyage,
-        isSupportVoyage,
-        true, // selected
-        isHovered,
-      );
-
-      this.drawFleet(voyage, sender, isMyVoyage, isShipVoyage, isSupportVoyage);
-    }
-
-    const unconfirmedDepartures = gameUIManager.getUnconfirmedMoves();
-    for (const unconfirmedMove of unconfirmedDepartures) {
-      this.drawVoyagePath(
-        unconfirmedMove.intent.from,
-        unconfirmedMove.intent.to,
+        origin.coords,
+        destination.coords,
+        mineA,
+        getFleetTier(intent.forces),
+        0,
         false,
-        true,
-        // This false doesn't matter because we force isMyVoyage to true
-        false,
-        false, // unconfirmed moves are always white
-        false, // unconfirmed moves are never selected
-        false, // unconfirmed moves are never hovered
       );
     }
   }
 
   private drawVoyagePath(
-    from: LocationId,
-    to: LocationId,
-    confirmed: boolean,
-    isMyVoyage: boolean,
-    isShipVoyage: boolean,
-    isSupportVoyage: boolean,
-    isSelected: boolean = false,
-    isHovered: boolean = false,
+    from: WorldCoords,
+    to: WorldCoords,
+    color: RGBAVec,
+    tier: FleetTier,
+    emphasis: number,
+    confirmed = true,
   ) {
-    const { context: gameUIManager } = this.renderer;
+    const { width, alpha, halo, dash } = fleetRoutes[tier];
+    const [r, g, b] = color;
+    const { lineRenderer } = this.renderer;
+    const z = RenderZIndex.Voyages;
+    const routeWidth = width + Number(emphasis > 0);
 
-    const fromLoc = gameUIManager.getLocationOfPlanet(from);
-    const fromPlanet = gameUIManager.getPlanetWithId(from);
-    const toLoc = gameUIManager.getLocationOfPlanet(to);
-    const toPlanet = gameUIManager.getPlanetWithId(to);
-
-    if (!fromPlanet || !fromLoc || !toLoc || !toPlanet) {
-      return;
-    }
-
-    const voyageColor = getVoyageColor(
-      fromPlanet,
-      toPlanet,
-      isMyVoyage,
-      isShipVoyage,
-      isSupportVoyage,
-    );
-
-    // Draw the normal voyage line
-    this.renderer.lineRenderer.queueLineWorld(
-      fromLoc.coords,
-      toLoc.coords,
-      voyageColor,
-      confirmed ? 2 : 1,
-      RenderZIndex.Voyages,
-      confirmed ? false : true,
-    );
-
-    // If hovered, draw a subtle highlight
-    if (isHovered && !isSelected) {
-      const hoverColor: [number, number, number, number] = [0, 255, 255, 150]; // White with transparency
-      this.renderer.lineRenderer.queueLineWorld(
-        fromLoc.coords,
-        toLoc.coords,
-        hoverColor,
-        3, // Slightly thicker line for hover
-        RenderZIndex.Voyages + 0.5, // Draw above normal but below selected
-        false, // Solid line
+    if (confirmed && (halo > 0 || emphasis > 0)) {
+      lineRenderer.queueLineWorld(
+        from,
+        to,
+        [r, g, b, Math.max(halo, Math.round(56 * emphasis))],
+        routeWidth + 4,
+        z,
       );
     }
 
-    // If selected, draw a highlighted line on top
-    if (isSelected) {
-      const highlightColor: [number, number, number, number] = [
-        0, 255, 255, 255,
-      ]; // Cyan highlight
-      this.renderer.lineRenderer.queueLineWorld(
-        fromLoc.coords,
-        toLoc.coords,
-        highlightColor,
-        4, // Thicker line for selected voyage
-        RenderZIndex.Voyages + 1, // Draw on top
-        false, // Solid line
-      );
-    }
+    lineRenderer.queueLineWorld(
+      from,
+      to,
+      [r, g, b, confirmed ? Math.round(alpha + (255 - alpha) * emphasis) : 100],
+      routeWidth,
+      z,
+      confirmed ? dash : true,
+    );
   }
 
   flush() {}
@@ -462,8 +418,10 @@ export class VoyageRenderer implements VoyageRendererType {
    * Gets voyage data for rendering UI components
    */
   getVoyageData() {
-    const { context: gameUIManager, now, currentTick } = this.renderer;
+    const { context: gameUIManager, currentTick } = this.renderer;
     const voyages = gameUIManager.getAllVoyages();
+    const account = gameUIManager.getAccount();
+    const playerAddress = gameUIManager.getPlayer()?.address;
     const voyageData: Array<{
       voyage: QueuedArrival;
       position: { x: number; y: number };
@@ -471,35 +429,24 @@ export class VoyageRenderer implements VoyageRendererType {
       canRevert: boolean;
     }> = [];
 
-    console.log("Getting voyage data for", voyages.length, "voyages");
-
     for (const voyage of voyages) {
       if (currentTick < voyage.arrivalTick) {
         const isMyVoyage =
-          voyage.player === gameUIManager.getAccount() ||
-          gameUIManager.getArtifactWithId(voyage.artifactId)?.controller ===
-            gameUIManager.getPlayer()?.address;
+          voyage.player === account ||
+          (playerAddress !== undefined &&
+            gameUIManager.getArtifactWithId(voyage.artifactId)?.controller ===
+              playerAddress);
 
         const fromLoc = gameUIManager.getLocationOfPlanet(voyage.fromPlanet);
         const toLoc = gameUIManager.getLocationOfPlanet(voyage.toPlanet);
 
         if (fromLoc && toLoc) {
-          const departureTime = gameUIManager.convertTickToMs(
-            voyage.departureTick,
+          const { proportion } = this.getVoyageTiming(voyage);
+          const shipsLocation = this.getFleetPosition(
+            fromLoc.coords,
+            toLoc.coords,
+            proportion,
           );
-          const arrivalTime = gameUIManager.convertTickToMs(voyage.arrivalTick);
-          const nowMs = now;
-
-          let proportion =
-            (nowMs - departureTime) / (arrivalTime - departureTime);
-          proportion = Math.max(proportion, 0.01);
-          proportion = Math.min(proportion, 0.99);
-
-          const shipsLocationX =
-            (1 - proportion) * fromLoc.coords.x + proportion * toLoc.coords.x;
-          const shipsLocationY =
-            (1 - proportion) * fromLoc.coords.y + proportion * toLoc.coords.y;
-          const shipsLocation = { x: shipsLocationX, y: shipsLocationY };
 
           // Check if can revert using proper logic
           let canRevert = false;
@@ -508,9 +455,7 @@ export class VoyageRenderer implements VoyageRendererType {
             const sourcePlanet = gameUIManager.getPlanetWithId(
               voyage.fromPlanet,
             );
-            canRevert = Boolean(
-              sourcePlanet && sourcePlanet.owner === gameUIManager.getAccount(),
-            );
+            canRevert = Boolean(sourcePlanet && sourcePlanet.owner === account);
           }
 
           voyageData.push({
@@ -523,7 +468,6 @@ export class VoyageRenderer implements VoyageRendererType {
       }
     }
 
-    console.log("Total voyage data entries:", voyageData.length);
     return voyageData;
   }
 }

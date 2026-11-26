@@ -20,7 +20,6 @@ import {
 import { getMaterialTooltipName, TooltipTrigger } from "../Panes/Tooltip";
 import { BiomeTextColors } from "../Styles/Colors";
 import dfstyles from "../Styles/dfstyles";
-import { snips } from "../Styles/dfstyles";
 import { useUIManager } from "../Utils/AppHooks";
 import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 
@@ -28,22 +27,10 @@ const VoyageCardContainer = styled.div<{
   isDragging?: boolean;
   isHovered?: boolean;
 }>`
-  ${snips.roundedBordersWithEdge}
-  border-color: ${(props) =>
-    props.isHovered ? dfstyles.colors.dfblue : dfstyles.colors.borderDarker};
-  background: linear-gradient(
-    135deg,
-    ${(props) =>
-        props.isHovered
-          ? `${dfstyles.colors.backgroundlight}dd`
-          : dfstyles.colors.backgroundlight}
-      0%,
-    ${(props) =>
-        props.isHovered
-          ? `${dfstyles.colors.background}dd`
-          : dfstyles.colors.background}
-      100%
-  );
+  background: linear-gradient(155deg, rgb(19 32 51 / 97%), rgb(10 17 29 / 97%));
+  border-radius: 9px;
+  font-family: system-ui, "PingFang SC", sans-serif;
+  font-variant-numeric: tabular-nums;
   padding: 16px;
   min-width: 320px;
   max-width: 400px;
@@ -52,14 +39,9 @@ const VoyageCardContainer = styled.div<{
   user-select: none;
   box-shadow: ${(props) =>
     props.isHovered
-      ? "0 4px 20px rgba(0, 123, 255, 0.3)"
-      : "0 4px 12px rgba(0, 0, 0, 0.3)"};
-  backdrop-filter: blur(10px);
-  border: 1px solid
-    ${(props) =>
-      props.isHovered ? dfstyles.colors.dfblue : dfstyles.colors.border};
-  opacity: ${(props) => (props.isHovered ? 0.95 : 1)};
-  transition: all 0.2s ease;
+      ? "0 8px 25px rgba(11, 138, 165, 0.24)"
+      : "0 12px 32px rgba(2, 5, 12, 0.38)"};
+  border: 1px solid ${(props) => (props.isHovered ? "#7fdbde" : "#324961")};
 `;
 
 const DragHandle = styled.div`

@@ -16,6 +16,7 @@ import type {
   EmojiFlagBody,
   PlanetMessage,
   PlanetRenderInfo,
+  RGBAVec,
   WorldCoords,
 } from "@df/types";
 import { ArtifactRarity, LogoType, TextAlign } from "@df/types";
@@ -23,6 +24,7 @@ import { ArtifactRarity, LogoType, TextAlign } from "@df/types";
 import { avatarFromType } from "./Avatars";
 import { engineConsts } from "./EngineConsts";
 import { EngineUtils } from "./EngineUtils";
+import { type FleetTier, getFleetSprite } from "./FleetSprites";
 import { hatFromType } from "./Hats";
 import { logoFromType } from "./Logos";
 import { memeFromType } from "./Memes";
@@ -328,6 +330,59 @@ export class Overlay2DRenderer {
     this.ctx.stroke();
 
     this.ctx.setLineDash([]);
+  }
+
+  drawFleetMarker(
+    position: CanvasCoords,
+    origin: CanvasCoords,
+    destination: CanvasCoords,
+    color: RGBAVec,
+    tier: FleetTier,
+    emphasized: boolean,
+    highPerf: boolean,
+  ) {
+    const { ctx } = this;
+    const sprite = getFleetSprite(tier);
+    if (!sprite) return;
+
+    const heading = Math.atan2(
+      destination.y - origin.y,
+      destination.x - origin.x,
+    );
+    const traveled = Math.hypot(position.x - origin.x, position.y - origin.y);
+    const scale = emphasized ? 1.12 : 1;
+    const width = sprite.width * scale;
+    const height = sprite.height * scale;
+    const engine = -width * 0.36;
+    const tail = Math.min(width * 1.5, traveled);
+    const rgb = `${color[0]}, ${color[1]}, ${color[2]}`;
+
+    ctx.save();
+    ctx.translate(position.x, position.y);
+    ctx.rotate(heading);
+    ctx.globalAlpha = emphasized ? 1 : 0.92;
+
+    if (!highPerf && tail > -engine + 3) {
+      const exhaust = ctx.createLinearGradient(-tail, 0, engine, 0);
+      exhaust.addColorStop(0, `rgba(${rgb}, 0)`);
+      exhaust.addColorStop(0.7, `rgba(${rgb}, .54)`);
+      exhaust.addColorStop(1, `rgb(${rgb})`);
+      ctx.strokeStyle = exhaust;
+      ctx.lineWidth = width / 8;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-tail, 0);
+      ctx.lineTo(engine, 0);
+      ctx.stroke();
+    }
+
+    if (emphasized && !highPerf) {
+      ctx.shadowColor = `rgb(${rgb})`;
+      ctx.shadowBlur = 7;
+    }
+    ctx.drawImage(sprite.image, -width / 2, -height / 2, width, height);
+    ctx.restore();
+    return Math.ceil(Math.hypot(width, height) / 2);
   }
 
   drawPlanetMessages(

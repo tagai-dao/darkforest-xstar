@@ -226,10 +226,10 @@ export const PERLIN_PROGRAM_DEFINITION = {
       float m = ${MAX_PERLIN_VALUE}.;
       float p = res * (m / 2.) + (m / 2.);
 
-      vec4 c0 = vec4(0.000, 0.080, 0.320, 1.0);
-      vec4 c1 = vec4(0.000, 0.021, 0.170, 1.0);
-      vec4 c2 = vec4(0.008, 0.000, 0.024, 1.0);
-      vec4 c3 = vec4(0.000, 0.141, 0.000, 1.0);
+      vec4 c0 = vec4(0.035, 0.095, 0.215, .78);
+      vec4 c1 = vec4(0.045, 0.065, 0.147, .78);
+      vec4 c2 = vec4(0.039, 0.034, 0.089, .78);
+      vec4 c3 = vec4(0.040, 0.096, 0.079, .78);
 
 
       float t1 = ${u.thresholds}.x;

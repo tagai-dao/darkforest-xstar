@@ -47,6 +47,7 @@ export function Table<T>({
   alignments,
   headerStyle,
   paginated,
+  getRowKey,
 }: {
   rows: T[];
   headers: React.ReactNode[];
@@ -54,6 +55,7 @@ export function Table<T>({
   alignments?: Array<"r" | "c" | "l">;
   headerStyle?: React.CSSProperties;
   paginated?: boolean;
+  getRowKey?: (row: T) => React.Key;
 }): JSX.Element {
   const itemsPerPage = 10;
   const [page, setPage] = useState(0);
@@ -66,9 +68,10 @@ export function Table<T>({
       <TableElement>
         <thead style={headerStyle}>
           <tr>
-            {headers.map((h: string, colIdx: number) => (
+            {headers.map((h, colIdx) => (
               <th
                 key={colIdx}
+                scope="col"
                 style={
                   (alignments && {
                     textAlign: AlignmentOptions[alignments[colIdx]],
@@ -84,7 +87,7 @@ export function Table<T>({
 
         <ScrollableBody>
           {visibleRows.map((row: T, rowIdx: number) => (
-            <tr key={rowIdx}>
+            <tr key={getRowKey?.(row) ?? rowIdx}>
               {columns.map((column, colIdx) => (
                 <td
                   key={colIdx}

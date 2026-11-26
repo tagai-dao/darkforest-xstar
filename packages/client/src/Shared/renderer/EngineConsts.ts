@@ -42,17 +42,17 @@ export const engineConsts = {
     sensaicha: [77, 81, 57] as RGBVec,
     range: {
       dash: [150, 145, 191] as RGBVec,
-      energy: [245, 180, 130] as RGBVec,
+      energy: [139, 154, 212] as RGBVec,
     },
     voyage: {
       enemy: [255, 0, 0] as RGBVec,
-      enemyA: [255, 0, 0, 255] as RGBAVec,
+      enemyA: [255, 117, 133, 255] as RGBAVec,
       mine: [0, 0, 255] as RGBVec,
-      mineA: [255, 255, 255, 255] as RGBAVec,
+      mineA: [113, 234, 225, 255] as RGBAVec,
       // Alpha version of `gold` above
       shipA: [255, 221, 48, 255] as RGBAVec,
       support: [0, 255, 255] as RGBVec,
-      supportA: [0, 255, 255, 255] as RGBAVec,
+      supportA: [135, 185, 255, 255] as RGBAVec,
     },
     bonus: {
       energyCap: hslToRgb([360, 73, 70]) as RGBVec,

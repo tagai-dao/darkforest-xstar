@@ -154,6 +154,7 @@ function DepartureSliders({ planet }: { planet: LocatablePlanet }) {
       UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
         text,
         copied,
+        kind: "convert-score",
         label: "已复制换分单，直接粘贴给 agent",
       });
     });
@@ -176,6 +177,7 @@ function DepartureSliders({ planet }: { planet: LocatablePlanet }) {
       UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
         text,
         copied,
+        kind: "convert-score",
         label: "已复制银换分单，直接粘贴给 agent",
       });
     });
@@ -188,6 +190,7 @@ function DepartureSliders({ planet }: { planet: LocatablePlanet }) {
           label="出发能量"
           percent={energyPercent}
           amount={departureEnergy(planet.energy, energyPercent)}
+          availableAmount={departureEnergy(planet.energy, 100)}
           onChange={setEnergy}
         />
       </div>
@@ -196,6 +199,7 @@ function DepartureSliders({ planet }: { planet: LocatablePlanet }) {
           label="出发银"
           percent={silverPercent}
           amount={departureSilver(planet, silverPercent)}
+          availableAmount={departureSilver(planet, 100)}
           onChange={setSilver}
         />
       )}
@@ -226,6 +230,7 @@ function DepartureSliders({ planet }: { planet: LocatablePlanet }) {
           </Amount>
           <CopyScore
             type="button"
+            data-guide-target="convert-score"
             disabled={!silverScoreReady}
             onClick={copySilverScore}
           >
@@ -247,6 +252,7 @@ function DepartureSliders({ planet }: { planet: LocatablePlanet }) {
               material.materialAmount,
               carryPercents[material.materialId] ?? 0,
             )}
+            availableAmount={portion(material.materialAmount, 100)}
             onChange={(percent) => setCarry(material.materialId, percent)}
           />
         ))
@@ -290,6 +296,7 @@ function DepartureSliders({ planet }: { planet: LocatablePlanet }) {
                 </Amount>
                 <CopyScore
                   type="button"
+                  data-guide-target="convert-score"
                   disabled={!ready}
                   onClick={() => copyScore(material)}
                 >
@@ -313,6 +320,7 @@ function PercentRow({
   label,
   percent,
   amount,
+  availableAmount,
   onChange,
   verb = "派出",
   color,
@@ -320,11 +328,16 @@ function PercentRow({
   label: string;
   percent: number;
   amount: number;
+  availableAmount?: number;
   onChange: (percent: number) => void;
   verb?: string;
   // 和星球上直接显示的材料数字用同一种颜色。
   color?: string;
 }) {
+  const amountText =
+    availableAmount === undefined
+      ? amount.toLocaleString("zh-CN")
+      : `${amount}/${availableAmount}`;
   return (
     <Row>
       <RowLabel>
@@ -351,13 +364,12 @@ function PercentRow({
         </Step>
       </Controls>
       <Amount>
-        本次{verb}{" "}
+        本次{verb}
+        {availableAmount === undefined ? " " : "："}
         {color ? (
-          <MaterialNumber $color={color}>
-            {amount.toLocaleString("zh-CN")}
-          </MaterialNumber>
+          <MaterialNumber $color={color}>{amountText}</MaterialNumber>
         ) : (
-          amount.toLocaleString("zh-CN")
+          amountText
         )}
       </Amount>
     </Row>
@@ -427,6 +439,7 @@ function UpgradeCopy({ planet }: { planet: LocatablePlanet }) {
       UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
         text,
         copied,
+        kind: "upgrade",
         label: "已复制升级单，直接粘贴给 agent",
       });
     });
@@ -496,6 +509,7 @@ function JunkCopy({ planet }: { planet: LocatablePlanet }) {
       UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
         text,
         copied,
+        kind: "add-junk",
         label: "已复制登记单，直接粘贴给 agent",
       });
     });
@@ -683,6 +697,7 @@ function SilverBuyCopy({ planet }: { planet: LocatablePlanet }) {
       UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
         text,
         copied,
+        kind: "buy-silver",
         label: "已复制购银单，直接粘贴给 agent",
       });
     });
@@ -724,7 +739,7 @@ function SilverBuyCopy({ planet }: { planet: LocatablePlanet }) {
 }
 
 /**
- * 点中星球后固定在屏幕右边，排在右上角相关信息的下面。
+ * 点中星球后固定在屏幕右边，排在右上角游戏信息的下面。
  */
 export function SelectedPlanetSidePane() {
   const uiManager = useUIManager();
@@ -732,7 +747,7 @@ export function SelectedPlanetSidePane() {
   const selected = planet.value;
   const [top, setTop] = useState(DEFAULT_TOP);
 
-  // 相关信息的行数会变，量它的底边，避免星球详情盖住它。
+  // 游戏信息的行数会变，量它的底边，避免星球详情盖住它。
   useLayoutEffect(() => {
     const panel = document.querySelector(STATUS_SELECTOR);
     if (!(panel instanceof HTMLElement)) {
@@ -753,7 +768,7 @@ export function SelectedPlanetSidePane() {
   const { x, y } = selected.location.coords;
 
   return (
-    <Side $top={top}>
+    <Side $top={top} data-guide-panel="planet-details">
       <Name>{getPlanetName(selected)}</Name>
       <Coords>
         <span>
@@ -798,15 +813,20 @@ const Side = styled.aside<{ $top: number }>`
   padding: 12px;
   box-sizing: border-box;
   pointer-events: auto;
-  background: rgba(8, 12, 18, 0.94);
-  border: 1px solid #3d4d63;
+  background: linear-gradient(155deg, rgb(19 32 51 / 97%), rgb(10 17 29 / 97%));
+  border: 1px solid #324961;
+  border-radius: 9px;
+  box-shadow: 0 14px 34px rgb(2 5 12 / 38%);
   color: #e8eef7;
+  font-family: system-ui, "PingFang SC", sans-serif;
+  font-variant-numeric: tabular-nums;
 `;
 
 const Name = styled.div`
-  font-size: 14px;
+  margin-bottom: 7px;
+  color: #f0f6ff;
+  font-size: 16px;
   font-weight: 700;
-  margin-bottom: 8px;
 `;
 
 const Coords = styled.div`
@@ -877,15 +897,21 @@ const Controls = styled.div`
 const Range = styled.input`
   flex: 1;
   min-width: 0;
+  accent-color: #75e5db;
 `;
 
 const Step = styled.button`
   width: 28px;
   height: 28px;
   color: #e8eef7;
-  background: transparent;
-  border: 1px solid #3d4d63;
+  background: #132437;
+  border: 1px solid #354e68;
+  border-radius: 5px;
   cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: #8ce3e1;
+  }
 `;
 
 const Amount = styled.div`
@@ -932,14 +958,15 @@ const SilverTierButton = styled.button`
   min-width: 0;
   padding: 8px;
   color: #e8eef7;
-  background: transparent;
-  border: 1px solid #3d4d63;
+  background: #132437;
+  border: 1px solid #354e68;
+  border-radius: 5px;
   cursor: pointer;
-  text-align: left;
 
   &:hover:not(:disabled) {
-    border-color: #9be7ff;
+    border-color: #8ce3e1;
   }
+  text-align: left;
 
   &:disabled {
     color: #6d7b8c;
@@ -971,9 +998,14 @@ const TierPrice = styled.div`
 const CopyScore = styled.button`
   height: 28px;
   color: #e8eef7;
-  background: transparent;
-  border: 1px solid #3d4d63;
+  background: #132437;
+  border: 1px solid #354e68;
+  border-radius: 5px;
   cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: #8ce3e1;
+  }
 
   &:disabled {
     color: #6d7b8c;

@@ -828,6 +828,23 @@ export class GameUIManager extends EventEmitter {
     );
   }
 
+  public estimateVoyageDepartureEnergy(
+    voyage: QueuedArrival,
+    destination: Planet,
+  ): number {
+    // A move to a quasar halves the effective distance before energy decays.
+    const distanceMultiplier =
+      destination.planetType === PlanetType.SILVER_BANK ? 0.5 : 1;
+    return this.gameManager.getEnergyNeededForMove(
+      voyage.fromPlanet,
+      voyage.toPlanet,
+      voyage.energyArriving,
+      false,
+      undefined,
+      distanceMultiplier,
+    );
+  }
+
   getIsChoosingTargetPlanet() {
     return this.isChoosingTargetPlanet;
   }
@@ -1087,10 +1104,10 @@ export class GameUIManager extends EventEmitter {
             uiEmitter.emit(UIEmitterEvent.MoveOrderCopied, {
               text: orderText,
               copied,
+              kind: "move",
               label: artifact ? "已复制运送单，直接粘贴给 agent" : undefined,
             });
           });
-          uiEmitter.emit(UIEmitterEvent.MoveOrderCreated);
         }
 
         if (
@@ -1961,8 +1978,14 @@ export class GameUIManager extends EventEmitter {
   }
 
   public isOverOwnPlanet(coords: WorldCoords): Planet | undefined {
-    const planet = this.viewportEntities.getNearestVisiblePlanet(coords);
+    const planet = this.getVisiblePlanetAtCoords(coords);
     return this.canLaunchFrom(planet) ? planet : undefined;
+  }
+
+  public getVisiblePlanetAtCoords(
+    coords: WorldCoords,
+  ): LocatablePlanet | undefined {
+    return this.viewportEntities.getNearestVisiblePlanet(coords);
   }
 
   public getMyArtifacts(): Artifact[] {
@@ -2555,7 +2578,7 @@ export class GameUIManager extends EventEmitter {
     this.mouseHoveringOverCoords = coords;
     let hoveringPlanet = undefined;
 
-    const res = this.viewportEntities.getNearestVisiblePlanet(coords);
+    const res = this.getVisiblePlanetAtCoords(coords);
     if (res) {
       hoveringPlanet = res;
       this.mouseHoveringOverCoords = res.location.coords;

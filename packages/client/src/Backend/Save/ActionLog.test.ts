@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  actionHistoryWidth,
   actionTextParts,
   aiproPriceLabel,
   formatActionTime,
@@ -44,11 +43,6 @@ describe("action log", () => {
     expect(actionTextParts("buy-silver tier 0")).toEqual([
       { kind: "text", value: "buy-silver tier 0" },
     ]);
-  });
-
-  it("widens the log to the longest row and stops at 80 percent", () => {
-    expect(actionHistoryWidth(400, 1000)).toBe(424);
-    expect(actionHistoryWidth(900, 1000)).toBe(800);
   });
 
   it("shows the empty price hook as not connected", () => {

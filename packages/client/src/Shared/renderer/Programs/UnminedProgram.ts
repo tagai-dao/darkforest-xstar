@@ -76,17 +76,11 @@ export const UNMINED_PROGRAM_DEFINITION = {
     uniform float ${u.time};
 
     void main() {
-      float rx = ${v.rectPos}.x;
-      float ry = ${v.rectPos}.y;
-      float t = ${u.time} / 8.;
-
-      vec2 pos = ${v.rectPos} + vec2(${u.viewportCenter}.x, -${u.viewportCenter}.y);
-
-      float p = cnoise(vec3(4. * pos, t));
-      p -= cnoise(vec3(16.  * pos, -t));
-      p += cnoise(vec3(.1 * pos, 0.));
-
-      outColor = mix(${v.color}, vec4(.04, .03, .07, 1.), 1.-abs(p));
+      vec2 pos = ${v.rectPos} + ${u.viewportCenter}.xy * .00016;
+      float dust = cnoise(vec3(pos * 3.4, ${u.time} * .008));
+      vec3 fog = mix(vec3(.012, .018, .037), vec3(.025, .04, .075),
+        smoothstep(-.4, .6, dust));
+      outColor = vec4(fog + ${v.color}.rgb * .1, .44);
     }
   `,
 };

@@ -2,7 +2,6 @@ import { Biome, MaterialType, SpaceType } from "@df/types";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 
-import dfstyles from "../../Styles/dfstyles";
 import { getMaterialColor } from "../../Utils/materialColor";
 import {
   renderBiomeCatalog,
@@ -10,6 +9,7 @@ import {
   type TypeShot,
   type TypeShotKey,
 } from "./biomeShots";
+import { DocTable, DocTableFrame } from "./DocTable";
 
 type MaterialCell = {
   id: MaterialType;
@@ -185,74 +185,31 @@ const FOUNDRY_ROW_SPAN = GROUPS.slice(1).reduce(
   0,
 );
 
-const BORDER = "1px solid rgba(215, 255, 228, 0.28)";
-
 const Figure = styled.figure`
-  margin: 0 0 16px;
+  margin: 0 0 18px;
 `;
 
-const TableWrap = styled.div`
-  overflow-x: auto;
-`;
+const CatalogTable = styled(DocTable)`
+  min-width: 940px;
 
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  border: ${BORDER};
-  table-layout: fixed;
-  font-size: 14px;
-  line-height: 1.5;
-
-  th,
-  td {
-    padding: 8px 8px;
-    border: ${BORDER};
-    text-align: left;
+  td,
+  tbody th {
     vertical-align: middle;
   }
 
-  th:nth-child(1) {
-    width: 320px;
-  }
-
-  th:nth-child(2) {
-    width: 200px;
-  }
-
-  th:nth-child(3) {
-    width: 72px;
-  }
-
-  th:nth-child(4) {
-    width: 22%;
-  }
-
-  th:nth-child(5) {
-    width: 108px;
-  }
-
-  th:nth-child(6) {
-    width: 136px;
-  }
-
-  th {
-    color: ${dfstyles.colors.dfgreen};
-    font-weight: 600;
+  [rowspan] {
+    border-left: 1px solid var(--doc-border);
   }
 `;
 
-const StatsCell = styled.td`
-  width: 22%;
-`;
-
-const NameCell = styled.td`
-  white-space: nowrap;
+const NameCell = styled.th`
+  min-width: 92px;
 `;
 
 const Stats = styled.div`
-  color: ${dfstyles.colors.subtext};
-  font-size: 12px;
-  line-height: 1.45;
+  color: var(--doc-text);
+  font-size: 13px;
+  line-height: 1.55;
 `;
 
 const Shots = styled.div`
@@ -277,7 +234,7 @@ const PlanetShot = styled.img`
 
 const ShotLabel = styled.figcaption`
   margin-top: 2px;
-  color: ${dfstyles.colors.subtext};
+  color: var(--doc-muted);
   font-size: 10px;
   line-height: 1.2;
   text-align: center;
@@ -285,7 +242,7 @@ const ShotLabel = styled.figcaption`
 
 const Caption = styled.figcaption`
   margin-top: 8px;
-  color: ${dfstyles.colors.subtext};
+  color: var(--doc-muted);
   font-size: 13px;
   line-height: 1.5;
 `;
@@ -315,16 +272,16 @@ export function BiomeTable() {
 
   return (
     <Figure>
-      <TableWrap>
-        <Table>
+      <DocTableFrame tabIndex={0} role="region" aria-label="空间与生态对照表">
+        <CatalogTable>
           <thead>
             <tr>
-              <th>画面</th>
-              <th>生态</th>
-              <th>空间</th>
-              <th>空间属性</th>
-              <th>铸造厂神器</th>
-              <th>小行星带材料</th>
+              <th scope="col">画面</th>
+              <th scope="col">生态</th>
+              <th scope="col">空间</th>
+              <th scope="col">空间属性</th>
+              <th scope="col">铸造厂神器</th>
+              <th scope="col">小行星带材料</th>
             </tr>
           </thead>
           <tbody>
@@ -363,18 +320,18 @@ export function BiomeTable() {
                         })}
                       </Shots>
                     </td>
-                    <NameCell>{row.name}</NameCell>
+                    <NameCell scope="row">{row.name}</NameCell>
                     {index === 0 && (
                       <td rowSpan={group.biomes.length}>{group.space}</td>
                     )}
                     {index === 0 && (
-                      <StatsCell rowSpan={group.biomes.length}>
+                      <td rowSpan={group.biomes.length}>
                         <Stats>
                           {group.stats.map((stat) => (
                             <div key={stat}>{stat}</div>
                           ))}
                         </Stats>
-                      </StatsCell>
+                      </td>
                     )}
                     {showArtifacts && (
                       <td rowSpan={artifactSpan}>
@@ -400,11 +357,11 @@ export function BiomeTable() {
               }),
             )}
           </tbody>
-        </Table>
-      </TableWrap>
+        </CatalogTable>
+      </DocTableFrame>
       <Caption>
-        铸造厂神器四种等概率，不看生态。生态只刻在神器上。稀有度看铸造厂等级。
-        {error}
+        四种神器的发现概率相同。生态决定神器标记，铸造厂等级影响稀有度。
+        {error && <div>{error}</div>}
       </Caption>
     </Figure>
   );

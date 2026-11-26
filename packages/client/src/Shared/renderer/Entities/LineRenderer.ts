@@ -1,6 +1,7 @@
 import {
   type CanvasCoords,
   DrawMode,
+  type LineDashPattern,
   type LineRendererType,
   RendererType,
   RenderZIndex,
@@ -8,9 +9,15 @@ import {
   type WorldCoords,
 } from "@df/types";
 
+import { engineConsts } from "../EngineConsts";
 import { LINE_PROGRAM_DEFINITION } from "../Programs/LineProgram";
 import type { GameGLManager } from "../WebGL/GameGLManager";
 import { GenericRenderer } from "../WebGL/GenericRenderer";
+
+const defaultDash = {
+  length: engineConsts.dashLength,
+  gap: engineConsts.dashLength,
+};
 
 export class LineRenderer
   extends GenericRenderer<typeof LINE_PROGRAM_DEFINITION, GameGLManager>
@@ -40,17 +47,18 @@ export class LineRenderer
     color: RGBAVec = [255, 0, 0, 255],
     width = 1,
     zIdx: number = RenderZIndex.DEFAULT,
-    dashed = false,
+    dashed: boolean | LineDashPattern = false,
   ): void {
     const { position: posA, color: colorA, dist: distA } = this.attribManagers;
 
     const { x: x1, y: y1 } = start;
     const { x: x2, y: y2 } = end;
+    if (x1 === x2 && y1 === y2) return;
 
-    let dist = 0;
-    if (dashed) {
-      dist = Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-    }
+    const pattern = dashed === true ? defaultDash : dashed;
+    const period = pattern ? pattern.length + pattern.gap : 1;
+    const repeats = pattern ? Math.hypot(x2 - x1, y2 - y1) / period : 0;
+    const fill = pattern ? pattern.length / period : 1;
 
     const { x: dX, y: dY } = this.getOffset(start, end);
 
@@ -67,11 +75,9 @@ export class LineRenderer
         this.verts,
       );
 
-      colorA.setVertex(
-        [color[0], color[1], color[2], color[0], color[1], color[2]],
-        this.verts,
-      );
-      distA.setVertex([0, dist], this.verts);
+      colorA.setVertex(color, this.verts);
+      colorA.setVertex(color, this.verts + 1);
+      distA.setVertex([0, fill, repeats, fill], this.verts);
       this.verts += 2;
     }
   }
@@ -82,7 +88,7 @@ export class LineRenderer
     color: RGBAVec = [255, 0, 0, 255],
     width = 1,
     zIdx: number = RenderZIndex.DEFAULT,
-    dashed = false,
+    dashed: boolean | LineDashPattern = false,
   ) {
     const viewport = this.manager.renderer.getViewport();
     const startC = viewport.worldToCanvasCoords(start);

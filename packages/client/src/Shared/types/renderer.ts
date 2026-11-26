@@ -671,6 +671,8 @@ export interface PerlinRendererType {
   flush(): void;
 }
 
+export type LineDashPattern = { length: number; gap: number };
+
 export interface LineRendererType {
   rendererType: RendererType;
 
@@ -685,7 +687,7 @@ export interface LineRendererType {
    * @param color
    * @param width - how thick the line should be from the center
    * @param zIdx - Z axis
-   * @param dashed - if the line should be dashed
+   * @param dashed - the default dashed line or custom lengths in screen pixels
    */
   queueLineWorld(
     start: WorldCoords,
@@ -693,7 +695,7 @@ export interface LineRendererType {
     color?: RGBAVec,
     width?: number,
     zIdx?: number,
-    dashed?: boolean,
+    dashed?: boolean | LineDashPattern,
   ): void;
 
   /**

@@ -176,6 +176,10 @@ export interface RendererGameContext extends DiagnosticUpdater {
     toId: LocationId,
     energy: number,
   ): number;
+  estimateVoyageDepartureEnergy(
+    voyage: QueuedArrival,
+    destination: Planet,
+  ): number;
   getIsChoosingTargetPlanet(): boolean;
   getLinkSourceArtifactType(): ArtifactType;
   getLinkSourceArtifactRarity(): ArtifactRarity;
@@ -398,7 +402,6 @@ export class Renderer {
 
     // clear all
     this.overlay2dRenderer.clear();
-    this.glManager.isHighPerf = this.context.getIsHighPerfMode();
     this.glManager.clear();
 
     // get some data
@@ -451,6 +454,7 @@ export class Renderer {
     this.bgRenderer.flush();
 
     this.uiRenderManager.queueBorders();
+    this.circleRenderer.flush();
 
     this.captureZoneRenderer.queueCaptureZones();
     this.captureZoneRenderer.flush();

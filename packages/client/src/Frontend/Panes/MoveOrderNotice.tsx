@@ -2,23 +2,20 @@ import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 
 import { DFZIndex } from "../Utils/constants";
-import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
-
-type CopiedMove = {
-  text: string;
-  copied: boolean;
-  label?: string;
-};
+import UIEmitter, {
+  type OrderCopyResult,
+  UIEmitterEvent,
+} from "../Utils/UIEmitter";
 
 /**
  * 拖动结束后告诉用户：出兵单已经在剪贴板里，可以直接粘贴给 agent。
  */
 export function MoveOrderNotice() {
-  const [notice, setNotice] = useState<CopiedMove | undefined>();
+  const [notice, setNotice] = useState<OrderCopyResult | undefined>();
 
   useEffect(() => {
     const emitter = UIEmitter.getInstance();
-    const show = (next: CopiedMove) => {
+    const show = (next: OrderCopyResult) => {
       setNotice(next);
     };
     emitter.on(UIEmitterEvent.MoveOrderCopied, show);

@@ -1,5 +1,21 @@
 import { EventEmitter } from "events";
 
+export type GuidedOrderKind =
+  | "add-junk"
+  | "move"
+  | "buy-silver"
+  | "buy-junk"
+  | "convert-score"
+  | "claim-rewards"
+  | "upgrade";
+
+export type OrderCopyResult = {
+  text: string;
+  copied: boolean;
+  label?: string;
+  kind?: GuidedOrderKind;
+};
+
 export const enum UIEmitterEvent {
   GamePlanetSelected = "GamePlanetSelected",
   CenterPlanet = "CenterPlanet",
@@ -31,7 +47,6 @@ export const enum UIEmitterEvent {
   SendInitiated = "SendInitiated",
   SendCancelled = "SendCancelled",
   SendCompleted = "SendCompleted",
-  MoveOrderCreated = "MoveOrderCreated",
   MoveOrderCopied = "MoveOrderCopied",
 
   DepositArtifact = "DepositArtifact",

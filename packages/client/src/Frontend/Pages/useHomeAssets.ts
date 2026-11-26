@@ -1,36 +1,57 @@
-import { useComponentValue } from "@latticexyz/react";
-import { singletonEntity } from "@latticexyz/store-sync/recs";
+import { formatWholeToken } from "@df/gamelogic";
+import { resourceToHex } from "@latticexyz/common";
+import { getNetworkConfig } from "@mud/getNetworkConfig";
 import { useMUD } from "@mud/MUDContext";
 import { useEffect, useState } from "react";
-import { formatWholeToken } from "@df/gamelogic";
 import {
+  type Abi,
   type Address,
+  formatUnits,
+  getAddress,
+  type Hex,
   isAddress,
   parseAbi,
+  parseAbiItem,
   type PublicClient,
+  sliceHex,
   zeroAddress,
 } from "viem";
 
+import { fetchHomeBoards, type HomeBoards } from "./homeLeaderboard";
+
 const DEAD: Address = "0x000000000000000000000000000000000000dEaD";
 
-/** Multicall3 on BSC / most EVM chains. */
-const MULTICALL3: Address = "0xcA11bde05977b3631167028862bE2a173976CA11";
+const worldAbi = parseAbi([
+  "function getRecord(bytes32 tableId, bytes32[] keyTuple) view returns (bytes, bytes32, bytes)",
+]);
+const WORLD_TABLES = {
+  config: "DFXStarConfig",
+  pass: "GamePassNFT",
+  circle: "InnerCircle",
+  frontier: "SilverFrontier",
+  stats: "GlobalStats",
+} as const;
+const INITIAL_INNER_RADIUS = 75_000;
 
 const communityAbi = parseAbi([
   "function rewardCalculator() view returns (address)",
+  "function getCommunityToken() view returns (address)",
 ]);
 
 const calculatorAbi = parseAbi([
   "function getCurrentRewardRate(address community) view returns (uint256)",
+  "function calculateReward(address community, uint256 start, uint256 end) view returns (uint256)",
 ]);
 
 const poolAbi = parseAbi([
   "function getTotalStakedAmount() view returns (uint256)",
+  "function getCommunity() view returns (address)",
 ]);
 
 const erc20Abi = parseAbi([
   "function symbol() view returns (string)",
   "function balanceOf(address account) view returns (uint256)",
+  "function decimals() view returns (uint8)",
 ]);
 
 const nftAbi = parseAbi([
@@ -38,9 +59,22 @@ const nftAbi = parseAbi([
   "function symbol() view returns (string)",
   "function totalSupply() view returns (uint256)",
   "function maxSupply() view returns (uint256)",
+  "function communityTokenPrice() view returns (uint256)",
+  "function nativePrice() view returns (uint256)",
 ]);
 
-const lockerAbi = parseAbi(["function nft() view returns (address)"]);
+const lockerAbi = parseAbi([
+  "function nft() view returns (address)",
+  "function handleRegistry() view returns (address)",
+]);
+const registryAbi = parseAbi([
+  "function handleOf(address owner) view returns (string)",
+]);
+const injectedEvent = parseAbiItem(
+  "event InjectedRewards(address indexed injector, uint256 amount, uint256 totalStaked)",
+);
+const LOG_BLOCK_SPAN = 10_000n;
+const LOG_CONCURRENCY = 4;
 
 export type PoolRow = {
   address: string;
@@ -52,7 +86,9 @@ export type PoolRow = {
 export type NftRow = {
   label: string;
   symbol?: string;
-  address?: string;
+  address: Address;
+  mintPrice?: string;
+  soldOut: boolean;
   minted?: string;
   maxSupply?: string;
 };
@@ -61,7 +97,7 @@ export type HomeAssets = {
   pools: PoolRow[];
   poolNote: string;
   tokenSymbol: string;
-  tokenAddress?: string;
+  tokenAddress?: Address;
   /** 买银累计销毁（dead 地址余额），展示用。 */
   burnedAmount?: string;
   /** TagAI / 行情价文案。 */
@@ -69,6 +105,11 @@ export type HomeAssets = {
   /** 完全稀释市值（FDV）文案。 */
   tokenFdv?: string;
   nfts: NftRow[];
+  totalRewards?: string;
+  rewardsUnavailable?: boolean;
+  match?: { players?: number; maxPlanetLevel?: number; shrinkPct?: number };
+  boards?: HomeBoards;
+  handles?: ReadonlyMap<string, string>;
 };
 
 const EMPTY: HomeAssets = {
@@ -85,7 +126,7 @@ function configured(value: string | undefined): Address | undefined {
   return value;
 }
 
-function grouped(value: bigint): string {
+function grouped(value: bigint | string): string {
   return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
@@ -148,68 +189,217 @@ async function fetchTagAiQuote(token: Address): Promise<TagAiQuote> {
   }
 }
 
-type CallResult = {
-  status: "success" | "failure";
-  result?: unknown;
+type AssetRead = {
+  slot: string;
+  address: Address;
+  abi: Abi;
+  functionName: string;
+  args?: readonly unknown[];
 };
 
-function ok<T>(row: CallResult | undefined): T | undefined {
-  if (!row || row.status !== "success") return undefined;
-  return row.result as T;
+async function readAssetStage(
+  publicClient: PublicClient,
+  blockNumber: bigint,
+  reads: AssetRead[],
+) {
+  if (!reads.length) return new Map<string, unknown>();
+  const multicall = publicClient.chain?.contracts?.multicall3;
+  if (!multicall || BigInt(multicall.blockCreated ?? 0) > blockNumber) {
+    throw new Error("Multicall3 is unavailable for the current chain snapshot");
+  }
+  const results = await publicClient.multicall({
+    blockNumber,
+    multicallAddress: multicall.address,
+    allowFailure: true,
+    batchSize: 8192,
+    contracts: reads.map(({ address, abi, functionName, args }) => ({
+      address,
+      abi,
+      functionName,
+      args,
+    })),
+  });
+  return new Map(
+    reads.map(({ slot }, index) => {
+      const result = results[index];
+      return [slot, result?.status === "success" ? result.result : undefined];
+    }),
+  );
 }
 
-/**
- * 首页链上读数：两轮 Multicall3，减少 RPC round-trip。
- * 第一轮：池质押 / 代币 / locker.nft / community.calculator
- * 第二轮：小时奖励 / NFT 元数据（依赖第一轮地址）
- */
-async function loadHomeAssets(
+type GameRewardHistory = {
+  blockNumber: bigint;
+  total: bigint;
+};
+
+// BSC round 1: sum of InjectedRewards from deployment through finalized block
+// 135779388 (0x387e1445a8f4c58c44826e6ac9abfa6ee79d0c11d8f6005f555dc9d64118af7a).
+const ROUND_ONE_REWARDS = {
+  world: "0xfad1cddad97113e4c0335ff5a815955c21b2ddca",
+  pool: "0x375ded0c49aeb8ddd3e9db6a4b5c84a0add93c9f",
+  startBlock: 135405573n,
+  blockNumber: 135779388n,
+  total: 7031500000000000000000n,
+} as const;
+
+export function readGameInjections(
+  startBlock: bigint | undefined,
+  world?: string,
+) {
+  const histories = new Map<Address, GameRewardHistory>();
+  return async (client: PublicClient, pool: Address, blockNumber: bigint) => {
+    if (startBlock === undefined) throw new Error("Missing World start block");
+    const checkpoint = ROUND_ONE_REWARDS;
+    const matchesCheckpoint =
+      client.chain?.id === 56 &&
+      startBlock === checkpoint.startBlock &&
+      world?.toLowerCase() === checkpoint.world &&
+      pool.toLowerCase() === checkpoint.pool;
+    const history =
+      histories.get(pool) ?? (matchesCheckpoint ? checkpoint : undefined);
+    const cached =
+      history && history.blockNumber <= blockNumber ? history : undefined;
+    let total = cached?.total ?? 0n;
+    let fromBlock = cached ? cached.blockNumber + 1n : startBlock;
+    while (fromBlock <= blockNumber) {
+      const windows = [];
+      for (
+        let index = 0;
+        index < LOG_CONCURRENCY && fromBlock <= blockNumber;
+        index++
+      ) {
+        const end = fromBlock + LOG_BLOCK_SPAN - 1n;
+        windows.push({
+          fromBlock,
+          toBlock: end < blockNumber ? end : blockNumber,
+        });
+        fromBlock = end + 1n;
+      }
+      const results = await Promise.all(
+        windows.map((window) =>
+          client.getLogs({
+            address: pool,
+            event: injectedEvent,
+            strict: true,
+            ...window,
+          }),
+        ),
+      );
+      for (const logs of results) {
+        for (const log of logs) total += log.args.amount;
+      }
+    }
+    // The snapshot is finalized, so subsequent refreshes can reuse these logs.
+    if (!history || history.blockNumber < blockNumber)
+      histories.set(pool, { blockNumber, total });
+    return total;
+  };
+}
+
+function packedAddress(data: Hex, offset: number) {
+  if (data.length < (offset + 20) * 2 + 2) return undefined;
+  return configured(getAddress(sliceHex(data, offset, offset + 20)));
+}
+
+function packedNumber(data: Hex | undefined, offset: number, size: number) {
+  if (!data || data.length < (offset + size) * 2 + 2) return undefined;
+  return Number(BigInt(sliceHex(data, offset, offset + size)));
+}
+
+export async function loadHomeAssets(
   publicClient: PublicClient,
-  scorePool: Address | undefined,
-  paymentToken: Address | undefined,
-  community: Address | undefined,
-  passAddress: Address | undefined,
+  worldAddress: Address,
+  gameInjections: ReturnType<typeof readGameInjections>,
+  boardPromise?: Promise<HomeBoards>,
+  onMetadata?: (assets: HomeAssets) => void,
 ): Promise<HomeAssets> {
+  const { number: blockNumber, timestamp } = await publicClient.getBlock({
+    blockTag: "finalized",
+  });
+  const records = await readAssetStage(
+    publicClient,
+    blockNumber,
+    Object.entries(WORLD_TABLES).map(([slot, name]) => ({
+      slot,
+      address: worldAddress,
+      abi: worldAbi,
+      functionName: "getRecord",
+      args: [resourceToHex({ type: "table", namespace: "df", name }), []],
+    })),
+  );
+  const staticRecord = (slot: keyof typeof WORLD_TABLES) =>
+    (records.get(slot) as [Hex, Hex, Hex] | undefined)?.[0];
+  const config = staticRecord("config");
+  const pass = staticRecord("pass");
+  if (config === undefined || pass === undefined)
+    throw new Error("World asset configuration could not be read");
+
+  const scorePool = packedAddress(config, 0);
+  const paymentToken = packedAddress(config, 20);
+  const community = packedAddress(config, 60);
+  const passAddress = packedAddress(pass, 0);
+  const radius = packedNumber(staticRecord("circle"), 0, 8);
+  const match = {
+    players: packedNumber(staticRecord("stats"), 32, 32),
+    maxPlanetLevel: packedNumber(staticRecord("frontier"), 0, 1),
+    shrinkPct:
+      radius === undefined
+        ? undefined
+        : Math.min(100, Math.max(0, (1 - radius / INITIAL_INNER_RADIUS) * 100)),
+  };
   const next: HomeAssets = {
     pools: [],
-    poolNote: scorePool ? "DFXStar 分数池" : "分数池还没接到这局里",
+    poolNote: scorePool ? "" : "分数池还没接到这局里",
     tokenSymbol: "AIPRO",
     tokenAddress: paymentToken,
+    match,
     nfts: [],
   };
 
-  // —— 第一轮：彼此独立的 view ——
-  type Slot = "stake" | "symbol" | "burn" | "lockerNft" | "calculator";
-  const round1: {
-    slot: Slot;
-    address: Address;
-    abi: readonly unknown[];
-    functionName: string;
-    args?: readonly unknown[];
-  }[] = [];
+  const quotePromise: Promise<TagAiQuote> =
+    paymentToken && publicClient.chain?.id === 56
+      ? fetchTagAiQuote(paymentToken)
+      : Promise.resolve({});
 
+  const round1: AssetRead[] = [];
   if (scorePool) {
-    round1.push({
-      slot: "stake",
-      address: scorePool,
-      abi: poolAbi,
-      functionName: "getTotalStakedAmount",
-    });
+    round1.push(
+      {
+        slot: "stake",
+        address: scorePool,
+        abi: poolAbi,
+        functionName: "getTotalStakedAmount",
+      },
+      {
+        slot: "poolCommunity",
+        address: scorePool,
+        abi: poolAbi,
+        functionName: "getCommunity",
+      },
+    );
   }
   if (paymentToken) {
-    round1.push({
-      slot: "symbol",
-      address: paymentToken,
-      abi: erc20Abi,
-      functionName: "symbol",
-    });
-    round1.push({
-      slot: "burn",
-      address: paymentToken,
-      abi: erc20Abi,
-      functionName: "balanceOf",
-      args: [DEAD],
-    });
+    round1.push(
+      {
+        slot: "symbol",
+        address: paymentToken,
+        abi: erc20Abi,
+        functionName: "symbol",
+      },
+      {
+        slot: "burn",
+        address: paymentToken,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [DEAD],
+      },
+      {
+        slot: "decimals",
+        address: paymentToken,
+        abi: erc20Abi,
+        functionName: "decimals",
+      },
+    );
   }
   if (passAddress) {
     round1.push({
@@ -218,68 +408,71 @@ async function loadHomeAssets(
       abi: lockerAbi,
       functionName: "nft",
     });
+    if (boardPromise) {
+      round1.push({
+        slot: "registry",
+        address: passAddress,
+        abi: lockerAbi,
+        functionName: "handleRegistry",
+      });
+    }
   }
   if (community) {
-    round1.push({
-      slot: "calculator",
-      address: community,
-      abi: communityAbi,
-      functionName: "rewardCalculator",
-    });
+    round1.push(
+      {
+        slot: "calculator",
+        address: community,
+        abi: communityAbi,
+        functionName: "rewardCalculator",
+      },
+      {
+        slot: "rewardToken",
+        address: community,
+        abi: communityAbi,
+        functionName: "getCommunityToken",
+      },
+    );
   }
 
-  const bySlot = new Map<Slot, CallResult>();
-  if (round1.length > 0) {
-    const results = (await publicClient.multicall({
-      allowFailure: true,
-      multicallAddress: MULTICALL3,
-      contracts: round1.map((c) => ({
-        address: c.address,
-        abi: c.abi,
-        functionName: c.functionName,
-        args: c.args,
-      })),
-    })) as CallResult[];
-    round1.forEach((c, i) => {
-      bySlot.set(c.slot, results[i]);
-    });
-  }
-
-  const stake = ok<bigint>(bySlot.get("stake"));
-  const symbol = ok<string>(bySlot.get("symbol"));
-  const burn = ok<bigint>(bySlot.get("burn"));
-  const passNft = configured(ok<Address>(bySlot.get("lockerNft")));
-  const calculator = configured(ok<Address>(bySlot.get("calculator")));
+  const first = await readAssetStage(publicClient, blockNumber, round1);
+  const stake = first.get("stake") as bigint | undefined;
+  const symbol = first.get("symbol") as string | undefined;
+  const burn = first.get("burn") as bigint | undefined;
+  const decimals = first.get("decimals") as number | undefined;
+  const poolCommunity = configured(
+    first.get("poolCommunity") as Address | undefined,
+  );
+  const rewardToken = configured(
+    first.get("rewardToken") as Address | undefined,
+  );
+  const passNft = configured(first.get("lockerNft") as Address | undefined);
+  const calculator = configured(first.get("calculator") as Address | undefined);
+  const gameRewards =
+    scorePool &&
+    community &&
+    poolCommunity?.toLowerCase() === community.toLowerCase() &&
+    paymentToken &&
+    rewardToken?.toLowerCase() === paymentToken.toLowerCase()
+      ? gameInjections(publicClient, scorePool, blockNumber).catch(
+          () => undefined,
+        )
+      : undefined;
 
   if (scorePool) {
-    const row: PoolRow = {
-      address: scorePool,
-      label: "DFXStar 分数池",
-      // 与排行榜分数同一套展示单位（链上 / 1000）。
-      totalStaked: stake !== undefined ? formatScoreStake(stake) : "读不到",
-    };
-    next.pools = [row];
-    next.poolNote = "";
+    next.pools = [
+      {
+        address: scorePool,
+        label: "DFXStar 分数池",
+        totalStaked: stake !== undefined ? formatScoreStake(stake) : "读不到",
+      },
+    ];
+  }
+  if (symbol) next.tokenSymbol = symbol;
+  if (burn !== undefined && decimals !== undefined) {
+    next.burnedAmount = formatWholeToken(burn, decimals);
   }
 
-  if (symbol) next.tokenSymbol = symbol;
-  if (burn !== undefined) next.burnedAmount = formatWholeToken(burn);
-
-  // 行情与第二轮链上读并行
-  const quotePromise: Promise<TagAiQuote> = paymentToken
-    ? fetchTagAiQuote(paymentToken)
-    : Promise.resolve({});
-
-  // —— 第二轮：依赖第一轮地址 ——
-  type Slot2 = "rate" | "nftName" | "nftSymbol" | "nftMinted" | "nftMax";
-  const round2: {
-    slot: Slot2;
-    address: Address;
-    abi: readonly unknown[];
-    functionName: string;
-    args?: readonly unknown[];
-  }[] = [];
-
+  const round2: AssetRead[] = [];
   if (calculator && community) {
     round2.push({
       slot: "rate",
@@ -288,121 +481,171 @@ async function loadHomeAssets(
       functionName: "getCurrentRewardRate",
       args: [community],
     });
+    if (gameRewards) {
+      // HourlyTickCalculator measures releases from its injection history.
+      // Calculate up to the current hour of this same finalized block.
+      const rewardHead = timestamp - (timestamp % 3600n);
+      round2.push({
+        slot: "released",
+        address: calculator,
+        abi: calculatorAbi,
+        functionName: "calculateReward",
+        args: [community, 0n, rewardHead],
+      });
+    }
   }
   if (passNft) {
-    round2.push({
-      slot: "nftName",
-      address: passNft,
-      abi: nftAbi,
-      functionName: "name",
-    });
-    round2.push({
-      slot: "nftSymbol",
-      address: passNft,
-      abi: nftAbi,
-      functionName: "symbol",
-    });
-    round2.push({
-      slot: "nftMinted",
-      address: passNft,
-      abi: nftAbi,
-      functionName: "totalSupply",
-    });
-    round2.push({
-      slot: "nftMax",
-      address: passNft,
-      abi: nftAbi,
-      functionName: "maxSupply",
-    });
+    for (const functionName of [
+      "name",
+      "symbol",
+      "totalSupply",
+      "maxSupply",
+      "communityTokenPrice",
+      "nativePrice",
+    ]) {
+      round2.push({
+        slot: functionName,
+        address: passNft,
+        abi: nftAbi,
+        functionName,
+      });
+    }
   }
 
-  const bySlot2 = new Map<Slot2, CallResult>();
-  const round2Promise =
-    round2.length > 0
-      ? publicClient.multicall({
-          allowFailure: true,
-          multicallAddress: MULTICALL3,
-          contracts: round2.map((c) => ({
-            address: c.address,
-            abi: c.abi,
-            functionName: c.functionName,
-            args: c.args,
-          })),
-        })
-      : Promise.resolve([] as CallResult[]);
-
-  const [quote, round2Results] = await Promise.all([
-    quotePromise,
-    round2Promise as Promise<CallResult[]>,
-  ]);
-
-  next.tokenPrice = quote.price ?? (paymentToken ? "价格未接入" : undefined);
-  next.tokenFdv = quote.fdv ?? (paymentToken ? "未接入" : undefined);
-
-  round2.forEach((c, i) => {
-    bySlot2.set(c.slot, round2Results[i]);
-  });
-
-  const rate = ok<bigint>(bySlot2.get("rate"));
-  if (rate !== undefined && next.pools[0]) {
-    next.pools[0].hourlyReward = `${formatWholeToken(rate)} / 小时`;
+  const boards = await boardPromise;
+  const registry = configured(first.get("registry") as Address | undefined);
+  const boardAddresses = new Set(
+    [...(boards?.score ?? []), ...(boards?.kills ?? [])]
+      .map(({ address }) => address.toLowerCase())
+      .filter((address): address is Address => isAddress(address)),
+  );
+  if (registry) {
+    for (const address of boardAddresses) {
+      round2.push({
+        slot: address,
+        address: registry,
+        abi: registryAbi,
+        functionName: "handleOf",
+        args: [address],
+      });
+    }
   }
 
+  const second = await readAssetStage(publicClient, blockNumber, round2);
+  const rate = second.get("rate") as bigint | undefined;
+  if (rate !== undefined && decimals !== undefined && next.pools[0]) {
+    next.pools[0].hourlyReward = `${formatWholeToken(rate, decimals)} / 小时`;
+  }
   if (passNft) {
-    const name = ok<string>(bySlot2.get("nftName"));
-    const nftSymbol = ok<string>(bySlot2.get("nftSymbol"));
-    const minted = ok<bigint>(bySlot2.get("nftMinted"));
-    const maxSupply = ok<bigint>(bySlot2.get("nftMax"));
+    const minted = second.get("totalSupply") as bigint | undefined;
+    const maxSupply = second.get("maxSupply") as bigint | undefined;
+    const tokenPrice = second.get("communityTokenPrice") as bigint | undefined;
+    const nativePrice = second.get("nativePrice") as bigint | undefined;
+    const native = publicClient.chain?.nativeCurrency;
+    const mintPrice =
+      tokenPrice === undefined ||
+      nativePrice === undefined ||
+      decimals === undefined ||
+      !native
+        ? undefined
+        : `${formatUnits(tokenPrice, decimals).replace(/^\d+/, grouped)} ${next.tokenSymbol} + ${formatUnits(nativePrice, native.decimals)} ${native.symbol}`;
+
     next.nfts.push({
-      label: name ?? "Game Pass NFT",
+      label: (second.get("name") as string | undefined) ?? "Game Pass NFT",
+      symbol: second.get("symbol") as string | undefined,
       address: passNft,
-      symbol: nftSymbol,
       minted: minted !== undefined ? grouped(minted) : undefined,
       maxSupply: maxSupply !== undefined ? grouped(maxSupply) : undefined,
+      soldOut:
+        minted !== undefined &&
+        maxSupply !== undefined &&
+        maxSupply > 0n &&
+        minted >= maxSupply,
+      mintPrice,
     });
   }
 
+  const handles = new Map<string, string>();
+  for (const address of boardAddresses) {
+    const handle = second.get(address);
+    if (typeof handle === "string" && handle) handles.set(address, handle);
+  }
+  next.boards = boards;
+  next.handles = handles;
+
+  const quote = await quotePromise;
+  next.tokenPrice = quote.price ?? (paymentToken ? "价格未接入" : undefined);
+  next.tokenFdv = quote.fdv ?? (paymentToken ? "未接入" : undefined);
+  onMetadata?.({ ...next });
+
+  const released = second.get("released") as bigint | undefined;
+  const injected = await gameRewards;
+  if (
+    decimals !== undefined &&
+    released !== undefined &&
+    injected !== undefined
+  ) {
+    next.totalRewards = formatWholeToken(released + injected, decimals);
+  } else {
+    next.rewardsUnavailable = true;
+  }
   return next;
 }
 
-/** 首页：只展示 DFXStar 分数池、代币销毁 / 价格 / FDV、入场 NFT 发行量。 */
-export function useHomeAssets(_wallet: string | undefined): HomeAssets {
+export function useHomeAssets(enabled: boolean): HomeAssets {
   const {
     network: { publicClient },
-    components: { DFXStarConfig, GamePassNFT },
   } = useMUD();
-  const star = useComponentValue(DFXStarConfig, singletonEntity);
-  const pass = useComponentValue(GamePassNFT, singletonEntity);
+  const { worldAddress, initialBlockNumber } = getNetworkConfig();
   const [assets, setAssets] = useState<HomeAssets>(EMPTY);
 
   useEffect(() => {
+    if (!enabled) return;
     let stopped = false;
-    let seq = 0;
-    const scorePool = configured(star?.scoreStakingPool);
-    const paymentToken = configured(star?.paymentToken);
-    const community = configured(star?.community);
-    const passAddress = configured(pass?.addr);
+    let inFlight = false;
+    const gameInjections = readGameInjections(
+      initialBlockNumber >= 0 ? BigInt(initialBlockNumber) : undefined,
+      worldAddress,
+    );
+
+    const boardPromise = fetchHomeBoards();
 
     const refresh = () => {
-      const mine = ++seq;
+      if (inFlight) return;
+      inFlight = true;
       void loadHomeAssets(
         publicClient,
-        scorePool,
-        paymentToken,
-        community,
-        passAddress,
+        getAddress(worldAddress),
+        gameInjections,
+        boardPromise,
+        (metadata) => {
+          if (stopped) return;
+          setAssets((previous) => ({
+            ...metadata,
+            totalRewards:
+              previous.tokenAddress === metadata.tokenAddress &&
+              previous.pools[0]?.address === metadata.pools[0]?.address
+                ? previous.totalRewards
+                : undefined,
+          }));
+        },
       )
         .then((next) => {
-          // 只接受最新一次 multicall，避免慢请求把新质押盖回 0。
-          if (!stopped && mine === seq) setAssets(next);
+          if (!stopped) setAssets(next);
         })
-        .catch(() => {
-          if (!stopped && mine === seq) {
+        .catch(async () => {
+          const boards = await boardPromise;
+          if (!stopped) {
             setAssets({
               ...EMPTY,
+              boards,
               poolNote: "链上暂时读不到",
+              rewardsUnavailable: true,
             });
           }
+        })
+        .finally(() => {
+          inFlight = false;
         });
     };
 
@@ -413,13 +656,7 @@ export function useHomeAssets(_wallet: string | undefined): HomeAssets {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [
-    pass?.addr,
-    publicClient,
-    star?.community,
-    star?.paymentToken,
-    star?.scoreStakingPool,
-  ]);
+  }, [enabled, initialBlockNumber, publicClient, worldAddress]);
 
   return assets;
 }

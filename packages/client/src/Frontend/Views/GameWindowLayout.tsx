@@ -89,7 +89,11 @@ export function GameWindowLayout({
   onReturnHome?: () => void;
 }) {
   const uiManager = useUIManager();
-  const { guideOpen, openGuide, closeGuide } = useNewPlayerGuide(guideWallet);
+  const [mapInputReady, setMapInputReady] = useState(false);
+  const { guideStart, openGuide, closeGuide } = useNewPlayerGuide(
+    uiManager,
+    mapInputReady ? guideWallet : undefined,
+  );
   const modalManager = uiManager.getModalManager();
   const modalPositions = modalManager.getModalPositions();
 
@@ -373,11 +377,13 @@ export function GameWindowLayout({
         <PublicGameStatus homeReady={homeReady} onOpenGuide={openGuide} />
       )}
       {showPublicStatus && <ActionHistory actions={actions} />}
-      {showPublicStatus && guideOpen && (
+      {showPublicStatus && mapInputReady && guideStart !== undefined && (
         <NewPlayerGuide
+          key={guideStart}
           uiManager={uiManager}
           walletAddress={guideWallet}
           homeReady={homeReady}
+          startAt={guideStart}
           onClose={closeGuide}
         />
       )}
@@ -509,7 +515,7 @@ export function GameWindowLayout({
             />
           )}
           <CanvasWrapper>
-            <ControllableCanvas />
+            <ControllableCanvas onInputReadyChange={setMapInputReady} />
           </CanvasWrapper>
           <NotificationsPane />
           {paneVisible && <CoordsPane />}

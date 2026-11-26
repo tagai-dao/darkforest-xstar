@@ -51,14 +51,15 @@ export class BackgroundRenderer implements BackgroundRendererType {
     /* draw using mask program */
     const viewport = this.manager.renderer.getViewport();
 
-    // draw large background rect underneath everything
-    unminedRenderer.queueRect(
-      { x: 0, y: 0 },
-      viewport.viewportWidth,
-      viewport.viewportHeight,
-      [0, 0, 0],
-      4,
-    );
+    if (this.highQuality) {
+      unminedRenderer.queueRect(
+        { x: 0, y: 0 },
+        viewport.viewportWidth,
+        viewport.viewportHeight,
+        [0, 0, 0],
+        4,
+      );
+    }
     if (
       innerNebulaColor &&
       nebulaColor &&

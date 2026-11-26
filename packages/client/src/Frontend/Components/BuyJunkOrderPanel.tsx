@@ -2,45 +2,26 @@ import styled from "styled-components";
 import { formatEther } from "viem";
 
 import { formatBuyJunkOrder } from "../../Backend/GameLogic/moveOrder";
-import dfstyles from "../Styles/dfstyles";
 import { useUIManager } from "../Utils/AppHooks";
+import {
+  GameListPanel,
+  ListButton,
+  ListEmpty,
+  ListTable,
+} from "./GameListPanel";
 import { junkTierQuotes } from "./junkTiers";
 
-const Shell = styled.div`
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 7;
-  width: min(420px, calc(100vw - 420px));
-  max-height: calc(100vh - 32px);
-  overflow: auto;
-  padding: 12px;
-  background: ${dfstyles.colors.background};
-  color: ${dfstyles.colors.text};
-  border: 1px solid ${dfstyles.colors.borderDark};
+const Hint = styled.p`
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid #28394e;
+  color: #a9bdd5;
 `;
 
-const TitleRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-`;
-
-const Hint = styled.div`
-  margin-bottom: 8px;
-  opacity: 0.8;
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-
+const QuoteTable = styled(ListTable)`
   th,
   td {
-    padding: 4px 6px;
     text-align: right;
-    border-bottom: 1px solid ${dfstyles.colors.borderDark};
   }
 
   th:last-child,
@@ -49,17 +30,8 @@ const Table = styled.table`
   }
 `;
 
-const ActionButton = styled.button`
-  cursor: pointer;
-  color: ${dfstyles.colors.text};
-  background: transparent;
-  border: 1px solid ${dfstyles.colors.borderDark};
-  padding: 4px 8px;
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.5;
-  }
+const Owned = styled.span`
+  color: #a9bdd5;
 `;
 
 /**
@@ -90,62 +62,69 @@ export function BuyJunkOrderPanel({
         );
 
   return (
-    <Shell data-guide-panel="buy-junk">
-      <TitleRow>
-        <div>购买垃圾额度</div>
-        <ActionButton type="button" onClick={onClose}>
-          关闭
-        </ActionButton>
-      </TitleRow>
-      {currentAllocation === undefined ? (
-        <div>额度还没同步，请稍后再试。</div>
-      ) : (
-        <>
+    <GameListPanel
+      title="购买垃圾额度"
+      count={
+        junkLimit !== undefined
+          ? `当前 ${junkLimit.toLocaleString("zh-CN")}`
+          : undefined
+      }
+      width={450}
+      onClose={onClose}
+      guidePanel="buy-junk"
+      toolbar={
+        currentAllocation !== undefined && (
           <Hint>
-            当前额度 {junkLimit?.toLocaleString("zh-CN")}
-            。价格是从当前额度升到该档要付的 BNB，点购买会复制命令，粘贴给 agent
-            即可。
+            价格为升到该档所需的 BNB。点击购买后，将复制的命令粘贴给 agent。
           </Hint>
-          <Table>
+        )
+      }
+    >
+      {currentAllocation === undefined ? (
+        <ListEmpty>额度还没同步，请稍后再试。</ListEmpty>
+      ) : (
+        <QuoteTable>
+          <table>
             <thead>
               <tr>
-                <th>额度</th>
-                <th>价格 (BNB)</th>
-                <th />
+                <th scope="col">额度</th>
+                <th scope="col">价格 (BNB)</th>
+                <th scope="col">操作</th>
               </tr>
             </thead>
             <tbody>
               {quotes.map((quote) => (
                 <tr key={quote.allocation}>
                   <td>{quote.limit.toLocaleString("zh-CN")}</td>
+                  <td>{quote.owned ? "—" : formatEther(quote.priceWei)}</td>
                   <td>
-                    {quote.owned ? "已拥有" : formatEther(quote.priceWei)}
-                  </td>
-                  <td>
-                    <ActionButton
-                      type="button"
-                      data-guide-target="buy-junk-tier"
-                      disabled={quote.owned}
-                      onClick={() =>
-                        onCopy(
-                          formatBuyJunkOrder({
-                            currentAllocation,
-                            allocation: quote.allocation,
-                            valueWei: quote.priceWei,
-                          }),
-                          `已复制购买 ${quote.limit.toLocaleString("zh-CN")} 额度的命令，直接粘贴给 agent`,
-                        )
-                      }
-                    >
-                      购买
-                    </ActionButton>
+                    {quote.owned ? (
+                      <Owned>已拥有</Owned>
+                    ) : (
+                      <ListButton
+                        type="button"
+                        data-guide-target="buy-junk-tier"
+                        onClick={() =>
+                          onCopy(
+                            formatBuyJunkOrder({
+                              currentAllocation,
+                              allocation: quote.allocation,
+                              valueWei: quote.priceWei,
+                            }),
+                            `已复制购买 ${quote.limit.toLocaleString("zh-CN")} 额度的命令，直接粘贴给 agent`,
+                          )
+                        }
+                      >
+                        购买
+                      </ListButton>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
-          </Table>
-        </>
+          </table>
+        </QuoteTable>
       )}
-    </Shell>
+    </GameListPanel>
   );
 }

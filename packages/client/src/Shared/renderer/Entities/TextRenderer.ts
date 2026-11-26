@@ -32,7 +32,8 @@ export class TextRenderer
 
   glyphData: Map<string, GlyphInfo>;
 
-  texIdx: number;
+  private readonly texIdx: number;
+  private readonly atlasTexture: WebGLTexture | null;
   rendererType = RendererType.Text;
   constructor(manager: GameGLManager) {
     super(manager, TEXT_PROGRAM_DEFINITION);
@@ -43,28 +44,24 @@ export class TextRenderer
     this.createGlyphs();
 
     this.texIdx = this.manager.getTexIdx();
-    this.setTexture(this.texIdx);
+    this.atlasTexture = this.createTexture();
     this.quad3Buffer = EngineUtils.makeEmptyQuad();
     this.quad2Buffer = EngineUtils.makeEmptyQuadVec2();
   }
 
-  private setTexture(texIdx: number): void {
+  private createTexture(): WebGLTexture | null {
     const { gl } = this.manager;
-
-    // gl.useProgram should be called from parent fn
-
     const atlasTex = gl.createTexture();
-    gl.activeTexture(gl.TEXTURE0 + texIdx);
+    if (!atlasTex) return null;
+
+    gl.activeTexture(gl.TEXTURE0 + this.texIdx);
     gl.bindTexture(gl.TEXTURE_2D, atlasTex);
 
-    const canvas = this.bufferCanvas;
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    // Glyph coordinates are measured from the top of the canvas.
+    this.manager.uploadTexture(this.bufferCanvas, false, false);
     gl.generateMipmap(gl.TEXTURE_2D);
 
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-
-    this.uniformSetters.texture(this.texIdx);
+    return atlasTex;
   }
 
   private createGlyphs(debug = false): void {
@@ -185,6 +182,10 @@ export class TextRenderer
   }
 
   public setUniforms() {
+    const { gl } = this.manager;
+    gl.activeTexture(gl.TEXTURE0 + this.texIdx);
+    gl.bindTexture(gl.TEXTURE_2D, this.atlasTexture);
+    this.uniformSetters.texture(this.texIdx);
     this.uniformSetters.matrix(this.manager.projectionMatrix);
   }
 

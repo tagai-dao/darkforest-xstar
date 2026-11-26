@@ -28,12 +28,24 @@ const CanvasWrapper = styled.div`
   height: 100%;
 
   position: relative;
+  background:
+    radial-gradient(
+      ellipse at 50% 43%,
+      transparent 22%,
+      rgb(4 8 19 / 64%) 100%
+    ),
+    linear-gradient(rgb(6 12 24 / 31%), rgb(6 12 24 / 56%)),
+    url("/lobby-starfield.webp") center / cover no-repeat #080e1d;
 
   canvas {
     width: 100%;
     height: 100%;
 
     position: absolute;
+
+    &:not([data-guide-map]) {
+      pointer-events: none;
+    }
 
     &#buffer {
       width: auto;
@@ -51,7 +63,11 @@ const CanvasWrapper = styled.div`
   }
 `;
 
-export default function ControllableCanvas() {
+export default function ControllableCanvas({
+  onInputReadyChange,
+}: {
+  onInputReadyChange?: (ready: boolean) => void;
+}) {
   // html canvas element width and height. viewport dimensions are tracked by viewport obj
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
@@ -192,6 +208,7 @@ export default function ControllableCanvas() {
       },
     );
     initializedRef.current = true;
+    const unbindPointerEvents = bindCanvasPointerEvents(canvas);
 
     // We can't attach the wheel event onto the canvas due to:
     // https://www.chromestatus.com/features/6662647093133312
@@ -203,11 +220,14 @@ export default function ControllableCanvas() {
 
     const initialResizeFrameId = window.requestAnimationFrame(() => {
       uiEmitter.emit(UIEmitterEvent.WindowResize);
+      onInputReadyChange?.(true);
     });
 
     return () => {
       initializedRef.current = false;
       window.cancelAnimationFrame(initialResizeFrameId);
+      onInputReadyChange?.(false);
+      unbindPointerEvents();
       Viewport.destroyInstance();
       Renderer.destroy();
       canvas.removeEventListener("wheel", onWheel);
@@ -218,16 +238,12 @@ export default function ControllableCanvas() {
     canInitialize,
     gameUIManager,
     doResize,
+    onInputReadyChange,
     canvasRef,
     glRef,
     bufferRef,
     evtRef,
   ]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) return bindCanvasPointerEvents(canvas);
-  }, []);
 
   // Keyboard movement handlers with continuous movement supportAdd commentMore actions
   const isUpPressed = useIsDown(MOVE_UP);

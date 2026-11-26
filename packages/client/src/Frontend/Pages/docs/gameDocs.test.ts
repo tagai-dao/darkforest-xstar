@@ -77,6 +77,44 @@ describe("game docs", () => {
     });
   });
 
+  it("compares all five planet types with distinct labels and their uses", () => {
+    const planets = findChapter("planets");
+    expect(chapterHeadings(planets)[0]?.id).toBe("types");
+    const comparison = planets.blocks.find(
+      (block) => block.kind === "table" && block.comparison,
+    );
+    expect(comparison).toMatchObject({
+      headers: ["星球类型", "主要用途", "关键规则"],
+      rows: [
+        [
+          { text: "行星", detail: "Planet" },
+          "派遣舰队、升级",
+          expect.any(String),
+        ],
+        [
+          { text: "小行星带", detail: "Asteroid Field" },
+          "生产银和材料",
+          expect.any(String),
+        ],
+        [
+          { text: "铸造厂", detail: "Foundry" },
+          "勘探并发现神器",
+          expect.any(String),
+        ],
+        [
+          { text: "时空裂隙", detail: "Spacetime Rip" },
+          "提取银和材料，增加分数与质押",
+          expect.any(String),
+        ],
+        [
+          { text: "类星体", detail: "Quasar" },
+          "缩短航程，适合中转",
+          expect.any(String),
+        ],
+      ],
+    });
+  });
+
   it("lists the innate stat doubles after the planet type", () => {
     const planets = findChapter("planets");
     const table = planets.blocks.find(
@@ -201,6 +239,7 @@ describe("game docs", () => {
       "goal",
       "round",
       "contracts",
+      "wallet-login",
       "entry",
     ]);
   });
