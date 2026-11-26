@@ -95,8 +95,12 @@ export function BuySilverPane({
   const account = useAccount(uiManager);
   const publicClient = usePublicClient();
   const {
+    network: { publicClient: mudClient, worldAddress: syncedWorldAddress },
     components: { DFXStarConfig, SilverFrontier },
   } = useMUD();
+  const worldAddress = gameManager.getContractAddress();
+  const isSyncedWorld =
+    worldAddress.toLowerCase() === syncedWorldAddress.toLowerCase();
 
   const dfxConfig = useComponentValue(DFXStarConfig, singletonEntity);
   const frontier =
@@ -164,6 +168,7 @@ export function BuySilverPane({
     planet.owner === account;
 
   const canShow =
+    isSyncedWorld &&
     planet &&
     !planet.destroyed &&
     !planet.frozen &&
@@ -200,6 +205,8 @@ export function BuySilverPane({
     const quote = quoteSilverPurchase(level, tier, frontier);
     if (!quote || quote.priceWei !== price) return;
     const text = formatBuySilverOrder({
+      chainId: mudClient.chain.id,
+      worldAddress,
       planetId: planet.locationId,
       tier,
       priceWhole: quote.priceWhole,

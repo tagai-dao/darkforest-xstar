@@ -34,6 +34,7 @@ import {
   http,
   webSocket,
 } from "viem";
+import { bsc } from "viem/chains";
 
 import {
   syncFilters as extraSyncFilters,
@@ -71,10 +72,8 @@ export async function setupNetwork() {
    */
   const write$ = new Subject<ContractWrite>();
   /*
-   * Sync on-chain state into RECS and keeps our client in sync.
-   * Uses the MUD indexer if available, otherwise falls back
-   * to the viem publicClient to make RPC calls to fetch MUD
-   * events from the chain.
+   * The SQLite indexer supplies a snapshot. MUD falls back to the public RPC
+   * for live events when the indexer's live stream is unavailable.
    */
   const { components, latestBlock$, storedBlockLogs$, waitForTransaction } =
     await syncToRecs({
@@ -84,6 +83,7 @@ export async function setupNetwork() {
       publicClient,
       indexerUrl: networkConfig.indexerUrl,
       startBlock: BigInt(networkConfig.initialBlockNumber),
+      maxBlockRange: networkConfig.chain.id === bsc.id ? 500n : undefined,
       tables: extraTables,
     });
 
@@ -112,6 +112,7 @@ export async function setupNetwork() {
   waitForStateChange.resolve(waitForTransaction);
   return {
     world,
+    worldAddress: networkConfig.worldAddress,
     components,
     playerEntity: encodeEntity(
       { address: "address" },

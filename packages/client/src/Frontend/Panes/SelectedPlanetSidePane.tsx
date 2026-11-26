@@ -27,7 +27,7 @@ import { useAccount, useSelectedPlanet, useUIManager } from "../Utils/AppHooks";
 import { DFZIndex } from "../Utils/constants";
 import { useEmitterValue } from "../Utils/EmitterHooks";
 import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
-import { PlanetCard } from "../Views/PlanetCard";
+import { PlanetCard, PlanetCardMetadata } from "../Views/PlanetCard";
 import { getMaterialColor } from "./PlanetMaterialsPane";
 
 const STATUS_SELECTOR = "[data-public-status]";
@@ -472,7 +472,7 @@ function UpgradeCopy({ planet }: { planet: LocatablePlanet }) {
               disabled={!enoughSilver || branchFull}
               onClick={() => copyUpgrade(branch)}
             >
-              {branchFull ? "已满" : "复制升级"}
+              {branchFull ? "已满" : "升级"}
             </CopyScore>
           </TierLine>
         );
@@ -540,7 +540,7 @@ function JunkCopy({ planet }: { planet: LocatablePlanet }) {
           data-guide-target={junkIsMine ? undefined : "add-junk"}
           onClick={copyAdd}
         >
-          复制 addJunk
+          登记
         </CopyScore>
       </TierLine>
       <TierLine>
@@ -548,7 +548,7 @@ function JunkCopy({ planet }: { planet: LocatablePlanet }) {
           {junkIsMine ? "清除后会放弃这颗星球" : "垃圾不在自己名下"}
         </TierPrice>
         <CopyScore type="button" disabled={!junkIsMine} onClick={copyClear}>
-          复制 removeJunk
+          取消登记
         </CopyScore>
       </TierLine>
     </BuyBox>
@@ -650,16 +650,20 @@ function ArtifactCopy({ planet }: { planet: LocatablePlanet }) {
  */
 function SilverBuyCopy({ planet }: { planet: LocatablePlanet }) {
   const uiManager = useUIManager();
+  const gameManager = uiManager.getGameManager();
   const account = useAccount(uiManager);
   const {
+    network: { publicClient, worldAddress: syncedWorldAddress },
     components: { DFXStarConfig, SilverFrontier },
   } = useMUD();
+  const worldAddress = gameManager.getContractAddress();
   const config = useComponentValue(DFXStarConfig, singletonEntity);
   const frontier =
     useComponentValue(SilverFrontier, singletonEntity)?.level ?? 0;
   const paymentToken = configuredAddress(config?.paymentToken);
   const buySilverSystem = configuredAddress(config?.buySilverSystem);
   const canBuy =
+    sameAddress(worldAddress, syncedWorldAddress) &&
     planet.planetType !== PlanetType.TRADING_POST &&
     planet.planetLevel >= 1 &&
     planet.addJunkTick > 0 &&
@@ -684,6 +688,8 @@ function SilverBuyCopy({ planet }: { planet: LocatablePlanet }) {
       return;
     }
     const text = formatBuySilverOrder({
+      chainId: publicClient.chain.id,
+      worldAddress,
       planetId: planet.locationId,
       tier,
       priceWhole: quote.priceWhole,
@@ -691,7 +697,7 @@ function SilverBuyCopy({ planet }: { planet: LocatablePlanet }) {
       silverDisplay: quote.silverDisplay,
       paymentToken,
       buySilverSystem,
-      entryFeeWei: uiManager.getGameManager().getTransactionFee(),
+      entryFeeWei: gameManager.getTransactionFee(),
     });
     void copyText(text).then((copied) => {
       UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
@@ -770,6 +776,7 @@ export function SelectedPlanetSidePane() {
   return (
     <Side $top={top} data-guide-panel="planet-details">
       <Name>{getPlanetName(selected)}</Name>
+      <PlanetCardMetadata planet={selected} />
       <Coords>
         <span>
           坐标 {formatCoord(x)}, {formatCoord(y)}
@@ -797,7 +804,7 @@ export function SelectedPlanetSidePane() {
       <PlanetArtifactUse planet={selected} />
       <SilverBuyCopy planet={selected} />
       <UpgradeCopy planet={selected} />
-      <PlanetCard planetWrapper={planet} />
+      <PlanetCard planetWrapper={planet} showIdentity={false} />
     </Side>
   );
 }
@@ -833,7 +840,7 @@ const Coords = styled.div`
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 10px;
+  margin: 5px 0 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
   color: #9be7ff;

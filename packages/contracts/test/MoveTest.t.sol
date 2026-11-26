@@ -263,18 +263,62 @@ contract MoveTest is BaseTest {
     vm.prank(user1);
     IWorld(worldAddress).df__move(proof, input, 110000, 1000, 0, new MaterialMove[](0));
 
-    PendingMoveData memory pendingMove = PendingMove.get(bytes32(planet2.planetHash));
-    uint256 index = _getIndexAt(pendingMove, 1);
-    MoveData memory move2 = Move.get(bytes32(planet2.planetHash), uint8(index));
+    MoveData memory firstArrival = _queuedMove(planet2.planetHash, 0);
+    MoveData memory secondArrival = _queuedMove(planet2.planetHash, 1);
+    assertLt(firstArrival.arrivalTick, secondArrival.arrivalTick);
 
     input.distance *= 2;
-    vm.warp(_getTimestampAtTick(move2.arrivalTick));
-    planet2 = IWorld(worldAddress).df__readPlanet(2);
+    vm.warp(_getTimestampAtTick(secondArrival.arrivalTick));
     vm.prank(user1);
     IWorld(worldAddress).df__move(proof, input, 120000, 1000, 0, new MaterialMove[](0));
 
-    uint256 expectedDestroyed = (move2.population * 100) / planet2.defense;
+    uint256 expectedDestroyed = (firstArrival.population * 100) /
+      planet2.defense +
+      (secondArrival.population * 100) /
+      planet2.defense;
     assertEq(PlayerKillStats.get(user1), expectedDestroyed);
+  }
+
+  function testPlanetEmojiSettlesArrivedFleetAndBattleStatsTogether() public {
+    vm.warp(block.timestamp + 1000);
+    Planet memory destination = IWorld(worldAddress).df__readPlanet(2);
+    bytes32 destinationKey = bytes32(destination.planetHash);
+
+    vm.prank(admin);
+    IWorld(worldAddress).df__addMaterial(1, MaterialType(1), 100);
+
+    Proof memory proof;
+    MoveInput memory input;
+    input.fromPlanetHash = 1;
+    input.toPlanetHash = destination.planetHash;
+    input.distance = 80;
+    vm.prank(user1);
+    IWorld(worldAddress).df__move(proof, input, 100000, 1000, 0, _mats(MaterialMove({ resourceId: 1, amount: 100 })));
+
+    MoveData memory arrived = _queuedMove(destination.planetHash, 0);
+    assertEq(PendingMove.getNumber(destinationKey), 1);
+    assertEq(PlayerKillStats.get(user1), 0);
+
+    uint256 destroyed = (arrived.population * 100) / destination.defense;
+    assertGt(destroyed, 0);
+    Planet memory preview = IWorld(worldAddress).df__readPlanetAt(destination.planetHash, arrived.arrivalTick);
+    assertEq(preview.moveQueue.number, 0);
+    assertEq(PendingMove.getNumber(destinationKey), 1);
+    assertEq(PlayerKillStats.get(user1), 0);
+    vm.warp(_getTimestampAtTick(arrived.arrivalTick));
+    vm.prank(user2);
+    IWorld(worldAddress).df__setPlanetEmoji(destination.planetHash, "!");
+
+    assertEq(PendingMove.getNumber(destinationKey), 0);
+    assertEq(PlayerKillStats.get(user1), destroyed);
+    assertEq(PlanetTable.getLastUpdateTick(destinationKey), arrived.arrivalTick);
+    assertEq(PlanetTable.getPopulation(destinationKey), preview.population);
+    assertEq(PlanetTable.getSilver(destinationKey), destination.silver + arrived.silver);
+    assertEq(PlanetMaterial.get(destinationKey, uint8(1)), 100);
+
+    _sendFleet(user2, destination.planetHash, 1, 80);
+    assertEq(PlayerKillStats.get(user1), destroyed);
+    assertEq(PlanetMaterial.get(destinationKey, uint8(1)), 100);
   }
 
   function testNeutralPlanetAttackDoesNotRecordKills() public {
@@ -341,6 +385,70 @@ contract MoveTest is BaseTest {
     assertEq(latestPlanet2.owner, user1);
     assertEq(latestPlanet2.population, move2.population + _getPopulationAtTick(planet2, move2.arrivalTick));
     assertEq(latestPlanet2.silver, move2.silver + planet2.silver);
+  }
+
+  function testRevertMovePreservesOtherFlightsAndReusesFreedSlot() public {
+    vm.warp(block.timestamp + 1000);
+    _sendFleet(user2, 2, 1, 80);
+    MoveData memory inbound = _queuedMove(1, 0);
+    _sendFleet(user1, 1, 2, 80);
+    MoveData memory outbound = _queuedMove(2, 0);
+    _sendFleet(user1, 1, 2, 96);
+    MoveData memory remainingOutbound = _queuedMove(2, 1);
+
+    vm.warp(_getTimestampAtTick(outbound.departureTick + 5));
+    vm.prank(user1);
+    IWorld(worldAddress).df__revertMove(outbound.id, bytes32(uint256(2)));
+
+    assertEq(PendingMove.getNumber(bytes32(uint256(1))), 2);
+    assertEq(PendingMove.getNumber(bytes32(uint256(2))), 1);
+    MoveData memory returning = _queuedMove(1, 0);
+    assertEq(returning.id, outbound.id);
+    assertEq(returning.captain, outbound.captain);
+    assertEq(returning.from, bytes32(uint256(2)));
+    assertEq(returning.arrivalTick, outbound.departureTick + 10);
+    assertEq(returning.population, outbound.population / 2);
+    assertEq(returning.silver, outbound.silver / 2);
+    assertEq(abi.encode(_queuedMove(1, 1)), abi.encode(inbound));
+    assertEq(abi.encode(_queuedMove(2, 0)), abi.encode(remainingOutbound));
+    assertTrue(IWorld(worldAddress).df__isMoveReverted(outbound.id));
+    assertEq(Counter.getMove(), remainingOutbound.id);
+
+    _sendFleet(user1, 1, 2, 112);
+    assertEq(PendingMove.getNumber(bytes32(uint256(2))), 2);
+    assertEq(abi.encode(_queuedMove(2, 0)), abi.encode(remainingOutbound));
+    assertEq(_queuedMove(2, 1).id, Counter.getMove());
+  }
+
+  function testRevertMovePersistsReturnWhenSourceSettlesAnArrival() public {
+    vm.warp(block.timestamp + 1000);
+    _sendFleet(user2, 2, 1, 16);
+    MoveData memory arriving = _queuedMove(1, 0);
+    _sendFleet(user2, 2, 1, 96);
+    MoveData memory pending = _queuedMove(1, 1);
+    _sendFleet(user1, 1, 2, 128);
+    MoveData memory outbound = _queuedMove(2, 0);
+    uint256 silverBeforeArrival = PlanetTable.getSilver(bytes32(uint256(1)));
+
+    vm.warp(_getTimestampAtTick(arriving.arrivalTick));
+    vm.prank(user1);
+    IWorld(worldAddress).df__revertMove(outbound.id, bytes32(uint256(2)));
+
+    assertEq(PlanetTable.getSilver(bytes32(uint256(1))), silverBeforeArrival + arriving.silver);
+    assertEq(PendingMove.getNumber(bytes32(uint256(1))), 2);
+    assertEq(_queuedMove(1, 0).id, outbound.id);
+    assertEq(abi.encode(_queuedMove(1, 1)), abi.encode(pending));
+    assertEq(PendingMove.getNumber(bytes32(uint256(2))), 0);
+  }
+
+  function _sendFleet(address captain, uint256 from, uint256 to, uint256 distance) internal {
+    Proof memory proof;
+    MoveInput memory input;
+    input.fromPlanetHash = from;
+    input.toPlanetHash = to;
+    input.distance = distance;
+    vm.prank(captain);
+    IWorld(worldAddress).df__move(proof, input, 80000, 1000, 0, new MaterialMove[](0));
   }
 
   function _sendMaterialFleet(MaterialMove[] memory materials) internal {

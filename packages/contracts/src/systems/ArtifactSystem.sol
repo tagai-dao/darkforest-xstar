@@ -30,13 +30,7 @@ contract ArtifactSystem is BaseSystem {
     PlayerStats.setChargeArtifactCount(_msgSender(), PlayerStats.getChargeArtifactCount(_msgSender()) + 1);
 
     address worldAddress = _world();
-    DFUtils.tick(worldAddress);
-
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
-    Artifact memory artifact = planet.mustGetArtifact(artifactId);
-    if (planet.owner != _msgSender()) {
-      revert NotPlanetOwner();
-    }
+    (Planet memory planet, Artifact memory artifact) = _readOwnedArtifact(worldAddress, planetHash, artifactId);
     (planet, artifact) = planet.chargeArtifact(artifact, data, worldAddress);
 
     artifact.writeToStore();
@@ -51,13 +45,7 @@ contract ArtifactSystem is BaseSystem {
     PlayerStats.setShutdownArtifactCount(_msgSender(), PlayerStats.getShutdownArtifactCount(_msgSender()) + 1);
 
     address worldAddress = _world();
-    DFUtils.tick(worldAddress);
-
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
-    Artifact memory artifact = planet.mustGetArtifact(artifactId);
-    if (planet.owner != _msgSender()) {
-      revert NotPlanetOwner();
-    }
+    (Planet memory planet, Artifact memory artifact) = _readOwnedArtifact(worldAddress, planetHash, artifactId);
     (planet, artifact) = planet.shutdownArtifact(artifact, worldAddress);
 
     artifact.writeToStore();
@@ -73,16 +61,24 @@ contract ArtifactSystem is BaseSystem {
     PlayerStats.setActivateArtifactCount(_msgSender(), PlayerStats.getActivateArtifactCount(_msgSender()) + 1);
 
     address worldAddress = _world();
-    DFUtils.tick(worldAddress);
-
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
-    Artifact memory artifact = planet.mustGetArtifact(artifactId);
-    if (planet.owner != _msgSender()) {
-      revert NotPlanetOwner();
-    }
+    (Planet memory planet, Artifact memory artifact) = _readOwnedArtifact(worldAddress, planetHash, artifactId);
     (planet, artifact) = planet.activateArtifact(artifact, data, worldAddress);
 
     artifact.writeToStore();
     planet.writeToStore();
+  }
+
+  function _readOwnedArtifact(
+    address worldAddress,
+    uint256 planetHash,
+    uint256 artifactId
+  ) private returns (Planet memory planet, Artifact memory artifact) {
+    DFUtils.tick(worldAddress);
+
+    planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    artifact = planet.mustGetArtifact(artifactId);
+    if (planet.owner != _msgSender()) {
+      revert NotPlanetOwner();
+    }
   }
 }

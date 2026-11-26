@@ -117,7 +117,14 @@ export const bsc = {
  * for instructions on how to add networks.
  */
 export const supportedChains: MUDChain[] = [
-  mudFoundry,
+  {
+    ...mudFoundry,
+    // Installed and checked by packages/contracts/script/start-local-anvil.sh.
+    contracts: {
+      ...mudFoundry.contracts,
+      multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" },
+    },
+  },
   redstone,
   garnet,
   baseSepolia,

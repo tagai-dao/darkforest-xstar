@@ -1,13 +1,14 @@
 import { MAX_ARTIFACT_TYPE, MIN_ARTIFACT_TYPE } from "@df/constants";
 import { formatNumber, isLocatable } from "@df/gamelogic";
 import { getPlanetName } from "@df/procedural";
-import type { ArtifactId, LocationId, Planet } from "@df/types";
+import type { ArtifactId, LocationId, MaterialType, Planet } from "@df/types";
 import { PlanetType } from "@df/types";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 
 import { PlanetThumb } from "../Panes/PlanetDexPane";
 import { useUIManager } from "../Utils/AppHooks";
+import { getMaterialColor } from "../Utils/materialColor";
 import { PlanetLink } from "../Views/PlanetLink";
 import { SortableTable } from "../Views/SortableTable";
 import { ArtifactHelp } from "./ArtifactHelp";
@@ -223,7 +224,10 @@ function PlanetStatus({
       {friendly > 0 && <Tag $color="#98e7d3">己方航行 {friendly}</Tag>}
       {upgraded > 0 && <Tag $color="#d0bcff">已升级 {upgraded}</Tag>}
       {materials.map(({ materialId, materialAmount }) => (
-        <Tag key={materialId}>
+        <Tag
+          key={materialId}
+          $color={getMaterialColor(materialId as MaterialType)}
+        >
           {MATERIAL_NAME[materialId] ?? "材料"} {formatNumber(materialAmount)}
         </Tag>
       ))}

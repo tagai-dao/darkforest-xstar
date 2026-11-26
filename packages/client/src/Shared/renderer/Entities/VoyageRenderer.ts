@@ -386,7 +386,7 @@ export class VoyageRenderer implements VoyageRendererType {
     emphasis: number,
     confirmed = true,
   ) {
-    const { width, alpha, halo, dash } = fleetRoutes[tier];
+    const { width, alpha, halo } = fleetRoutes[tier];
     const [r, g, b] = color;
     const { lineRenderer } = this.renderer;
     const z = RenderZIndex.Voyages;
@@ -408,7 +408,6 @@ export class VoyageRenderer implements VoyageRendererType {
       [r, g, b, confirmed ? Math.round(alpha + (255 - alpha) * emphasis) : 100],
       routeWidth,
       z,
-      confirmed ? dash : true,
     );
   }
 

@@ -112,6 +112,10 @@ describe("move order", () => {
 
   it("writes a claim for the injected AIPRO on the score pool", () => {
     const text = formatClaimRewardsOrder({
+      chainId: 56,
+      worldAddress: "0x0000000000000000000000000000000000000010",
+      account: "0x0000000000000000000000000000000000000011",
+      valueWei: 0n,
       pool: "0xaaF713E1F8478318288836FDeACe0AC28d9316D3",
       pendingWei: 8888n * 10n ** 18n,
     });
@@ -127,6 +131,10 @@ describe("move order", () => {
 
   it("writes a community claim against the score pool", () => {
     const text = formatClaimCommunityOrder({
+      chainId: 56,
+      worldAddress: "0x0000000000000000000000000000000000000010",
+      account: "0x0000000000000000000000000000000000000011",
+      valueWei: 500_000_000_000_000n,
       community: "0x06AA8A7AEDb0359074388dA43e5D51D62496DBb7",
       pool: "0xaaF713E1F8478318288836FDeACe0AC28d9316D3",
       pendingWei: 59524n * 10n ** 18n,
@@ -139,11 +147,13 @@ describe("move order", () => {
     expect(order.community).toBe("0x06AA8A7AEDb0359074388dA43e5D51D62496DBb7");
     expect(order.pool).toBe("0xaaF713E1F8478318288836FDeACe0AC28d9316D3");
     expect(order.pendingWei).toBe((59524n * 10n ** 18n).toString());
-    expect(order.valueWei).toBe("0");
+    expect(order.valueWei).toBe("500000000000000");
   });
 
-  it("writes a silver purchase with the tier and the token price", () => {
+  it("writes a silver purchase with its deployment, tier, and token price", () => {
     const text = formatBuySilverOrder({
+      chainId: 31337,
+      worldAddress: "0x0000000000000000000000000000000000000100",
       planetId: FROM,
       tier: 1,
       priceWhole: 2500,
@@ -158,6 +168,10 @@ describe("move order", () => {
     expect(text.startsWith("DARKFOREST_BUY_SILVER\n")).toBe(true);
     expect(order.kind).toBe("darkforest-buy-silver");
     expect(order.call).toBe("df__buySilver");
+    expect(order.chainId).toBe(31337);
+    expect(order.worldAddress).toBe(
+      "0x0000000000000000000000000000000000000100",
+    );
     expect(order.planetHash).toBe("10");
     expect(order.tier).toBe(1);
     expect(order.priceWhole).toBe("2500");

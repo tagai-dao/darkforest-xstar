@@ -6,6 +6,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { BaseSystem } from "systems/internal/BaseSystem.sol";
 import { Planet } from "libraries/Planet.sol";
 import { PlanetType } from "codegen/common.sol";
+import { PlanetConstants } from "codegen/tables/PlanetConstants.sol";
 import { Player } from "codegen/tables/Player.sol";
 import { DFXStarConfig } from "codegen/tables/DFXStarConfig.sol";
 import { SilverBurnStats } from "codegen/tables/SilverBurnStats.sol";
@@ -23,6 +24,28 @@ contract BuySilverSystem is BaseSystem {
   /// @dev 万分比的分母。5000 是一半，10000 是整笔。
   uint256 internal constant BPS_DENOMINATOR = 10_000;
 
+  error UntrustedBuySilverWorld();
+
+  address public immutable trustedWorld;
+
+  constructor(address worldAddress) {
+    if (worldAddress.code.length == 0) revert UntrustedBuySilverWorld();
+    trustedWorld = worldAddress;
+  }
+
+  modifier onlyTrustedWorld() {
+    // Authenticate the real caller before using MUD's forwarded player or store context.
+    if (msg.sender != trustedWorld) revert UntrustedBuySilverWorld();
+    _;
+  }
+
+  function quoteBuySilver(
+    uint256 planetHash,
+    uint8 tier
+  ) public view onlyTrustedWorld returns (uint256 price, uint256 silver) {
+    return SilverMarket.quote(PlanetConstants.getLevel(bytes32(planetHash)), tier);
+  }
+
   /**
    * @param planetHash 目标星球。等级决定档位，种类和空间加成不改价格和数量。
    * @param tier 0=20%，1=50%，2=80%，3=150% 的星云行星基础银上限
@@ -30,7 +53,7 @@ contract BuySilverSystem is BaseSystem {
   function buySilver(
     uint256 planetHash,
     uint8 tier
-  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  ) public onlyTrustedWorld requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
     address pool = DFXStarConfig.getScoreStakingPool();
     if (pool == address(0)) revert DFXStarPoolNotConfigured();
 

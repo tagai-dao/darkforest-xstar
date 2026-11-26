@@ -5,7 +5,10 @@ import { BaseSystem } from "systems/internal/BaseSystem.sol";
 import { Ticker } from "codegen/tables/Ticker.sol";
 import { MoveData } from "codegen/tables/Move.sol";
 import { Planet } from "libraries/Planet.sol";
+import { PlanetStatus } from "codegen/common.sol";
 import { MoveLib } from "libraries/Move.sol";
+import { ITickSystem } from "codegen/world/ITickSystem.sol";
+import { IPlanetWriteSystem } from "codegen/world/IPlanetWriteSystem.sol";
 
 contract PlanetReadSystem is BaseSystem {
   using MoveLib for MoveData;
@@ -54,7 +57,7 @@ contract PlanetReadSystem is BaseSystem {
   }
 
   /**
-   * @notice Sync a planet for state-changing systems and record attacker kill stats.
+   * @notice Settle arrivals for state-changing systems and persist their kill stats and planet state.
    * @dev View-only reads must keep using `readPlanet` so eth_call does not write tables.
    */
   function readPlanetWithKillStats(
@@ -81,9 +84,9 @@ contract PlanetReadSystem is BaseSystem {
   }
 
   function _syncWithKillStats(Planet memory planet) internal returns (Planet memory) {
-    // 两个公开入口都从这里走。系统互调会在检查里放行。
-    _requireGamePass(_msgSender());
+    ITickSystem(_world()).df__checkPlanetSyncGamePass(_msgSender());
     uint256 untilTick = Ticker.getTickNumber();
+    if (planet.status != PlanetStatus.DEFAULT) return _syncTo(planet, untilTick);
     return _syncToWithKillStats(planet, untilTick);
   }
 
@@ -106,6 +109,10 @@ contract PlanetReadSystem is BaseSystem {
       move = planet.popArrivedMove(untilTick);
     }
     planet.naturalGrowth(untilTick);
+    if (planet.moveQueue.shouldWrite) {
+      // Persist consumed arrivals in the same transaction as their kill stats.
+      IPlanetWriteSystem(_world()).df__writePlanet(planet);
+    }
     return planet;
   }
 }

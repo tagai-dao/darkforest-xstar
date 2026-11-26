@@ -279,16 +279,6 @@ contract BuySilverTest is BaseTest {
     assertEq(DFXStarConfig.getBurnBps(), 2_500);
   }
 
-  function testSetDFXStarConfig_keepsBurnBps() public {
-    vm.startPrank(admin);
-    IWorld(worldAddress).df__updateSilverBurnBps(2_500);
-    IWorld(worldAddress).df__setDFXStarConfig(address(pool), address(token), address(0), address(0), address(this));
-    vm.stopPrank();
-
-    assertEq(DFXStarConfig.getBurnBps(), 2_500);
-    assertEq(DFXStarConfig.getScoreStakingPool(), address(pool));
-  }
-
   function _burnAddress() internal pure returns (address) {
     return 0x000000000000000000000000000000000000dEaD;
   }

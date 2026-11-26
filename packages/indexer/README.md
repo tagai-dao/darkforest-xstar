@@ -1,7 +1,5 @@
 # BSC store-indexer + 排行榜投影
 
-Client 首屏慢是因为没有 MUD HTTP Indexer，浏览器在用 BSC RPC 从 World 部署块扫日志。
-
 本目录用官方 `@latticexyz/store-indexer` 的 **sqlite-indexer** 追块。
 
 `sqlite-indexer` 负责服务端的链上读取。投影从索引读取 `Player` / `PlayerScore` / `PlayerKillStats`，写入 MySQL。排行榜 HTTP API 只读 MySQL。
@@ -16,7 +14,9 @@ chmod +x start.sh start-project.sh
 ./start.sh
 ```
 
-首次会从 `START_BLOCK` 追到链头。追平后日志会稳定轮询。
+首次启动从 `START_BLOCK` 追到链头。保留 SQLite 数据库后，重启会从已经保存的区块继续同步。追平后，HTTP 模式默认每 5 分钟追一次块。
+
+在已有服务器上保留 `RPC_HTTP_URL` 中的 NodeReal 地址，将 `.env` 中的 `POLLING_INTERVAL` 设为 `300000`，保持 `RPC_WS_URL` 未设置，再重启索引进程。
 
 同步状态可通过 `curl -i http://127.0.0.1:3001/readyz` 检查，端口与 `.env` 中的 `PORT` 一致。
 
@@ -68,13 +68,16 @@ VITE_INDEXER_URL=https://darkforest-indexer.tagai.fun
 VITE_API_BASE_URL=https://df-api.tagai.fun
 ```
 
+浏览器从 SQLite 索引器加载快照，再用 `VITE_DEFAULT_RPC` 指定的 BSC RPC 分段补读快照和链头之间的日志，每批最多 500 块。浏览器使用生产配置里的公开 RPC。排行榜从服务端的快照更新，正常情况下可能比链上慢约 5 分钟。
+
 ## 环境变量要点
 
-| 变量              | 说明                                          |
-| ----------------- | --------------------------------------------- |
-| `RPC_HTTP_URL`    | BSC HTTP RPC（建议稳定节点）                  |
-| `START_BLOCK`     | `worlds.json` 里 56 的 `blockNumber`          |
-| `STORE_ADDRESS`   | World 地址                                    |
-| `MAX_BLOCK_RANGE` | 默认示例 `500`；过大易被 RPC `limit exceeded` |
-| `PORT`            | store-indexer HTTP，默认 `3001`               |
-| `DB_HOST` 等      | 投影 + 只读 API 的 MySQL（代码里拼连接串）    |
+| 变量               | 说明                                          |
+| ------------------ | --------------------------------------------- |
+| `RPC_HTTP_URL`     | BSC HTTP RPC（建议稳定节点）                  |
+| `START_BLOCK`      | `worlds.json` 里 56 的 `blockNumber`          |
+| `STORE_ADDRESS`    | World 地址                                    |
+| `MAX_BLOCK_RANGE`  | 默认示例 `500`；过大易被 RPC `limit exceeded` |
+| `POLLING_INTERVAL` | HTTP 轮询间隔，默认 `300000` 毫秒             |
+| `PORT`             | store-indexer HTTP，默认 `3001`               |
+| `DB_HOST` 等       | 投影 + 只读 API 的 MySQL（代码里拼连接串）    |

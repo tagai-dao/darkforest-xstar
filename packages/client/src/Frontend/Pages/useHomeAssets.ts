@@ -1,4 +1,4 @@
-import { formatWholeToken } from "@df/gamelogic";
+import { formatWholeToken, getInnerCircleShrinkPercent } from "@df/gamelogic";
 import { resourceToHex } from "@latticexyz/common";
 import { getNetworkConfig } from "@mud/getNetworkConfig";
 import { useMUD } from "@mud/MUDContext";
@@ -31,7 +31,6 @@ const WORLD_TABLES = {
   frontier: "SilverFrontier",
   stats: "GlobalStats",
 } as const;
-const INITIAL_INNER_RADIUS = 75_000;
 
 const communityAbi = parseAbi([
   "function rewardCalculator() view returns (address)",
@@ -343,9 +342,7 @@ export async function loadHomeAssets(
     players: packedNumber(staticRecord("stats"), 32, 32),
     maxPlanetLevel: packedNumber(staticRecord("frontier"), 0, 1),
     shrinkPct:
-      radius === undefined
-        ? undefined
-        : Math.min(100, Math.max(0, (1 - radius / INITIAL_INNER_RADIUS) * 100)),
+      radius === undefined ? undefined : getInnerCircleShrinkPercent(radius),
   };
   const next: HomeAssets = {
     pools: [],

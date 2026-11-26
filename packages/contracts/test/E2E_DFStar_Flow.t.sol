@@ -19,6 +19,20 @@ import { DFXStarScoreStakingFactory } from "nutbox/dapps/dfxstar-score-staking/D
 import { DFXStarScoreStaking } from "nutbox/dapps/dfxstar-score-staking/DFXStarScoreStaking.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Errors } from "../src/interfaces/errors.sol";
+import { BuySilverSystem } from "../src/systems/BuySilverSystem.sol";
+
+interface IWorldBuySilverQuote {
+  function df__quoteBuySilver(uint256 planetHash, uint8 tier) external view returns (uint256 price, uint256 silver);
+}
+
+/// @dev An unrelated caller that rejects any attempt to use it as a store.
+contract NutboxNonWorldCaller {
+  error UnexpectedStoreRead();
+
+  fallback() external {
+    revert UnexpectedStoreRead();
+  }
+}
 
 /// @dev Simple ERC20 for testing (non-mintable, pre-minted supply).
 contract TestDFS is ERC20 {
@@ -182,6 +196,24 @@ contract E2E_DFStar_Flow is BaseTest {
 
   // ─── Test: Buy silver injects rewards to real pool ───
 
+  function test_buySilver_rejectsDirectCallerBeforeReadingWorldState() public {
+    NutboxNonWorldCaller caller = new NutboxNonWorldCaller();
+    address spender = _buySilverSystem();
+    assertGt(spender.code.length, 0);
+    bytes memory callData = abi.encodeCall(BuySilverSystem.buySilver, (planetHash, 0));
+
+    // An ordinary direct call must fail at the authorization boundary before consulting caller state.
+    vm.prank(address(caller));
+    (bool ok, bytes memory result) = spender.call(callData);
+
+    assertFalse(ok, "direct call must be rejected");
+    assertEq(result, abi.encodeWithSelector(BuySilverSystem.UntrustedBuySilverWorld.selector));
+    assertTrue(
+      bytes4(result) != NutboxNonWorldCaller.UnexpectedStoreRead.selector,
+      "spender consulted a non-World caller"
+    );
+  }
+
   function test_buySilver_injectsRewardsToRealPool() public {
     // Step 1: Withdraw to seed totalStaked > 0
     vm.prank(user1);
@@ -199,6 +231,52 @@ contract E2E_DFStar_Flow is BaseTest {
     assertEq(userBalBefore - userBalAfter, 34_000 ether, "user should pay 34,000 DFS");
     assertEq(dfsToken.balanceOf(address(pool)), 17_000 ether, "pool should hold the unburned half");
     assertEq(dfsToken.balanceOf(_burnAddress()), 17_000 ether, "dead address should hold the burned half");
+  }
+
+  function test_buySilver_usesTheWorldQuoteFromTheBoundSystem() public {
+    address spender = _buySilverSystem();
+    assertEq(BuySilverSystem(spender).trustedWorld(), worldAddress);
+    vm.prank(user1);
+    IWorld(worldAddress).df__withdrawSilver(ripHash, 300_000_000);
+    vm.prank(user2);
+    (uint256 price, uint256 silver) = IWorldBuySilverQuote(worldAddress).df__quoteBuySilver(planetHash, 0);
+    assertEq(price, 34_000 ether);
+    assertEq(silver, 10_000_000);
+
+    uint256 balanceBefore = dfsToken.balanceOf(user1);
+    uint256 silverBefore = Planet.getSilver(bytes32(planetHash));
+    vm.startPrank(user1);
+    dfsToken.approve(spender, price);
+    IWorld(worldAddress).df__buySilver(planetHash, 0);
+    vm.stopPrank();
+
+    assertEq(balanceBefore - dfsToken.balanceOf(user1), price);
+    assertEq(Planet.getSilver(bytes32(planetHash)) - silverBefore, silver);
+  }
+
+  function test_buySilver_feeExemptionMustCoverActualSpender() public {
+    vm.prank(user1);
+    IWorld(worldAddress).df__withdrawSilver(ripHash, 300_000_000);
+
+    address spender = _buySilverSystem();
+    vm.startPrank(admin);
+    committee.adminSetPoolOperationFee(0.001 ether);
+    committee.adminAddFeeFreeAddress(worldAddress);
+    vm.stopPrank();
+
+    vm.startPrank(user1);
+    dfsToken.approve(spender, 34_000 ether);
+    vm.expectRevert(bytes("Insufficient fee"));
+    IWorld(worldAddress).df__buySilver(planetHash, 0);
+    vm.stopPrank();
+    assertEq(dfsToken.balanceOf(address(pool)), 0, "failed purchase must not fund the pool");
+    assertEq(dfsToken.balanceOf(_burnAddress()), 0, "failed purchase must not burn tokens");
+
+    vm.prank(admin);
+    committee.adminAddFeeFreeAddress(spender);
+    vm.prank(user1);
+    IWorld(worldAddress).df__buySilver(planetHash, 0);
+    assertEq(dfsToken.balanceOf(address(pool)), 17_000 ether);
   }
 
   // ─── Test: Buy silver reverts without stakers ───
@@ -301,6 +379,7 @@ contract E2E_DFStar_Flow is BaseTest {
   function test_setConfig_acceptsBoundPoolOnce() public {
     vm.startPrank(admin);
     DFXStarConfig.set(address(0), address(0), address(0), address(0), address(0), 0);
+    IWorld(worldAddress).df__updateSilverBurnBps(2_500);
     IWorld(worldAddress).df__setDFXStarConfig(
       address(pool),
       address(dfsToken),
@@ -309,6 +388,102 @@ contract E2E_DFStar_Flow is BaseTest {
       worldAddress
     );
     vm.stopPrank();
+    assertEq(DFXStarConfig.getScoreStakingPool(), address(pool));
+    assertEq(DFXStarConfig.getPaymentToken(), community.getCommunityToken());
+    assertEq(DFXStarConfig.getBurnBps(), 2_500);
+  }
+
+  function test_setConfig_acceptsMatchingPaymentTokenBeforePoolBinding() public {
+    address spender = _buySilverSystem();
+    vm.startPrank(admin);
+    DFXStarConfig.set(address(0), address(0), address(0), address(0), address(0), 0);
+    IWorld(worldAddress).df__setDFXStarConfig(
+      address(0),
+      address(dfsToken),
+      address(dfxFactory),
+      address(community),
+      spender
+    );
+    vm.stopPrank();
+
+    assertEq(DFXStarConfig.getScoreStakingPool(), address(0));
+    assertEq(DFXStarConfig.getPaymentToken(), community.getCommunityToken());
+    assertEq(DFXStarConfig.getCommunity(), address(community));
+  }
+
+  function test_setConfig_rejectsPaymentTokenThatDoesNotMatchCommunity() public {
+    address otherToken = address(new TestDFS("Other test token", "OTHER", 0));
+    address spender = _buySilverSystem();
+    vm.prank(admin);
+    vm.expectRevert(Errors.PaymentTokenCommunityMismatch.selector);
+    IWorld(worldAddress).df__setDFXStarConfig(
+      address(pool),
+      otherToken,
+      address(dfxFactory),
+      address(community),
+      spender
+    );
+
+    assertEq(DFXStarConfig.getPaymentToken(), address(dfsToken));
+    assertEq(DFXStarConfig.getCommunity(), address(community));
+    assertEq(DFXStarConfig.getBuySilverSystem(), address(this));
+  }
+
+  function test_setConfig_rejectsPaymentTokenWithoutCommunityContract() public {
+    address spender = _buySilverSystem();
+    address noCodeCommunity = makeAddr("community without code");
+
+    vm.startPrank(admin);
+    vm.expectRevert(Errors.DFXStarCommunityNotConfigured.selector);
+    IWorld(worldAddress).df__setDFXStarConfig(
+      address(pool),
+      address(dfsToken),
+      address(dfxFactory),
+      address(0),
+      spender
+    );
+    vm.expectRevert(Errors.DFXStarCommunityNotConfigured.selector);
+    IWorld(worldAddress).df__setDFXStarConfig(
+      address(pool),
+      address(dfsToken),
+      address(dfxFactory),
+      noCodeCommunity,
+      spender
+    );
+    vm.stopPrank();
+  }
+
+  function test_setConfig_rejectsDifferentPoolCommunityEvenWithMatchingToken() public {
+    bytes memory policy = _encodePolicy(block.timestamp + 10, block.timestamp + 10 + 365 days, 1000);
+    address otherCommunity = communityFactory.createCommunity(
+      false,
+      address(dfsToken),
+      address(0),
+      bytes(""),
+      address(calculator),
+      policy
+    );
+    address spender = _buySilverSystem();
+
+    vm.prank(admin);
+    vm.expectRevert(Errors.ScorePoolCommunityMismatch.selector);
+    IWorld(worldAddress).df__setDFXStarConfig(
+      address(pool),
+      address(dfsToken),
+      address(dfxFactory),
+      otherCommunity,
+      spender
+    );
+
+    assertEq(DFXStarConfig.getCommunity(), address(community));
+  }
+
+  function test_setConfig_acceptsDisabledPaymentToken() public {
+    address spender = _buySilverSystem();
+    vm.prank(admin);
+    IWorld(worldAddress).df__setDFXStarConfig(address(pool), address(0), address(dfxFactory), address(0), spender);
+
+    assertEq(DFXStarConfig.getPaymentToken(), address(0));
     assertEq(DFXStarConfig.getScoreStakingPool(), address(pool));
   }
 

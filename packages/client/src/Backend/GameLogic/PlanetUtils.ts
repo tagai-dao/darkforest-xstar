@@ -675,7 +675,6 @@ export class PlanetUtils {
 
   public getDefaultMaterials(biome: Biome, planet: Planet): Materials[] {
     const planetType = planet.planetType;
-    const amount = planet.silver;
     const cap = planet.silverCap;
     const growthRate = planet.silverGrowth;
 
@@ -695,6 +694,13 @@ export class PlanetUtils {
     if (planetType !== PlanetType.SILVER_MINE) {
       return materials;
     }
+
+    const [, initialSilver] = this._initPopulationAndSilver(
+      planet.spaceType,
+      planetType,
+      planet.planetLevel,
+    );
+    const amount = initialSilver / CONTRACT_PRECISION;
 
     // Helper function to set material by finding the correct index
     const setMaterialByType = (materialType: MaterialType) => {

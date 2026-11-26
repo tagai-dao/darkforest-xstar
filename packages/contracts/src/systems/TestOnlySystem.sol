@@ -22,6 +22,7 @@ import { PlanetMaterialStorage } from "codegen/tables/PlanetMaterialStorage.sol"
 import { PlanetMaterial } from "codegen/tables/PlanetMaterial.sol";
 import { PlayerJunkLimit } from "codegen/tables/PlayerJunkLimit.sol";
 import { DFXStarConfig } from "codegen/tables/DFXStarConfig.sol";
+import { DFXStarConfigLib } from "libraries/DFXStarConfigLib.sol";
 import { IDFXStarScoreStaking } from "interfaces/nutbox/IDFXStarScoreStaking.sol";
 
 contract TestOnlySystem is BaseSystem {
@@ -192,7 +193,7 @@ contract TestOnlySystem is BaseSystem {
     }
     // 改地址时保留已经写好的销毁比例，避免把管理员设过的数清成 0。
     uint16 burnBps = DFXStarConfig.getBurnBps();
-    DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem, burnBps);
+    DFXStarConfigLib.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem, burnBps);
   }
 
   function addMaterial(uint256 planetHash, MaterialType materialType, uint256 amount) public {

@@ -56,11 +56,7 @@ contract MoveSystem is BaseSystem {
     uint256 _silver,
     uint256 _artifact,
     MaterialMove[] calldata _materials
-  ) public requireGamePass entryFee {
-    GlobalStats.setMoveCount(GlobalStats.getMoveCount() + 1);
-    PlayerStats.setMoveCount(_msgSender(), PlayerStats.getMoveCount(_msgSender()) + 1);
-
-    // delegate to the internal function, where we’ll do the rest
+  ) public requireGamePass {
     _move(_proof, _input, _population, _silver, _artifact, _materials);
   }
 
@@ -71,7 +67,10 @@ contract MoveSystem is BaseSystem {
     uint256 _silver,
     uint256 _artifact,
     MaterialMove[] memory _materials
-  ) internal {
+  ) internal entryFee {
+    GlobalStats.setMoveCount(GlobalStats.getMoveCount() + 1);
+    PlayerStats.setMoveCount(_msgSender(), PlayerStats.getMoveCount(_msgSender()) + 1);
+
     address w = _world();
     DFUtils.tick(w);
     DFUtils.verify(w, _proof, _input);
@@ -192,14 +191,23 @@ contract MoveSystem is BaseSystem {
       revert Errors.NotPlanetOwner();
     }
 
-    // Remove original move from destination planet's queue
-    PendingMoveQueueLib.RemoveMove(queue, moveId);
+    PendingMoveQueueLib.RemoveMove(queue, moveIndex);
     queue.WriteToStore();
-
-    // Create new move with reduced variables
-    _createReversedMove(moveData, toPlanetHash, moveIndex, currentTick, elapsedTime);
-    // Delete original move
     Move.deleteRecord(toPlanetHash, moveIndex);
+
+    // Enqueue on the synced source planet, which allocates its own storage slot.
+    fromPlanet.pushMove(
+      MoveData({
+        from: toPlanetHash,
+        id: moveData.id,
+        captain: moveData.captain,
+        departureTick: uint64(2 * currentTick - moveData.arrivalTick),
+        arrivalTick: uint64(currentTick + elapsedTime),
+        population: moveData.population / 2,
+        silver: moveData.silver / 2,
+        artifact: moveData.artifact
+      })
+    );
 
     // Update materials (50% of original amounts)
     for (uint8 rid = 1; rid <= uint8(type(MaterialType).max); rid++) {
@@ -227,36 +235,6 @@ contract MoveSystem is BaseSystem {
    */
   function isMoveReverted(uint64 moveId) public view returns (bool) {
     return revertedMoves[moveId];
-  }
-
-  function _createReversedMove(
-    MoveData memory moveData,
-    bytes32 toPlanetHash,
-    uint8 moveIndex,
-    uint256 currentTick,
-    uint256 elapsedTime
-  ) internal {
-    // Create new move directly
-    Move.set(
-      moveData.from,
-      moveIndex,
-      MoveData({
-        from: toPlanetHash,
-        id: moveData.id,
-        captain: moveData.captain,
-        departureTick: uint64(2 * currentTick - moveData.arrivalTick),
-        arrivalTick: uint64(currentTick + elapsedTime),
-        population: uint64(moveData.population / 2),
-        silver: uint64(moveData.silver / 2),
-        artifact: moveData.artifact
-      })
-    );
-
-    // Add to original source planet's queue
-    PendingMoveQueue memory newQueue;
-    newQueue.ReadFromStore(uint256(moveData.from));
-    PendingMoveQueueLib.PushMove(newQueue, Move.get(moveData.from, moveIndex));
-    newQueue.WriteToStore();
   }
 }
 

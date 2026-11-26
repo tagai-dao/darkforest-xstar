@@ -2,9 +2,12 @@
 pragma solidity >=0.8.24;
 
 import { System } from "@latticexyz/world/src/System.sol";
+import { IBaseWorld } from "@latticexyz/world/src/codegen/interfaces/IBaseWorld.sol";
+import { WorldResourceIdInstance } from "@latticexyz/world/src/WorldResourceId.sol";
 import { AccessControl } from "@latticexyz/world/src/AccessControl.sol";
 import { SystemRegistry } from "@latticexyz/world/src/codegen/tables/SystemRegistry.sol";
 import { EntryFee } from "codegen/tables/EntryFee.sol";
+import { FeeRecipient } from "codegen/tables/FeeRecipient.sol";
 import { Errors } from "interfaces/errors.sol";
 import { RevenueStats } from "codegen/tables/RevenueStats.sol";
 import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
@@ -21,14 +24,25 @@ contract BaseSystem is System, Errors {
    */
   modifier entryFee() {
     uint256 fee = EntryFee.getFee();
-    if (_msgValue() < fee) {
-      revert InsufficientEntryFee(fee);
-    }
-    ResourceId resourceId = SystemRegistry.get(address(this));
-    bytes32 key = ResourceId.unwrap(resourceId);
-    uint256 amount = RevenueStats.get(key) + _msgValue();
-    RevenueStats.set(key, amount);
+    uint256 payment = _msgValue();
+    if (payment < fee) revert InsufficientEntryFee(fee);
     _;
+    _collectNativeFee(payment, true);
+  }
+
+  function _collectNativeFee(uint256 payment, bool recordRevenue) internal {
+    if (recordRevenue) {
+      bytes32 key = ResourceId.unwrap(SystemRegistry.get(address(this)));
+      RevenueStats.set(key, RevenueStats.get(key) + payment);
+    }
+
+    if (payment == 0) return;
+    address recipient = FeeRecipient.getRecipient();
+    if (recipient == address(0)) return;
+
+    // MUD credited this call's value to df before dispatching the system.
+    ResourceId namespaceId = WorldResourceIdInstance.getNamespaceId(FeeRecipient._tableId);
+    IBaseWorld(_world()).transferBalanceToAddress(namespaceId, recipient, payment);
   }
 
   /**
@@ -49,23 +63,17 @@ contract BaseSystem is System, Errors {
     _;
   }
 
-  /// @dev 保管合约地址为 0 时不检查，测试靠这个跳过入场。系统互调时调用方是系统合约，玩家那一笔已经查过。
   modifier requireGamePass() {
     _requireGamePass(_msgSender());
     _;
   }
 
   function _requireGamePass(address player) internal view {
-    address pass = GamePassNFT.get();
-    if (pass == address(0)) {
-      return;
-    }
-    if (ResourceId.unwrap(SystemRegistry.get(player)) != bytes32(0)) {
-      return;
-    }
-    if (!IGamePassNFT(pass).isPlayerInActiveSeason(player)) {
-      revert GamePassRequired();
-    }
+    _checkGamePass(GamePassNFT.get(), player);
+  }
+
+  function _checkGamePass(address pass, address player) internal view {
+    if (pass != address(0) && !IGamePassNFT(pass).isPlayerInActiveSeason(player)) revert GamePassRequired();
   }
 
   modifier requireSameOwnerAndJunkOwner(uint256 planetHash) {

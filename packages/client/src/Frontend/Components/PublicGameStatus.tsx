@@ -1,12 +1,12 @@
 import { EMPTY_ADDRESS } from "@df/constants";
 import { formatWholeToken } from "@df/gamelogic";
-import type { Planet } from "@df/types";
+import type { MaterialType, Planet } from "@df/types";
 import { useComponentValue } from "@latticexyz/react";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
 import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
-import { type Address, parseAbi } from "viem";
+import { type Address, formatUnits } from "viem";
 
 import {
   copyText,
@@ -15,11 +15,22 @@ import {
 } from "../../Backend/GameLogic/moveOrder";
 import Viewport from "../Game/Viewport";
 import { useUIManager } from "../Utils/AppHooks";
+import { getMaterialColor } from "../Utils/materialColor";
 import UIEmitter, {
   type GuidedOrderKind,
   UIEmitterEvent,
 } from "../Utils/UIEmitter";
 import { BuyJunkOrderPanel } from "./BuyJunkOrderPanel";
+import {
+  readRewardClaimQuote,
+  type RewardClaimKind,
+  RewardClaimQuoteError,
+} from "./claimRewardOrder";
+import {
+  formatNativeBalance,
+  type GameAccountSnapshot,
+  readGameAccountSnapshot,
+} from "./gameAccountSnapshot";
 import {
   collectOwnedArtifacts,
   type OwnedArtifactLine,
@@ -187,13 +198,40 @@ const AssetButtons = styled.div`
   margin-block: 6px;
 `;
 
+const WalletDetails = styled.dl`
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px 12px;
+  margin: 6px 0;
+  padding: 6px 8px;
+  background: #101c2d;
+  border: 1px solid #25394e;
+  border-radius: 5px;
+
+  dt {
+    color: #a9bdd4;
+  }
+
+  dd {
+    margin: 0;
+    color: #e6f4ff;
+    font-weight: 600;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+`;
+
+const WalletReadError = styled.div`
+  color: #ffbe9f;
+`;
+
 type MaterialLine = {
+  id: MaterialType;
   name: string;
   amount: number;
 };
 
 type WalletFacts = {
-  users?: number;
   planetCount: number;
   artifacts: OwnedArtifactLine[];
   energy?: number;
@@ -212,16 +250,10 @@ const EMPTY_FACTS: WalletFacts = {
   materials: [],
 };
 
-const REWARD_ABI = parseAbi([
-  "function getPendingExternalRewards(address user) view returns (uint256)",
-  "function getPendingCommunityRewards(address user) view returns (uint256)",
-]);
-
-type RewardRead = {
-  pool: Address;
-  community?: Address;
-  game: bigint;
-  communityPending?: bigint;
+type AccountRead = {
+  key: string;
+  snapshot?: GameAccountSnapshot;
+  failed?: boolean;
 };
 
 // 待领是 18 位的 wei；页面只显示整枚 AIPRO。
@@ -250,6 +282,7 @@ function sumMaterials(planets: Planet[]): MaterialLine[] {
     }
   }
   return [...totals.entries()].map(([id, amount]) => ({
+    id: id as MaterialType,
     name: MATERIAL_NAME[id] ?? `材料${id}`,
     amount,
   }));
@@ -296,75 +329,90 @@ export function PublicGameStatus({
   const [planetsOpen, setPlanetsOpen] = useState(false);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
   const [junkBuyOpen, setJunkBuyOpen] = useState(false);
-  const [reward, setReward] = useState<RewardRead | undefined>();
+  const [accountRead, setAccountRead] = useState<AccountRead>();
   const [refreshing, setRefreshing] = useState(false);
+  const [claimCopy, setClaimCopy] = useState<{
+    key: string;
+    kind?: RewardClaimKind;
+    error?: string;
+  }>();
+  const claimRequest = useRef<symbol | undefined>(undefined);
   const seenFacts = useRef("");
-  const rewardRead = useRef<(() => Promise<void>) | undefined>(undefined);
-  const rewardSeq = useRef(0);
+  const refreshAccount = useRef<(() => Promise<void>) | undefined>(undefined);
   const {
-    network: { publicClient },
-    components: { DFXStarConfig },
+    network: { publicClient, worldAddress },
+    components: { DFXStarConfig, GamePassNFT },
   } = useMUD();
   const star = useComponentValue(DFXStarConfig, singletonEntity);
+  const pass = useComponentValue(GamePassNFT, singletonEntity);
+  const account = uiManager.getAccount()?.toLowerCase() as Address | undefined;
+  const claimKey = [publicClient.uid, worldAddress, account].join(":");
+  const currentClaim = claimCopy?.key === claimKey ? claimCopy : undefined;
+  const canCheckClaim = Boolean(
+    account && account !== EMPTY_ADDRESS && worldAddress,
+  );
+  useEffect(
+    () => () => {
+      claimRequest.current = undefined;
+    },
+    [claimKey],
+  );
+  const aipro = star?.paymentToken;
+  const locker = pass?.addr;
   const pool = star?.scoreStakingPool;
   const community = star?.community;
+  const readKey = [
+    publicClient.uid,
+    account,
+    aipro,
+    locker,
+    pool,
+    community,
+  ].join(":");
+  const currentRead = accountRead?.key === readKey ? accountRead : undefined;
+  const wallet = currentRead?.snapshot;
+  const reward = wallet?.reward;
+  const nativeSymbol =
+    wallet?.native.symbol ??
+    publicClient.chain?.nativeCurrency?.symbol ??
+    "BNB";
+  const stakedNftId = wallet?.stakedNftId;
+  let stakedNftLabel = "—";
+  if (stakedNftId === null) stakedNftLabel = "未质押";
+  else if (stakedNftId !== undefined) stakedNftLabel = `#${stakedNftId}`;
 
-  // 两种待领都不在星球同步里。平时 30 秒读一次，刷新按钮立刻再读。
+  // 余额、质押和待领奖励共享同一个链上快照。
   useEffect(() => {
+    if (!account || account === EMPTY_ADDRESS) return;
     let stopped = false;
+    let latestRequest = 0;
     const read = async () => {
-      const mine = ++rewardSeq.current;
-      const account = uiManager.getAccount();
-      if (!pool || pool === EMPTY_ADDRESS || !account) {
-        if (!stopped && mine === rewardSeq.current) {
-          setReward(undefined);
-        }
-        return;
-      }
-      const poolAddress = pool as Address;
-      const communityAddress =
-        community && community !== EMPTY_ADDRESS
-          ? (community as Address)
-          : undefined;
+      const request = ++latestRequest;
       try {
-        const game = await publicClient.readContract({
-          address: poolAddress,
-          abi: REWARD_ABI,
-          functionName: "getPendingExternalRewards",
-          args: [account as Address],
+        const snapshot = await readGameAccountSnapshot(publicClient, account, {
+          aipro,
+          locker,
+          pool,
+          community,
         });
-        let communityPending: bigint | undefined;
-        if (communityAddress) {
-          communityPending = await publicClient.readContract({
-            address: poolAddress,
-            abi: REWARD_ABI,
-            functionName: "getPendingCommunityRewards",
-            args: [account as Address],
-          });
-        }
-        if (!stopped && mine === rewardSeq.current) {
-          setReward({
-            pool: poolAddress,
-            community: communityAddress,
-            game,
-            communityPending,
-          });
+        if (!stopped && request === latestRequest) {
+          setAccountRead({ key: readKey, snapshot });
         }
       } catch {
-        if (!stopped && mine === rewardSeq.current) {
-          setReward(undefined);
+        if (!stopped && request === latestRequest) {
+          setAccountRead({ key: readKey, failed: true });
         }
       }
     };
-    rewardRead.current = read;
+    refreshAccount.current = read;
     void read();
     const timer = window.setInterval(() => void read(), 30_000);
     return () => {
       stopped = true;
-      rewardRead.current = undefined;
+      refreshAccount.current = undefined;
       window.clearInterval(timer);
     };
-  }, [community, pool, publicClient, uiManager]);
+  }, [account, aipro, community, locker, pool, publicClient, readKey]);
 
   const refresh = () => {
     if (refreshing) {
@@ -373,7 +421,7 @@ export function PublicGameStatus({
     setRefreshing(true);
     // 清掉签名，下一帧会把半径、tick、分数这些本地数字重写一遍。
     seenFacts.current = "";
-    void Promise.resolve(rewardRead.current?.()).finally(() => {
+    void Promise.resolve(refreshAccount.current?.()).finally(() => {
       setRefreshing(false);
     });
   };
@@ -387,6 +435,57 @@ export function PublicGameStatus({
         kind,
       });
     });
+  };
+
+  const copyClaimOrder = async (kind: RewardClaimKind) => {
+    if (!account || !canCheckClaim || claimRequest.current) return;
+
+    const request = Symbol();
+    claimRequest.current = request;
+    setClaimCopy({ key: claimKey, kind });
+    const isActiveGame = () =>
+      uiManager.getGameManager().getContractAddress().toLowerCase() ===
+        worldAddress.toLowerCase() &&
+      uiManager.getAccount()?.toLowerCase() === account;
+
+    try {
+      if (!isActiveGame())
+        throw new RewardClaimQuoteError("当前钱包或 World 已变化，请重试");
+      const quote = await readRewardClaimQuote(publicClient, {
+        kind,
+        worldAddress: worldAddress as Address,
+        account,
+      });
+      if (claimRequest.current !== request) return;
+      if (!isActiveGame())
+        throw new RewardClaimQuoteError("当前钱包或 World 已变化，请重试");
+
+      if (kind === "game") {
+        copyOrder(
+          formatClaimRewardsOrder(quote),
+          "已复制游戏奖励领取单，直接粘贴给 agent",
+          "claim-rewards",
+        );
+      } else {
+        copyOrder(
+          formatClaimCommunityOrder(quote),
+          "已复制社区奖励领取单，直接粘贴给 agent",
+        );
+      }
+      setClaimCopy(undefined);
+    } catch (error) {
+      if (claimRequest.current === request) {
+        setClaimCopy({
+          key: claimKey,
+          error:
+            error instanceof RewardClaimQuoteError
+              ? error.message
+              : "无法核对链上领奖信息，请重试",
+        });
+      }
+    } finally {
+      if (claimRequest.current === request) claimRequest.current = undefined;
+    }
   };
 
   useEffect(() => {
@@ -419,13 +518,9 @@ export function PublicGameStatus({
         materials: [],
       };
       try {
-        next.users = uiManager.getSpawnedPlayerCount();
-      } catch {
-        // GlobalStats 还没同步到。
-      }
-      try {
-        const account = uiManager.getAccount()?.toLowerCase();
-        if (account) {
+        const playerAccount = uiManager.getAccount();
+        if (playerAccount) {
+          const account = playerAccount.toLowerCase();
           const held = heldByAccount(uiManager.getAllOwnedPlanets(), account);
           next.planetCount = held.length;
           const game = uiManager.getGameManager();
@@ -439,7 +534,7 @@ export function PublicGameStatus({
           next.energy = held.reduce((sum, planet) => sum + planet.energy, 0);
           next.silver = held.reduce((sum, planet) => sum + planet.silver, 0);
           next.materials = sumMaterials(held);
-          const player = uiManager.getGameManager().getPlayer(account);
+          const player = game.getPlayer(playerAccount);
           if (player) {
             next.junkUsed = player.junk;
             next.junkLimit = player.junkLimit;
@@ -454,7 +549,6 @@ export function PublicGameStatus({
       const signature = [
         nextRadius,
         nextTick,
-        next.users,
         next.planetCount,
         next.artifacts
           .map(
@@ -468,7 +562,7 @@ export function PublicGameStatus({
         next.energy,
         next.silver,
         next.materials
-          .map((material) => `${material.name}:${material.amount}`)
+          .map((material) => `${material.id}:${material.amount}`)
           .join(","),
       ].join("|");
       if (signature !== seenFacts.current) {
@@ -509,7 +603,35 @@ export function PublicGameStatus({
           <>
             <BoundaryRadius>收缩圈半径 {innerRadius ?? "..."}</BoundaryRadius>
             <div>当前 tick {tick ?? "..."}</div>
-            <div>总用户 {whole(facts.users)}</div>
+            <WalletDetails aria-label="钱包资产">
+              <dt>AIPRO 余额</dt>
+              <dd
+                title={
+                  wallet?.aipro
+                    ? formatUnits(wallet.aipro.amount, wallet.aipro.decimals)
+                    : undefined
+                }
+              >
+                {wallet?.aipro
+                  ? formatWholeToken(wallet.aipro.amount, wallet.aipro.decimals)
+                  : "—"}
+              </dd>
+              <dt>{nativeSymbol} 余额</dt>
+              <dd
+                title={
+                  wallet
+                    ? formatUnits(wallet.native.amount, wallet.native.decimals)
+                    : undefined
+                }
+              >
+                {wallet ? formatNativeBalance(wallet.native) : "—"}
+              </dd>
+              <dt>质押 NFT ID</dt>
+              <dd>{stakedNftLabel}</dd>
+            </WalletDetails>
+            {currentRead?.failed && (
+              <WalletReadError role="status">链上资产读取失败</WalletReadError>
+            )}
             <AssetButtons>
               <OpenButton
                 type="button"
@@ -560,22 +682,10 @@ export function PublicGameStatus({
               <ClaimButton
                 type="button"
                 data-guide-target="claim-game-rewards"
-                disabled={!reward || reward.game === 0n}
-                onClick={() => {
-                  if (!reward || reward.game === 0n) {
-                    return;
-                  }
-                  copyOrder(
-                    formatClaimRewardsOrder({
-                      pool: reward.pool,
-                      pendingWei: reward.game,
-                    }),
-                    "已复制游戏奖励领取单，直接粘贴给 agent",
-                    "claim-rewards",
-                  );
-                }}
+                disabled={!canCheckClaim || currentClaim?.kind !== undefined}
+                onClick={() => void copyClaimOrder("game")}
               >
-                领取
+                {currentClaim?.kind === "game" ? "核对中…" : "领取"}
               </ClaimButton>
             </RewardLine>
             <RewardLine>
@@ -588,39 +698,25 @@ export function PublicGameStatus({
               </span>
               <ClaimButton
                 type="button"
-                disabled={
-                  !reward?.community ||
-                  reward.communityPending === undefined ||
-                  reward.communityPending === 0n
-                }
-                onClick={() => {
-                  if (
-                    !reward?.community ||
-                    reward.communityPending === undefined ||
-                    reward.communityPending === 0n
-                  ) {
-                    return;
-                  }
-                  copyOrder(
-                    formatClaimCommunityOrder({
-                      community: reward.community,
-                      pool: reward.pool,
-                      pendingWei: reward.communityPending,
-                    }),
-                    "已复制社区奖励领取单，直接粘贴给 agent",
-                  );
-                }}
+                disabled={!canCheckClaim || currentClaim?.kind !== undefined}
+                onClick={() => void copyClaimOrder("community")}
               >
-                领取
+                {currentClaim?.kind === "community" ? "核对中…" : "领取"}
               </ClaimButton>
             </RewardLine>
+            {currentClaim?.error && (
+              <div role="alert">{currentClaim.error}</div>
+            )}
             <div>能量 {whole(facts.energy)}</div>
             <div>银 {whole(facts.silver)}</div>
             {facts.materials.length === 0 ? (
               <div>材料 无</div>
             ) : (
               facts.materials.map((material) => (
-                <div key={material.name}>
+                <div
+                  key={material.id}
+                  style={{ color: getMaterialColor(material.id) }}
+                >
                   {material.name} {whole(material.amount)}
                 </div>
               ))

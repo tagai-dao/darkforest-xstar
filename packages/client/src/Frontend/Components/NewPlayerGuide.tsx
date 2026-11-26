@@ -124,7 +124,7 @@ const steps = [
   {
     id: "register",
     title: "登记星球",
-    text: "点击「复制 addJunk」生成登记单。登记成功后数字会变白，星球按类型恢复能量或生产资源。",
+    text: "点击「登记」生成登记单。登记成功后数字会变白，星球按类型恢复能量或生产资源。",
     order: "add-junk",
     control: '[data-guide-target="add-junk"]',
     findPlanet: "选择一颗能量数字呈琥珀色的己方星球。",
@@ -171,7 +171,7 @@ const steps = [
   {
     id: "upgrade",
     title: "用银升级行星",
-    text: "选择范围、速度或防御分支，点击「复制升级」。",
+    text: "选择范围、速度或防御分支，点击「升级」。",
     order: "upgrade",
     control: '[data-guide-target="upgrade"] button:not(:disabled)',
     findPlanet: "选择一颗已登记、有银可用的己方 1 级或以上普通行星。",

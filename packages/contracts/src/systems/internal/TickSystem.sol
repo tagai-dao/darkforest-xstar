@@ -3,6 +3,11 @@ pragma solidity >=0.8.24;
 
 import { BaseSystem } from "systems/internal/BaseSystem.sol";
 import { AccessControl } from "@latticexyz/world/src/AccessControl.sol";
+import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
+import { WorldResourceIdInstance } from "@latticexyz/world/src/WorldResourceId.sol";
+import { ResourceAccess } from "@latticexyz/world/src/codegen/tables/ResourceAccess.sol";
+import { GamePassNFT } from "codegen/tables/GamePassNFT.sol";
+import { PlanetFlags } from "codegen/tables/PlanetFlags.sol";
 import { SystemRegistry } from "@latticexyz/world/src/codegen/tables/SystemRegistry.sol";
 import { Ticker, TickerData } from "codegen/tables/Ticker.sol";
 import { InnerCircle, InnerCircleData } from "codegen/tables/InnerCircle.sol";
@@ -20,13 +25,55 @@ contract TickSystem is BaseSystem {
    * there are at least 10 operations from all players within one block, then we save gas
    * by updating it in storage once per block.
    */
-  function tick() public requireGamePass {
+  function tick() public {
+    _requireGamePassForUpdate({ caller: _msgSender(), readingPlanet: false });
     TickerData memory ticker = Ticker.get();
     if (ticker.paused) {
       revert Paused();
     }
     _tick(ticker);
     Ticker.set(ticker);
+  }
+
+  /// @notice Applies the Game Pass rules used by PlanetReadSystem before recording arrivals.
+  function checkPlanetSyncGamePass(address caller) public view {
+    _requireGamePassForUpdate({ caller: caller, readingPlanet: true });
+  }
+
+  /// @dev Only Tick and the state-changing planet reads accept internal callers.
+  function _requireGamePassForUpdate(address caller, bool readingPlanet) internal view {
+    address pass = GamePassNFT.get();
+    if (pass == address(0) || _isGameUpdateSystem(caller, readingPlanet)) return;
+    _checkGamePass(pass, caller);
+  }
+
+  function _isGameUpdateSystem(address caller, bool readingPlanet) private view returns (bool) {
+    ResourceId systemId = SystemRegistry.get(caller);
+    bytes14 systemNamespace = WorldResourceIdInstance.getNamespace(systemId);
+    bytes16 systemName = WorldResourceIdInstance.getName(systemId);
+    if (systemNamespace != "df") {
+      // The installed Pink Bomb proxy has explicit game-table access and only needs Tick.
+      return
+        !readingPlanet &&
+        systemNamespace == "atf.1" &&
+        systemName == "ProxySystem" &&
+        ResourceAccess.get(PlanetFlags._tableId, caller);
+    }
+
+    return
+      systemName == "MoveSystem" ||
+      systemName == "BuySilverSystem" ||
+      systemName == "PlanetRevealSyst" ||
+      systemName == "ArtifactCreateSy" ||
+      systemName == "ArtifactSystem" ||
+      systemName == "PlanetUpgradeSys" ||
+      systemName == "WithdrawMaterial" ||
+      systemName == "PlanetJunkSystem" ||
+      systemName == "TestOnlySystem" ||
+      systemName == "PlanetWithdrawSi" ||
+      systemName == "ArtifactPortalSy" ||
+      systemName == "PlanetEmojiSyste" ||
+      (readingPlanet && systemName == "PlayerSystem");
   }
 
   function pause() public namespaceOwner {

@@ -5,7 +5,7 @@ import type {
   ActionRecord,
   AiproPrice,
 } from "../../Backend/Save/FileChunkSource";
-import Viewport from "../Game/Viewport";
+import { useUIManager } from "../Utils/AppHooks";
 
 const COLLAPSED_ROWS = 3;
 
@@ -240,15 +240,6 @@ export function actionTextParts(text: string): ActionTextPart[] {
   return parts;
 }
 
-function focusCoordinate(x: number, y: number): void {
-  try {
-    // 只移动中心，不改当前缩放。
-    Viewport.getInstance().focus({ x, y });
-  } catch {
-    // 画面还没建好。
-  }
-}
-
 /** 记录里的 time 是 ISO 字符串。页面上显示成本地的月日和时间。 */
 export function formatActionTime(time: string | undefined): string {
   if (!time) {
@@ -270,6 +261,7 @@ export function formatActionTime(time: string | undefined): string {
 
 /** 收起时只渲染最新三条。展开后保留完整记录。 */
 export function ActionHistory({ actions }: { actions: ActionRecord[] }) {
+  const uiManager = useUIManager();
   const [open, setOpen] = useState(false);
   const titleId = useId();
   const listId = useId();
@@ -277,6 +269,15 @@ export function ActionHistory({ actions }: { actions: ActionRecord[] }) {
   const followLatest = useRef(true);
   const startIndex = open ? 0 : Math.max(0, actions.length - COLLAPSED_ROWS);
   const visibleActions = open ? actions : actions.slice(startIndex);
+
+  const focusCoordinate = (x: number, y: number) => {
+    try {
+      // 已知坐标会选中星球，以当前缩放定位。
+      uiManager.centerCoords({ x, y });
+    } catch {
+      // 画面还没建好。
+    }
+  };
 
   useLayoutEffect(() => {
     const box = scroller.current;

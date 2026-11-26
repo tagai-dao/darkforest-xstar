@@ -1,6 +1,16 @@
-import { getRange, isLocatable } from "@df/gamelogic";
+import {
+  getInnerCircleShrinkPercent,
+  getRange,
+  isLocatable,
+} from "@df/gamelogic";
 import { isUnconfirmedMoveTx } from "@df/serde";
-import type { Planet, RGBAVec, UIRendererType, WorldCoords } from "@df/types";
+import type {
+  CanvasCoords,
+  Planet,
+  RGBAVec,
+  UIRendererType,
+  WorldCoords,
+} from "@df/types";
 import {
   ArtifactType,
   RendererType,
@@ -18,6 +28,60 @@ const { orangeA, redA, white, purpleA, blueA, pinkA, sensaichaA } =
 const ORIGIN = { x: 0, y: 0 };
 const SELECTION_COLOR: RGBAVec = [110, 236, 223, 245];
 const HOVER_COLOR: RGBAVec = [192, 218, 244, 215];
+
+export function getInnerCircleLabelPosition(
+  center: CanvasCoords,
+  radius: number,
+  width: number,
+  height: number,
+): CanvasCoords | undefined {
+  const left = 42;
+  const right = width - left;
+  const top = 24;
+  const bottom = height - top;
+  if (right <= left || bottom <= top || radius <= 0) return;
+
+  const anchor = { x: width / 2, y: height * 0.4 };
+  let position: CanvasCoords | undefined;
+  let closest = Infinity;
+  const consider = (x: number, y: number) => {
+    if (x < left || x > right || y < top || y > bottom) return;
+    const distance = (x - anchor.x) ** 2 + (y - anchor.y) ** 2;
+    if (distance < closest) {
+      closest = distance;
+      position = { x, y };
+    }
+  };
+
+  const dx = anchor.x - center.x;
+  const dy = anchor.y - center.y;
+  const length = Math.hypot(dx, dy);
+  if (length > 0) {
+    consider(
+      center.x + (dx / length) * radius,
+      center.y + (dy / length) * radius,
+    );
+  } else {
+    consider(center.x, center.y - radius);
+  }
+
+  // If the closest point is clipped, the visible arc starts or ends at an inset edge.
+  for (const x of [left, right]) {
+    const offset = radius ** 2 - (x - center.x) ** 2;
+    if (offset < 0) continue;
+    const dy = Math.sqrt(offset);
+    consider(x, center.y - dy);
+    consider(x, center.y + dy);
+  }
+  for (const y of [top, bottom]) {
+    const offset = radius ** 2 - (y - center.y) ** 2;
+    if (offset < 0) continue;
+    const dx = Math.sqrt(offset);
+    consider(center.x - dx, y);
+    consider(center.x + dx, y);
+  }
+  return position;
+}
 
 export class UIRenderer implements UIRendererType {
   renderer: Renderer;
@@ -58,6 +122,13 @@ export class UIRenderer implements UIRendererType {
           1,
           true,
         );
+        const label = getInnerCircleLabelPosition(
+          center,
+          edge,
+          viewportWidth,
+          viewportHeight,
+        );
+        if (label) this.drawInnerCircleProgress(label, inner);
       }
     }
 
@@ -72,6 +143,26 @@ export class UIRenderer implements UIRendererType {
       circleRenderer.queueCircleWorld(ORIGIN, outer, [89, 164, 242, 44], 7);
       circleRenderer.queueCircleWorld(ORIGIN, outer, [144, 203, 255, 225], 2);
     }
+  }
+
+  private drawInnerCircleProgress({ x, y }: CanvasCoords, innerRadius: number) {
+    const { ctx } = this.renderer.overlay2dRenderer;
+    const label = `${getInnerCircleShrinkPercent(innerRadius).toFixed(1)}%`;
+    ctx.save();
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const width = Math.ceil(ctx.measureText(label).width) + 20;
+    ctx.beginPath();
+    ctx.roundRect(x - width / 2, y - 12, width, 24, 6);
+    ctx.fillStyle = "#1d1722";
+    ctx.fill();
+    ctx.strokeStyle = "#be7c61";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = "#ffd4b9";
+    ctx.fillText(label, x, y);
+    ctx.restore();
   }
 
   /**

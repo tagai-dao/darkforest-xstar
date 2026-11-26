@@ -2,11 +2,71 @@
 pragma solidity >=0.8.24;
 
 import "forge-std/Test.sol";
+import { StoreCore } from "@latticexyz/store/src/StoreCore.sol";
+import { StoreSwitch } from "@latticexyz/store/src/StoreSwitch.sol";
 import { PlanetType, SpaceType, MaterialType, Biome } from "../src/codegen/common.sol";
 import { Planet } from "../src/lib/Planet.sol";
 import { PlanetLib } from "../src/lib/Planet.sol";
 import { PlanetMaterialStorage } from "../src/codegen/tables/PlanetMaterialStorage.sol";
 import { PlanetMaterial } from "../src/codegen/tables/PlanetMaterial.sol";
+import { PlanetMetadata, PlanetMetadataData } from "../src/codegen/tables/PlanetMetadata.sol";
+import { PlanetInitialResource } from "../src/codegen/tables/PlanetInitialResource.sol";
+import { InitializeSystem } from "../src/systems/internal/InitializeSystem.sol";
+
+contract AsteroidResourceDefaultsTest is Test, InitializeSystem {
+  function setUp() public {
+    StoreSwitch.setStoreAddress(address(this));
+    StoreCore.initialize();
+    PlanetMetadata.register();
+    PlanetInitialResource.register();
+    PlanetMaterialStorage.register();
+
+    setPlanetMetadata(6, PlanetMetadataData(2838, 160, 200, 300_000_000, 2917, 100_000_000, 2778), 7);
+  }
+
+  function testAsteroidSeedAndSharedGrowth() public view {
+    PlanetMetadataData memory metadata = PlanetMetadata.get(SpaceType.DEEP_SPACE, PlanetType.ASTEROID_FIELD, 6);
+    assertEq(metadata.silverCap, 300_000_000);
+    assertEq(metadata.silverGrowth, 416);
+
+    Planet memory asteroid;
+    asteroid.planetHash = 1;
+    asteroid.planetType = PlanetType.ASTEROID_FIELD;
+    asteroid.spaceType = SpaceType.DEEP_SPACE;
+    asteroid.level = 6;
+    asteroid.silverCap = metadata.silverCap;
+    asteroid.silverGrowth = metadata.silverGrowth;
+    asteroid.silver = PlanetInitialResource.getSilver(asteroid.spaceType, asteroid.planetType, 6);
+    assertEq(asteroid.silver, 15_000_000);
+
+    asteroid.materialStorage.ReadFromStore(asteroid.planetHash);
+    asteroid.naturalGrowth(20);
+    assertEq(asteroid.silver, 15_000_000);
+    assertEq(asteroid.getMaterial(MaterialType.WATER_CRYSTALS), 0);
+
+    asteroid.owner = address(1);
+    asteroid.junkOwner = asteroid.owner;
+    asteroid.initMaterial(MaterialType.WATER_CRYSTALS);
+    assertEq(asteroid.getMaterial(MaterialType.WATER_CRYSTALS), 15_000_000);
+    assertEq(asteroid.getMaterialCap(MaterialType.WATER_CRYSTALS), 300_000_000);
+
+    asteroid.naturalGrowth(120);
+    assertEq(asteroid.silver, 15_041_600);
+    assertEq(asteroid.getMaterial(MaterialType.WATER_CRYSTALS), 15_041_600);
+  }
+
+  function testOtherTypesKeepTheirSilverDefaults() public view {
+    uint64[5] memory caps = [uint64(150_000_000), 300_000_000, 150_000_000, 300_000_000, 1_500_000_000];
+    for (uint8 i = 1; i <= uint8(type(PlanetType).max); i++) {
+      PlanetType planetType = PlanetType(i);
+      if (planetType == PlanetType.ASTEROID_FIELD) continue;
+      PlanetMetadataData memory metadata = PlanetMetadata.get(SpaceType.DEEP_SPACE, planetType, 6);
+      assertEq(metadata.silverCap, caps[i - 1]);
+      assertEq(metadata.silverGrowth, 0);
+      assertEq(PlanetInitialResource.getSilver(SpaceType.DEEP_SPACE, planetType, 6), 0);
+    }
+  }
+}
 
 contract MaterialsTest is Test {
   function testMaterialGrowthLogic() public view {

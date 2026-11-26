@@ -621,8 +621,10 @@ export class GameObjects {
           );
 
           if (defaultMaterial && defaultMaterial.materialAmount > 0) {
-            const newAmount =
-              existing.materialAmount + defaultMaterial.materialAmount;
+            const newAmount = Math.min(
+              existing.materialAmount + defaultMaterial.materialAmount,
+              defaultMaterial.cap,
+            );
             console.log(
               `Adding ${defaultMaterial.materialAmount} to ${existing.materialAmount} = ${newAmount}`,
             );

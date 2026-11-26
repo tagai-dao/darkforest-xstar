@@ -141,7 +141,7 @@ export function ManageJunkButton({
               {adding ? (
                 <LoadingSpinner initialText="Adding Junk..." />
               ) : (
-                "复制 addJunk"
+                "登记"
               )}
             </TextWrapper>
           )}
@@ -151,7 +151,7 @@ export function ManageJunkButton({
               {clearing ? (
                 <LoadingSpinner initialText="Clearing Junk..." />
               ) : (
-                "复制 removeJunk"
+                "取消登记"
               )}
             </TextWrapper>
           )}

@@ -17,8 +17,6 @@ import { AccessControl } from "@latticexyz/world/src/AccessControl.sol";
 import { SystemRegistry } from "@latticexyz/world/src/codegen/tables/SystemRegistry.sol";
 import { Balances } from "@latticexyz/world/src/codegen/tables/Balances.sol";
 import { PlayerWithdrawSilver } from "codegen/tables/PlayerWithdrawSilver.sol";
-import { RevenueStats } from "codegen/tables/RevenueStats.sol";
-import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
 import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 
 contract GuildSystem is BaseSystem {
@@ -208,7 +206,8 @@ contract GuildSystem is BaseSystem {
     GlobalStats.setCreateGuildCount(GlobalStats.getCreateGuildCount() + 1);
 
     // Check if the creation fee is sufficient
-    if (_msgValue() < GuildConfig.getCreateFee()) {
+    uint256 payment = _msgValue();
+    if (payment < GuildConfig.getCreateFee()) {
       revert NeedFundsToCreateGuild();
     }
 
@@ -234,10 +233,7 @@ contract GuildSystem is BaseSystem {
 
     GuildName.set(uint8(guildId), name);
 
-    ResourceId resourceId = SystemRegistry.get(address(this));
-    bytes32 key = ResourceId.unwrap(resourceId);
-    uint256 amount = RevenueStats.get(key) + _msgValue();
-    RevenueStats.set(key, amount);
+    _collectNativeFee(payment, true);
   }
 
   function inviteToGuild(address invitee) public requireGamePass {

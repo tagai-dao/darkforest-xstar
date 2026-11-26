@@ -14,25 +14,25 @@ const dest = join(clientRoot, "public/skills/darkforest-punk-player");
 mkdirSync(dest, { recursive: true });
 cpSync(src, dest, { recursive: true });
 
-const mdFiles = readdirSync(dest)
-  .filter((name) => name.endsWith(".md"))
+const publishedFiles = readdirSync(src)
+  .filter((name) => name.endsWith(".md") || name === "check-buy-silver.mjs")
   .sort();
 
 const manifest = {
   name: "darkforest-punk-player",
-  version: "1.1.0",
+  version: "1.1.2",
   description:
     "BSC Dark Forest player skill. Entry is SKILL.md; fetch every path in files.",
   basePath: "/skills/darkforest-punk-player/",
   entry: "SKILL.md",
-  files: mdFiles,
+  files: publishedFiles,
 };
 
 writeFileSync(join(dest, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
 const links = [
   ["manifest.json", "manifest.json"],
-  ...mdFiles.map((name) => [name, name]),
+  ...publishedFiles.map((name) => [name, name]),
 ]
   .map(
     ([href, label]) =>
@@ -63,5 +63,5 @@ ${links}
 
 writeFileSync(join(dest, "index.html"), indexHtml);
 console.log(
-  `synced skill → public (${mdFiles.length} md + manifest.json + index.html)`,
+  `synced skill → public (${publishedFiles.length} skill files + manifest.json + index.html)`,
 );

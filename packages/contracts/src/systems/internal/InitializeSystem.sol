@@ -56,7 +56,7 @@ contract InitializeSystem is BaseSystem {
 
   /**
    * @dev
-   * ASTEROID_FIELD: 1/2 defense, double silverCap
+   * ASTEROID_FIELD: 1/2 defense, double silverCap, 1/10 resource growth, initial resources at 5% of capacity
    * SPACETIME_RIP: 1/2 defense, double silverCap, no silverGrowth
    * PLANET: no silver, no silverGrowth
    * FOUNDRY: no silver, no silverGrowth
@@ -71,13 +71,14 @@ contract InitializeSystem is BaseSystem {
     uint256 defense = metadata.defense;
     metadata.defense /= 2;
     metadata.silverCap *= 2;
+    metadata.silverGrowth /= 10;
     PlanetMetadata.set(spaceType, PlanetType.ASTEROID_FIELD, level, metadata);
     uint64 population = uint64((metadata.populationCap * initialPopulationPercentage) / 100);
     PlanetInitialResource.set(
       spaceType,
       PlanetType.ASTEROID_FIELD,
       level,
-      PlanetInitialResourceData(population, metadata.silverCap / 2)
+      PlanetInitialResourceData(population, metadata.silverCap / 20)
     );
     metadata.silverGrowth = 0;
     PlanetMetadata.set(spaceType, PlanetType.SPACETIME_RIP, level, metadata);

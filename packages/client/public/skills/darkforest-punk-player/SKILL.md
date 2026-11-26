@@ -148,13 +148,19 @@ That JSON is the whole purchase. The owner already picked the tier and saw its p
 
 The game page does not claim rewards. Under the score, the line labeled 游戏奖励 copies a block. The first line is `DARKFOREST_CLAIM_REWARDS`. The next line is one JSON object with `"kind": "darkforest-claim-rewards"`.
 
-That JSON is the whole claim. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start. Call `claimExternalRewards()` on `pool` with `valueWei` attached, which is 0. Sign with the player wallet. This pays the game-reward pending and leaves the stake in place. It does not pay community rewards. Do not claim when `pendingWei` is `0`. Wait for a successful receipt. Record `claim` as [actions.md](actions.md) describes. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
+When the owner clicks the button, the page reads the trusted World's `DFXStarConfig`, the pending game reward, the Committee's `getPoolOperationFee`, and the wallet's `getFeeFree` status through Multicall at one block. The order records the resulting `pool`, `pendingWei`, `valueWei`, `chainId`, `worldAddress`, and `account`.
+
+For an order copied from the game page, match `chainId` and `worldAddress` to the current game and `account` to the player wallet. If they differ, ask for a fresh copy from the matching game and wallet. A legacy order with all three context fields absent may use the current game and player wallet when it explicitly quotes `valueWei` as `0`. Ask for a fresh copy if a newer order has incomplete context.
+
+If `pendingWei` is positive and the context matches, call `claimExternalRewards()` on `pool` with exactly `valueWei` wei. Sign with the matching player wallet, wait for a successful receipt, and record `claim` as [actions.md](actions.md) describes. If the transaction reverts, tell the owner and leave the action history as it was.
 
 ## Pasted community reward claim
 
 The line labeled 社区奖励 copies a different block. The first line is `DARKFOREST_CLAIM_COMMUNITY`. The next line is one JSON object with `"kind": "darkforest-claim-community"`.
 
-That JSON is the whole claim. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start. Call `withdrawPoolsRewards` on `community` with a one-element array containing `pool`. Attach `valueWei`, which is 0. Sign with the player wallet. This pays the community pending and leaves the stake in place. It does not pay game rewards. Do not claim when `pendingWei` is `0`. Wait for a successful receipt. Record `claim-community` as [actions.md](actions.md) describes. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
+At copy time the page resolves `community` and `pool` from the trusted World and reads the pending community reward and the Committee's `getPoolOperationFee` through Multicall at one block. The order includes both addresses along with `pendingWei`, `valueWei`, `chainId`, `worldAddress`, and `account`.
+
+Apply the copied-order context checks and legacy-order rule in [Pasted game reward claim](#pasted-game-reward-claim). If `pendingWei` is positive and the context matches, call `withdrawPoolsRewards` on `community` with `[pool]` and attach exactly `valueWei` wei. Sign with the matching player wallet, wait for a successful receipt, and record `claim-community` as [actions.md](actions.md) describes. If the transaction reverts, tell the owner and leave the action history as it was.
 
 ## Ask first
 

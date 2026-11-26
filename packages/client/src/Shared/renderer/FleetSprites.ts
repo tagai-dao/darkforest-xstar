@@ -1,5 +1,3 @@
-import type { LineDashPattern } from "@df/types";
-
 const hulls = {
   light: {
     width: 22,
@@ -50,13 +48,13 @@ export type FleetTier = keyof typeof hulls;
 
 export const fleetRoutes: Record<
   FleetTier,
-  { width: number; alpha: number; halo: number; dash?: LineDashPattern }
+  { width: number; alpha: number; halo: number }
 > = {
   light: { width: 1, alpha: 120, halo: 0 },
-  medium: { width: 1, alpha: 152, halo: 0, dash: { length: 4, gap: 5 } },
-  heavy: { width: 2, alpha: 146, halo: 0, dash: { length: 12, gap: 5 } },
-  capital: { width: 3, alpha: 172, halo: 34, dash: { length: 22, gap: 7 } },
-  flagship: { width: 4, alpha: 195, halo: 56 },
+  medium: { width: 2, alpha: 152, halo: 0 },
+  heavy: { width: 3, alpha: 146, halo: 0 },
+  capital: { width: 4, alpha: 172, halo: 34 },
+  flagship: { width: 5, alpha: 195, halo: 56 },
 };
 
 type FleetSprite = {

@@ -299,7 +299,7 @@ library PendingMoveQueueLib {
     uint256 i = _q.head + _q.number;
     uint256 index = indexes[i % MAX_MOVE_QUEUE_SIZE];
     Move.set(bytes32(_q.planetHash), uint8(index), _move);
-    while (i > 0) {
+    while (i > _q.head) {
       uint256 curIndex = indexes[(i - 1) % MAX_MOVE_QUEUE_SIZE];
       MoveData memory move = Move.get(bytes32(_q.planetHash), uint8(curIndex));
       if (move.arrivalTick <= _move.arrivalTick) {
@@ -359,18 +359,7 @@ library PendingMoveQueueLib {
     return type(uint8).max; // Return max value to indicate not found
   }
 
-  function RemoveMove(PendingMoveQueue memory _q, uint64 moveId) internal view {
-    if (_q.IsEmpty()) {
-      return;
-    }
-
-    // Find the move index by moveId
-    uint8 moveIndex = _q.FindMoveIndex(moveId);
-    if (moveIndex == type(uint8).max) {
-      // Move not found in queue
-      return;
-    }
-
+  function RemoveMove(PendingMoveQueue memory _q, uint8 moveIndex) internal pure {
     uint256[] memory indexes = _q.indexes;
     uint256 head = _q.head;
     uint256 tail = head + _q.number;
@@ -385,6 +374,7 @@ library PendingMoveQueueLib {
             ++j;
           }
         }
+        indexes[(tail - 1) % MAX_MOVE_QUEUE_SIZE] = moveIndex;
         --_q.number;
         _q.indexes = indexes;
         _q.shouldWrite = true;

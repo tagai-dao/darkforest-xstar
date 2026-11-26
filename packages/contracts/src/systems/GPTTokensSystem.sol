@@ -4,9 +4,6 @@ pragma solidity >=0.8.24;
 import { BaseSystem } from "systems/internal/BaseSystem.sol";
 import { GPTTokens } from "codegen/index.sol";
 
-import { SystemRegistry } from "@latticexyz/world/src/codegen/tables/SystemRegistry.sol";
-import { RevenueStats } from "codegen/tables/RevenueStats.sol";
-import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
 import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
 
@@ -23,17 +20,14 @@ contract GPTTokensSystem is BaseSystem {
     GlobalStats.setBuyGPTTokensCount(GlobalStats.getBuyGPTTokensCount() + 1);
     PlayerStats.setBuyGPTTokensCount(_msgSender(), PlayerStats.getBuyGPTTokensCount(_msgSender()) + 1);
 
-    // Check if enough ETH is sent
-    if (_msgValue() < amount * creditPrice) revert NotEnoughETH();
+    uint256 payment = _msgValue();
+    if (payment < amount * creditPrice) revert NotEnoughETH();
 
     // Update the player's GPT token balance
     address executor = _msgSender();
     GPTTokens.set(executor, GPTTokens.get(executor) + amount);
 
-    ResourceId resourceId = SystemRegistry.get(address(this));
-    bytes32 key = ResourceId.unwrap(resourceId);
-    uint256 newAmount = RevenueStats.get(key) + _msgValue();
-    RevenueStats.set(key, newAmount);
+    _collectNativeFee(payment, true);
   }
 
   /**

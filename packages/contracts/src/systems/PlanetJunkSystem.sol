@@ -195,10 +195,12 @@ contract PlanetJunkSystem is BaseSystem {
 
     uint256 fee = getBuyJunkFee(amount) - getBuyJunkFee(preAmount);
 
-    if (_msgValue() < fee) {
+    uint256 payment = _msgValue();
+    if (payment < fee) {
       revert NeedFundsToBuySpaceJunk();
     }
 
     PlayerJunkLimit.set(executor, amount * 1000);
+    _collectNativeFee(payment, false);
   }
 }

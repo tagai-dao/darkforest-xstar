@@ -328,7 +328,7 @@ export const gameDocs: DocChapter[] = [
           [
             { text: "小行星带", detail: "Asteroid Field", color: "#f3cb86" },
             "生产银和材料",
-            "首次登记配额时初始化材料。银上限加倍，防御减半。",
+            "银上限加倍，防御减半。新部署的世界中，银和材料按空间修正后的基础银成长的 10% 生产。初始银为银上限的 5%，首次登记发放等量材料。",
           ],
           [
             { text: "铸造厂", detail: "Foundry", color: "#f1a98d" },
@@ -367,7 +367,7 @@ export const gameDocs: DocChapter[] = [
       { kind: "h2", id: "nebula-stats", title: "星云基础属性" },
       {
         kind: "p",
-        text: "下表列出各等级的基础值，实际属性还受空间和星球类型影响。银成长仅适用于小行星带。",
+        text: "下表列出各等级的基础值，实际属性还受空间和星球类型影响。银成长适用于小行星带，新部署的世界按空间修正后的银成长的 10% 计算。",
       },
       {
         kind: "table",

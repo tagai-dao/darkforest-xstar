@@ -77,6 +77,10 @@ export default defineWorld({
     // ],
   },
   systems: {
+    BuySilverSystem: {
+      // PostDeploy supplies its World constructor argument and registers it.
+      deploy: { disabled: true },
+    },
     InitializeSystem: {
       openAccess: false,
     },
@@ -185,6 +189,12 @@ export default defineWorld({
     EntryFee: {
       schema: {
         fee: "uint256",
+      },
+      key: [],
+    },
+    FeeRecipient: {
+      schema: {
+        recipient: "address",
       },
       key: [],
     },

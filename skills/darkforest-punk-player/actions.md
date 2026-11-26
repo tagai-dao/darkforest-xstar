@@ -100,13 +100,13 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 ## Buy silver
 
-**Send.** Read the pool, the payment token, and `buySilverSystem` from [nutbox.md](nutbox.md). Price the pack from [rules.md](rules.md): the planet's level picks the row, tier 0, 1, 2, or 3 is 20%, 50%, 80%, or 150%, and `SilverFrontier` discounts only the AIPRO. Approve the payment token to `buySilverSystem` for that discounted whole-token price. Do not approve the World. Then World `df__buySilver(uint256 planetHash, uint8 tier)`. Do not send on level 0, on a spacetime rip, when the chain silver plus the pack exceeds the chain cap, or when the balance or the remaining AIPRO cap is below the price.
+**Send.** For a strategy buy, create a candidate order in the same format as a pasted order using the selected tier and the planned price within the owner's existing cap. Before either transaction, run the purchase preflight in [nutbox.md](nutbox.md#verify-a-buy-before-signing). It verifies the chain and World, reads the configured token and actual registered spender, checks the spender's World binding, and fetches the on-chain quote and entry fee. The allowance target is the verified spender. If approval is needed, approve the exact verified price and refresh the full preflight after its receipt before calling World `df__buySilver(uint256 planetHash, uint8 tier)`. Skip level 0, spacetime rips, packs that exceed silver capacity, and strategy buys beyond the token balance or remaining AIPRO cap.
 
 **Effect.** The contract adds the pack's chain silver, display amount times 1000. The payment token moves from this wallet to `BuySilverSystem`. That system burns `price × burnBps / 10000`, rounded down, to `0x000000000000000000000000000000000000dEaD`, and injects the remainder into the Nutbox pool. Read `burnBps` from `DFXStarConfig`; deploy writes 5000. The call reverts on a spacetime rip, on level 0, for an unknown tier, when this wallet is not registered or not the owner, when the junk owner differs, when `addJunkTick` is 0, or when the added silver would pass the cap. It also reverts when the remainder is above 0 and the pool's total stake is zero. A `burnBps` of 10000 leaves a zero remainder and does not need stakers.
 
 **Impact.** Stakers can later claim their share of the injected remainder. The burned part is not claimable. A wallet that owns all of the stake mostly receives that remainder back on claim. The planet's level does not change, so a later pack on the same planet uses the same row unless the frontier has risen. Registering while the stored tick is 0 leaves `addJunkTick` at 0, so buy silver on that planet keeps reverting until a later registration sees a non-zero tick. Record the discounted whole-token amount in `spends.ndjson` and record `buy-silver`.
 
-**Pasted order.** The page copies a `DARKFOREST_BUY_SILVER` block when the owner clicks one silver tier. That block is the purchase to send. Follow [SKILL.md](SKILL.md) under Pasted silver purchase and send it in the same turn it is read. Approve `paymentToken` to `buySilverSystem` for `priceWei`, then call `df__buySilver` with `planetHash` and `tier`. Attach `entryFeeWei`. Do not ask which tier. Record `priceWhole` as the spend.
+**Pasted order.** The page copies a `DARKFOREST_BUY_SILVER` block when the owner chooses a tier. Follow [SKILL.md](SKILL.md#pasted-silver-purchase) and verify the complete order before authorizing payment. A mismatch or unavailable read stops the purchase. After a successful purchase receipt, record the verified whole-token price as the spend.
 
 ## Withdraw silver
 
@@ -156,7 +156,7 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Impact.** This is income, not a spend. It does not change stake or score. Record `claim`.
 
-**Pasted order.** The page copies a `DARKFOREST_CLAIM_REWARDS` block from the 游戏奖励 line. Follow [SKILL.md](SKILL.md) under Pasted game reward claim and send it in the same turn it is read. Call `claimExternalRewards()` on `pool` with value 0. Skip it when `pendingWei` is `0`.
+**Pasted order.** The page copies a `DARKFOREST_CLAIM_REWARDS` block from the 游戏奖励 line. Follow [SKILL.md](SKILL.md) under Pasted game reward claim and send it in the same turn it is read. Use the game and wallet specified by the copied order. Call `claimExternalRewards()` on `pool` with exactly `valueWei` wei. Skip it when `pendingWei` is `0`.
 
 ## Claim community rewards
 
@@ -166,7 +166,7 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Impact.** This is income, not a spend. The release is the part of the community injection that has vested, split by stake. Record `claim-community`.
 
-**Pasted order.** The page copies a `DARKFOREST_CLAIM_COMMUNITY` block from the 社区奖励 line. Follow [SKILL.md](SKILL.md) under Pasted community reward claim and send it in the same turn it is read. Call `withdrawPoolsRewards` on `community` with `[pool]` and value 0. Skip it when `pendingWei` is `0`.
+**Pasted order.** The page copies a `DARKFOREST_CLAIM_COMMUNITY` block from the 社区奖励 line. Follow [SKILL.md](SKILL.md) under Pasted community reward claim and send it in the same turn it is read. Use the game and wallet specified by the copied order. Call `withdrawPoolsRewards` on `community` with `[pool]` and attach exactly `valueWei` wei. Skip it when `pendingWei` is `0`.
 
 ## Rename and burner
 

@@ -18,7 +18,6 @@ import type { Wrapper } from "../../Backend/Utils/Wrapper";
 import {
   AlignCenterHorizontally,
   EmSpacer,
-  InlineBlock,
   SpreadApart,
 } from "../Components/CoreUI";
 import { Icon, IconType } from "../Components/Icons";
@@ -128,13 +127,38 @@ const DescContainer = styled.div`
   }
 `;
 
+const PlanetMetadata = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+`;
+
+export function PlanetCardMetadata({ planet }: { planet: Planet }) {
+  return (
+    <PlanetMetadata>
+      <span>
+        <PlanetLevel planet={planet} />
+      </span>
+      <span>
+        <PlanetRank planet={planet} />
+      </span>
+      <span>
+        <PlanetBiomeTypeLabelAnim planet={planet} />
+      </span>
+    </PlanetMetadata>
+  );
+}
+
 /** Preview basic planet information - used in `PlanetContextPane` and `HoverPlanetPane` */
 export function PlanetCard({
   planetWrapper: p,
   standalone,
+  showIdentity = true,
 }: {
   planetWrapper: Wrapper<Planet | undefined>;
   standalone?: boolean;
+  showIdentity?: boolean;
 }) {
   const uiManager = useUIManager();
   const active = useActiveArtifact(p, uiManager);
@@ -190,35 +214,30 @@ export function PlanetCard({
 
   return (
     <>
-      {standalone && (
+      {standalone && showIdentity && (
         <TitleBar>
           <PlanetCardTitle planet={p} />
         </TitleBar>
       )}
       <div style={{ padding: standalone ? "8px" : undefined }}>
-        <AlignCenterHorizontally style={{ justifyContent: "space-between" }}>
-          <InlineBlock>
-            <PlanetLevel planet={planet} />
-            <EmSpacer width={0.5} />
-            <PlanetRank planet={planet} />
-            <EmSpacer width={0.5} />
-            <PlanetBiomeTypeLabelAnim planet={planet} />
-            <EmSpacer width={0.5} />
-          </InlineBlock>
-        </AlignCenterHorizontally>
-        <StatRow>
-          <Sub>
-            坐标 (
-            {planet.location.coords.x.toLocaleString("zh-CN", {
-              maximumFractionDigits: 2,
-            })}
-            ,{" "}
-            {planet.location.coords.y.toLocaleString("zh-CN", {
-              maximumFractionDigits: 2,
-            })}
-            )
-          </Sub>
-        </StatRow>
+        {showIdentity && (
+          <>
+            <PlanetCardMetadata planet={planet} />
+            <StatRow>
+              <Sub>
+                坐标 (
+                {planet.location.coords.x.toLocaleString("zh-CN", {
+                  maximumFractionDigits: 2,
+                })}
+                ,{" "}
+                {planet.location.coords.y.toLocaleString("zh-CN", {
+                  maximumFractionDigits: 2,
+                })}
+                )
+              </Sub>
+            </StatRow>
+          </>
+        )}
         {active && (
           <>
             <EmSpacer height={0.5} />

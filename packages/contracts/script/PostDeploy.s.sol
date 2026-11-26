@@ -6,8 +6,9 @@ import { console } from "forge-std/console.sol";
 import { StoreSwitch } from "@latticexyz/store/src/StoreSwitch.sol";
 import { stdToml } from "forge-std/StdToml.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
-import { WorldResourceIdLib } from "@latticexyz/world/src/WorldResourceId.sol";
+import { ResourceId, WorldResourceIdLib } from "@latticexyz/world/src/WorldResourceId.sol";
 import { Systems } from "@latticexyz/world/src/codegen/tables/Systems.sol";
+import { BuySilverSystem } from "../src/systems/BuySilverSystem.sol";
 import { StakeScoreSystem } from "../src/systems/StakeScoreSystem.sol";
 import { DFXStarStakingLib } from "../src/lib/DFXStarStakingLib.sol";
 
@@ -30,6 +31,7 @@ import { AtfInstallModule } from "../src/codegen/index.sol";
 import { RevealedPlanet, PlanetBiomeConfig, PlanetBiomeConfigData, ArtifactConfig } from "../src/codegen/index.sol";
 import { JunkConfig, JunkConfigData } from "../src/codegen/index.sol";
 import { DFXStarConfig } from "../src/codegen/index.sol";
+import { DFXStarConfigLib } from "../src/lib/DFXStarConfigLib.sol";
 import { SilverPurchaseConfig } from "../src/codegen/index.sol";
 import { SilverMarket } from "../src/lib/SilverMarket.sol";
 import { ArtifactInstallModule } from "../src/modules/atfs/ArtifactInstallModule.sol";
@@ -106,6 +108,7 @@ contract PostDeploy is Script {
       IArtifactNFT(artifactNftAddress).setDF(roundNum, worldAddress);
     }
     _setSilverPurchaseConfig(toml);
+    _registerBuySilverSystem(worldAddress);
     // 付费铸造要扣本地 AIPRO，所以先建社区代币，再部署 NFT。
     _setDFXStarConfig(toml, worldAddress);
     _setGamePassConfig(toml);
@@ -235,6 +238,15 @@ contract PostDeploy is Script {
     console.log("Installed pinkbomb with index", index);
   }
 
+  function _registerBuySilverSystem(address worldAddress) internal {
+    IWorld world = IWorld(worldAddress);
+    ResourceId systemId = WorldResourceIdLib.encode("sy", "df", "BuySilverSystem");
+    world.registerSystem(systemId, new BuySilverSystem(worldAddress), true);
+    world.registerFunctionSelector(systemId, "buySilver(uint256,uint8)");
+    world.registerFunctionSelector(systemId, "quoteBuySilver(uint256,uint8)");
+    world.registerFunctionSelector(systemId, "trustedWorld()");
+  }
+
   function _setDFXStarConfig(string memory toml, address worldAddress) internal {
     address scoreStakingPool = toml.readAddress(".dfxstar.score_staking_pool");
     address paymentToken = toml.readAddress(".dfxstar.payment_token");
@@ -263,7 +275,7 @@ contract PostDeploy is Script {
 
     if (scoreStakingPool != address(0) || paymentToken != address(0)) {
       // 5000 是默认销毁一半。管理员之后用 updateSilverBurnBps 改。
-      DFXStarConfig.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem, 5000);
+      DFXStarConfigLib.set(scoreStakingPool, paymentToken, stakingFactory, community, buySilverSystem, 5000);
       console.log("DFXStar: config set");
       console.log("  BuySilverSystem:", buySilverSystem);
     }

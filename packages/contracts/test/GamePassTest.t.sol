@@ -2,13 +2,14 @@
 pragma solidity >=0.8.24;
 
 import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import { WorldResourceIdLib } from "@latticexyz/world/src/WorldResourceId.sol";
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { AiproNftStake } from "../src/tokens/AiproNftStake.sol";
 import { IBinanceHandle } from "../src/tokens/IBinanceHandle.sol";
-import { GamePassNFT as GamePassNFTTable, Ticker, TempConfigSet } from "../src/codegen/index.sol";
-import { PlanetType, SpaceType } from "../src/codegen/common.sol";
+import { GamePassNFT as GamePassNFTTable, Ticker, TempConfigSet, SpawnPlanet, PendingMove } from "../src/codegen/index.sol";
 import { Proof } from "../src/lib/SnarkProof.sol";
-import { MoveInput } from "../src/lib/VerificationInput.sol";
+import { MoveInput, SpawnInput } from "../src/lib/VerificationInput.sol";
+import { MoveSystem } from "../src/systems/MoveSystem.sol";
 import { MaterialMove } from "../src/lib/Material.sol";
 import { Errors } from "../src/interfaces/errors.sol";
 import { BaseTest } from "./BaseTest.t.sol";
@@ -100,39 +101,63 @@ contract GamePassTest is BaseTest {
     vm.stopPrank();
   }
 
-  function testMoveUsesStakeAndInternalTickStillRuns() public {
+  function testStakedPlayerCanRegisterSpawnAndMoveWithBurner() public {
+    IWorld world = IWorld(worldAddress);
+
     vm.expectRevert(Errors.GamePassRequired.selector);
     vm.prank(user1);
-    IWorld(worldAddress).df__tick();
+    world.df__tick();
 
-    _stake(user1);
+    uint256 tokenId = _stake(user1);
+    address burner = makeAddr("game session wallet");
     vm.startPrank(admin);
     TempConfigSet.setSkipProofCheck(true);
     if (Ticker.getPaused()) {
-      IWorld(worldAddress).df__unpause();
+      world.df__unpause();
     }
-    IWorld(worldAddress).df__createPlanet(1, user1, 0, 1, PlanetType.PLANET, SpaceType.NEBULA, 300000, 10000, 0);
-    IWorld(worldAddress).df__createPlanet(2, user2, 0, 1, PlanetType.PLANET, SpaceType.NEBULA, 200000, 10000, 0);
     vm.stopPrank();
 
-    vm.prank(user1);
-    IWorld(worldAddress).df__tick();
-
     Proof memory proof;
-    MoveInput memory input;
-    input.fromPlanetHash = 1;
-    input.toPlanetHash = 2;
-    input.distance = 80;
-    vm.prank(user1);
-    IWorld(worldAddress).df__move(proof, input, 100000, 1000, 0, new MaterialMove[](0));
+    SpawnInput memory home;
+    home.planetHash = 4194292 + 1;
+    home.perlin = 1;
+    home.radiusSquare = 80000 ** 2;
+    vm.startPrank(user1);
+    world.df__tick();
+    world.df__registerPlayer("staked-player", burner);
+    world.df__spawnPlayer(proof, home);
+    world.df__addJunk(home.planetHash, 0, proof);
+    vm.stopPrank();
 
-    uint256 tokenId = locker.stakedTokenOf(user1);
+    assertEq(SpawnPlanet.get(user1), home.planetHash);
+
+    MoveInput memory move;
+    move.fromPlanetHash = home.planetHash;
+    move.toPlanetHash = home.planetHash + 1;
+    move.toPerlin = home.perlin;
+    move.toRadiusSquare = home.radiusSquare;
+    move.distance = 20;
+    MaterialMove[] memory materials = new MaterialMove[](0);
+    bytes memory moveCall = abi.encodeCall(MoveSystem.move, (proof, move, 15000, 0, 0, materials));
+
+    vm.prank(user1);
+    world.df__move(proof, move, 15000, 0, 0, materials);
+    assertEq(PendingMove.getNumber(bytes32(move.toPlanetHash)), 1);
+
+    vm.prank(burner);
+    world.callFrom(user1, WorldResourceIdLib.encode("sy", "df", "MoveSystem"), moveCall);
+    assertEq(PendingMove.getNumber(bytes32(move.toPlanetHash)), 2);
+
     vm.prank(user1);
     locker.withdraw(tokenId);
 
     vm.expectRevert(Errors.GamePassRequired.selector);
     vm.prank(user1);
-    IWorld(worldAddress).df__move(proof, input, 100000, 1000, 0, new MaterialMove[](0));
+    world.df__move(proof, move, 15000, 0, 0, materials);
+
+    vm.expectRevert(Errors.GamePassRequired.selector);
+    vm.prank(burner);
+    world.callFrom(user1, WorldResourceIdLib.encode("sy", "df", "MoveSystem"), moveCall);
   }
 
   function _stake(address player) internal returns (uint256 tokenId) {

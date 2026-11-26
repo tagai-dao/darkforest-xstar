@@ -155,6 +155,8 @@ export function formatWithdrawSilverOrder(
 }
 
 export type BuySilverOrderInput = {
+  chainId: number;
+  worldAddress: string;
   planetId: LocationId;
   tier: number;
   // 折扣后的整枚 AIPRO，以及对应的 wei。银是页面数量。
@@ -171,6 +173,8 @@ export function formatBuySilverOrder(input: BuySilverOrderInput): string {
   const order = {
     kind: "darkforest-buy-silver",
     call: "df__buySilver",
+    chainId: input.chainId,
+    worldAddress: input.worldAddress,
     planetHash: locationIdToDecStr(input.planetId),
     planetHashHex: locationIdToHexStr(input.planetId).slice(2),
     tier: input.tier,
@@ -354,34 +358,44 @@ export function formatUseArtifactOrder(input: UseArtifactOrderInput): string {
   return `DARKFOREST_USE_ARTIFACT\n${JSON.stringify(order)}`;
 }
 
-// 领取买银注入的游戏奖励。agent 读到后调用池子的 claimExternalRewards，不附带 BNB。
-export function formatClaimRewardsOrder(input: {
+type RewardClaimOrderInput = {
+  chainId: number;
+  worldAddress: string;
+  account: string;
   pool: string;
   pendingWei: bigint;
-}): string {
+  valueWei: bigint;
+};
+
+// 领取买银注入的游戏奖励。手续费取自复制前的链上快照。
+export function formatClaimRewardsOrder(input: RewardClaimOrderInput): string {
   const order = {
     kind: "darkforest-claim-rewards",
     call: "claimExternalRewards",
+    chainId: input.chainId,
+    worldAddress: input.worldAddress,
+    account: input.account,
     pool: input.pool,
     pendingWei: input.pendingWei.toString(),
-    valueWei: "0",
+    valueWei: input.valueWei.toString(),
   };
   return `DARKFOREST_CLAIM_REWARDS\n${JSON.stringify(order)}`;
 }
 
-// 领取社区按小时释放的奖励。agent 读到后调用社区的 withdrawPoolsRewards，不附带 BNB。
-export function formatClaimCommunityOrder(input: {
-  community: string;
-  pool: string;
-  pendingWei: bigint;
-}): string {
+// 领取社区按小时释放的奖励。手续费取自复制前的链上快照。
+export function formatClaimCommunityOrder(
+  input: RewardClaimOrderInput & { community: string },
+): string {
   const order = {
     kind: "darkforest-claim-community",
     call: "withdrawPoolsRewards",
+    chainId: input.chainId,
+    worldAddress: input.worldAddress,
+    account: input.account,
     community: input.community,
     pool: input.pool,
     pendingWei: input.pendingWei.toString(),
-    valueWei: "0",
+    valueWei: input.valueWei.toString(),
   };
   return `DARKFOREST_CLAIM_COMMUNITY\n${JSON.stringify(order)}`;
 }
