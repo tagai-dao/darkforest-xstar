@@ -28,6 +28,7 @@ export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-3001}"
 export MAX_BLOCK_RANGE="${MAX_BLOCK_RANGE:-500}"
 export FOLLOW_BLOCK_TAG="${FOLLOW_BLOCK_TAG:-latest}"
+export POLLING_INTERVAL="${POLLING_INTERVAL:-300000}"
 export SQLITE_FILENAME="${SQLITE_FILENAME:-$ROOT/data/bsc-indexer.db}"
 
 # Resolve relative sqlite path against packages/indexer
@@ -41,6 +42,7 @@ echo "Starting sqlite-indexer"
 echo "  STORE_ADDRESS=$STORE_ADDRESS"
 echo "  START_BLOCK=$START_BLOCK"
 echo "  MAX_BLOCK_RANGE=$MAX_BLOCK_RANGE"
+echo "  POLLING_INTERVAL=${POLLING_INTERVAL}ms"
 echo "  SQLITE_FILENAME=$SQLITE_FILENAME"
 echo "  listen=http://${HOST}:${PORT}"
 
