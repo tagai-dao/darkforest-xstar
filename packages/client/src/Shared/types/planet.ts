@@ -291,6 +291,10 @@ export type Planet = {
   junkOwner: EthAddress;
   addJunkTick: number;
   materials: Materials[];
+  materialRegistrationPreview?: Pick<
+    Materials,
+    "materialId" | "materialAmount"
+  >[];
 };
 
 /**

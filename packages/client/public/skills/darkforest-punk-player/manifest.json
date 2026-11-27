@@ -1,6 +1,6 @@
 {
   "name": "darkforest-punk-player",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "BSC Dark Forest player skill. Entry is SKILL.md; fetch every path in files.",
   "basePath": "/skills/darkforest-punk-player/",
   "entry": "SKILL.md",
@@ -9,6 +9,7 @@
     "actions.md",
     "aggressive.md",
     "artifacts.md",
+    "check-buy-silver.mjs",
     "conservative.md",
     "home.md",
     "mining.md",

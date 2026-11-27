@@ -40,6 +40,19 @@ interface PlanetUtilsConfig {
   contractConstants: ContractConstants;
 }
 
+const materialsByBiome: Partial<Record<Biome, MaterialType[]>> = {
+  [Biome.OCEAN]: [MaterialType.WATER_CRYSTALS],
+  [Biome.FOREST]: [MaterialType.LIVING_WOOD],
+  [Biome.GRASSLAND]: [MaterialType.WINDSTEEL],
+  [Biome.TUNDRA]: [MaterialType.AURORIUM],
+  [Biome.SWAMP]: [MaterialType.MYCELIUM],
+  [Biome.DESERT]: [MaterialType.SANDGLASS],
+  [Biome.ICE]: [MaterialType.CRYOSTONE],
+  [Biome.WASTELAND]: [MaterialType.SCRAPIUM],
+  [Biome.LAVA]: [MaterialType.PYROSTEEL],
+  [Biome.CORRUPTED]: [MaterialType.BLACKALLOY, MaterialType.CORRUPTED_CRYSTAL],
+};
+
 export class PlanetUtils {
   private components: ClientComponents;
   private contractConstants: ContractConstants;
@@ -81,7 +94,6 @@ export class PlanetUtils {
     const distSquare = location.coords.x ** 2 + location.coords.y ** 2;
     const planet: Planet = this.readPlanet(planetId, perlin, distSquare);
     const biome = this.getBiome(location);
-    const materials = this.getDefaultMaterials(biome, planet);
 
     return {
       location: location,
@@ -128,7 +140,11 @@ export class PlanetUtils {
       addJunkTick: planet.addJunkTick,
       loadingServerState: false,
       needsServerRefresh: false,
-      materials: materials,
+      materials: this.readMaterials(planet),
+      materialRegistrationPreview: this.getMaterialRegistrationPreview(
+        biome,
+        planet,
+      ),
     };
   }
 
@@ -673,75 +689,26 @@ export class PlanetUtils {
     return (totalUpgradeCostPercent / 100) * silverCap;
   }
 
-  public getDefaultMaterials(biome: Biome, planet: Planet): Materials[] {
-    const planetType = planet.planetType;
-    const cap = planet.silverCap;
-    const growthRate = planet.silverGrowth;
-
-    const materials: Materials[] = [];
-
-    for (let i = 0; i <= getMaxMaterialType(); i++) {
-      materials.push({
-        materialId: i as MaterialType,
-        materialAmount: 0,
-        cap: 0,
-        growthRate: 0,
-        growth: false,
-        lastUpdateTick: 0,
-      });
-    }
-
-    if (planetType !== PlanetType.SILVER_MINE) {
-      return materials;
+  public getMaterialRegistrationPreview(
+    biome: Biome,
+    planet: Planet,
+  ): Planet["materialRegistrationPreview"] {
+    if (
+      planet.planetType !== PlanetType.SILVER_MINE ||
+      planet.addJunkTick !== 0
+    ) {
+      return undefined;
     }
 
     const [, initialSilver] = this._initPopulationAndSilver(
       planet.spaceType,
-      planetType,
+      planet.planetType,
       planet.planetLevel,
     );
-    const amount = initialSilver / CONTRACT_PRECISION;
-
-    // Helper function to set material by finding the correct index
-    const setMaterialByType = (materialType: MaterialType) => {
-      const index = materials.findIndex(
-        (mat) => mat.materialId === materialType,
-      );
-      if (index !== -1) {
-        materials[index] = {
-          materialId: materialType,
-          materialAmount: amount,
-          cap: cap,
-          growthRate: growthRate,
-          growth: true,
-          lastUpdateTick: 0,
-        };
-      }
-    };
-
-    if (biome === Biome.CORRUPTED) {
-      setMaterialByType(MaterialType.BLACKALLOY);
-      setMaterialByType(MaterialType.CORRUPTED_CRYSTAL);
-    } else if (biome === Biome.OCEAN) {
-      setMaterialByType(MaterialType.WATER_CRYSTALS);
-    } else if (biome === Biome.FOREST) {
-      setMaterialByType(MaterialType.LIVING_WOOD);
-    } else if (biome === Biome.GRASSLAND) {
-      setMaterialByType(MaterialType.WINDSTEEL);
-    } else if (biome === Biome.TUNDRA) {
-      setMaterialByType(MaterialType.AURORIUM);
-    } else if (biome === Biome.SWAMP) {
-      setMaterialByType(MaterialType.MYCELIUM);
-    } else if (biome === Biome.DESERT) {
-      setMaterialByType(MaterialType.SANDGLASS);
-    } else if (biome === Biome.ICE) {
-      setMaterialByType(MaterialType.CRYOSTONE);
-    } else if (biome === Biome.WASTELAND) {
-      setMaterialByType(MaterialType.SCRAPIUM);
-    } else if (biome === Biome.LAVA) {
-      setMaterialByType(MaterialType.PYROSTEEL);
-    }
-    return materials;
+    return materialsByBiome[biome]?.map((materialId) => ({
+      materialId,
+      materialAmount: initialSilver / CONTRACT_PRECISION,
+    }));
   }
 
   // directly read from the contract
@@ -767,7 +734,7 @@ export class PlanetUtils {
     );
 
     // Calculate material cap and growth rate based on planet's silver properties
-    // This matches the implementation in getDefaultMaterials and Solidity getMaterialGrowth
+    // This matches Solidity getMaterialGrowth.
     const materialCap = planet.silverCap;
     const materialGrowthRate = planet.silverGrowth;
 

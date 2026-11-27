@@ -70,7 +70,7 @@ The raw level is the low 24 bits of the planet hash, before any bonus. A value b
 
 Zone 0 then adds 1. A hash that is level 0 anywhere else is at least level 1 in the center, so it has a silver cap and can be upgraded when its type is a planet. The level is then cut by the tighter of the zone cap and the space-type cap. Space-type caps are 4, 5, 9, and 9 for nebula, space, deep space, and dead space. Deep space and dead space reach level 9 only in zone 0. In a nebula the cap is 4, so the center bonus cannot raise a planet past 4 there.
 
-These are the nebula numbers before a space-type scale and before the type adjustments. `silverGrowth` in this table is what an asteroid keeps. A planet, a foundry, a spacetime rip, and a quasar store silver growth 0.
+These are the nebula numbers before the space-type and planet-type adjustments. For an asteroid field, apply the space-type scale, then divide the original silver growth by 5 and round down. Silver and materials share that rate. Other types store silver growth 0.
 
 | Level | Range | Speed | Defense | Energy cap | Energy growth | Silver cap | Silver growth | Initial energy |
 | ----- | ----- | ----- | ------- | ---------- | ------------- | ---------- | ------------- | -------------- |
@@ -92,7 +92,7 @@ The type then adjusts that result:
 | Type | Name           | Adjustment                                                                                                                                                                                                                |
 | ---- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1    | Planet         | Space-type defense and silver cap. Silver growth 0. Energy grows. Silver can be bought here.                                                                                                                              |
-| 2    | Asteroid field | Defense halved again. Silver cap doubled. Silver growth kept. Initial silver equals the silver cap from before that doubling. Materials use this silver cap as their cap and this silver growth as their growth per tick. |
+| 2    | Asteroid field | Defense halved again. Silver cap doubled. Silver and material growth are 20% of the space-adjusted original silver growth, rounded down. Default initial silver is 5% of the doubled cap. Materials share the silver cap. |
 | 3    | Foundry        | Same stats as the planet. Artifacts are found here.                                                                                                                                                                       |
 | 4    | Spacetime rip  | The asteroid's defense and silver cap. Silver growth 0. No initial silver. Score is withdrawn here.                                                                                                                       |
 | 5    | Quasar         | From the planet's stats: silver cap ×10, energy cap ×5, speed ×2, energy growth 0. Initial energy is 5/2 of the planet's initial energy at that space type and level, and it does not grow afterward.                     |
@@ -117,7 +117,7 @@ Buy silver is allowed on a planet, an asteroid field, a foundry, and a quasar. I
 
 Space junk is on. Spawn sets this wallet's limit to 1000 and its used junk to 0. The home has an owner and no junk owner until it is registered.
 
-Registering a planet spends quota by level: 50, 55, 60, 65, 75, 100, 200, 250, 300, 500 for levels 0 through 9. Used junk plus that cost must fit under the limit. On success this wallet becomes the junk owner, and the previous junk owner's used junk falls by the same cost. The first registration of an asteroid field initializes its materials.
+Registering a planet spends quota by level: 50, 55, 60, 65, 75, 100, 200, 250, 300, 500 for levels 0 through 9. Used junk plus that cost must fit under the limit. On success this wallet becomes the junk owner, and the previous junk owner's used junk falls by the same cost. The first registration of an asteroid field adds its default initial silver amount (5% of the silver cap) to each material allowed by the biome, up to that material’s cap. Before registration, that grant is a preview. Use the on-chain material record for the actual inventory.
 
 Clearing junk returns that cost. The caller must be the junk owner. If this wallet also owns the planet, clearing sets the owner to the zero address as well. Energy and silver stay. The planet can be captured by anyone. Clearing a planet someone else owns only returns the quota.
 
@@ -155,7 +155,7 @@ The silver spent can no longer be withdrawn. A higher range changes which planet
 
 ## 8. Resources into stake
 
-Growth uses the ticks from the later of `addJunkTick` and `lastUpdateTick`, and only while the owner and the junk owner match. Energy follows a logistic curve toward the energy cap. It does not grow when energy growth is 0, which is the quasar case. Silver grows by `silverGrowth` per tick, up to the silver cap, and does not grow when silver growth is 0. Materials grow by that same `silverGrowth` per tick, up to `silverCap`, and only on an asteroid field.
+Growth uses the ticks from the later of `addJunkTick` and `lastUpdateTick`, and only while a nonzero owner matches the junk owner. Energy follows a logistic curve toward the energy cap. It does not grow when energy growth is 0, which is the quasar case. Silver grows by `silverGrowth` per tick, up to the silver cap, and does not grow when silver growth is 0. Materials grow only on an asteroid field and share its silver growth rate and cap. Use the rate read from the same pinned Multicall3 snapshot as the planet state for all unsettled ticks.
 
 Buying silver adds it immediately. The quantity and the undiscounted price depend only on the planet's level. Use the nebula planet's base silver cap from section 4, before the space-type scale and before the type adjustment. A planet, an asteroid field, a foundry, and a quasar of the same level buy the same pack. A spacetime rip reverts. Level 0 has no pack and does not raise the frontier.
 
@@ -177,28 +177,28 @@ Display silver is the chain amount divided by 1000. The nebula base caps in disp
 
 An upgrade does not change the planet's level or its silver cap, so buying one pack and then upgrading does not cheapen the next pack.
 
-The 150% pack often does not fit. A nebula planet's cap is the base, and a space planet's cap is 5/4 of the base, so neither holds it. A deep-space planet's cap is 3/2 of the base and holds it only when its silver is 0. A dead-space planet's cap is twice the base and still has room. A quasar's cap is 10 times the planet cap of that space type, so an empty quasar can hold it. An asteroid's cap is twice the planet cap, but it starts with silver equal to half of its own cap. A nebula or space asteroid has to move silver off first. A deep-space asteroid's remaining room equals this pack. A dead-space asteroid can buy it with its initial silver still there. Compare the chain amount, which is the display silver times 1000, with the planet's chain silver and chain cap.
+The 150% pack often does not fit. A nebula planet's cap is the base, and a space planet's cap is 5/4 of the base, so neither holds it. A deep-space planet's cap is 3/2 of the base and holds it only when its silver is 0. A dead-space planet's cap is twice the base and still has room. A quasar's cap is 10 times the planet cap of that space type, so an empty quasar can hold it. An asteroid's cap is twice the planet cap, and its default initial silver is 5% of that cap. An asteroid with only its default initial silver has room for this pack in any space type. For an already initialized asteroid, check its live balance before buying. Compare the chain amount, which is the display silver times 1000, with the planet's chain silver and chain cap.
 
 The player still pays the full quoted price. `BuySilverSystem` sends `price × burnBps / 10000`, rounded down, to `0x000000000000000000000000000000000000dEaD`, and injects the remainder. The remainder is split by the stake already in the pool, including this wallet's own stake. Deploy writes `burnBps` 5000. The namespace owner changes it with `df__updateSilverBurnBps`, and the value must be 0 through 10000. 0 injects the whole payment. 10000 burns the whole payment and does not call `injectRewards`. The call the player sends is still World `df__buySilver`. The `df` system runs by a normal call, so the token is pulled by `BuySilverSystem`, not by the World. Before either transaction, run the [purchase preflight](nutbox.md#verify-a-buy-before-signing) to verify the live spender, payment token, and on-chain quote. The call also reverts when the player is not registered, when this wallet is not the owner, when the junk owner differs, when `addJunkTick` is 0, when the silver would pass the cap, or when the pool or payment token is unset. It also reverts when the remainder is above 0 and the pool's total stake is 0. A remainder of 0 does not need stakers.
 
 Withdrawing silver or materials requires a spacetime rip that this wallet both owns and has registered. The amount must be at least one fifth of the cap: `cap ≤ amount × 5`. For silver the cap is `silverCap`. For a material the cap is also `silverCap`.
 
-Silver withdrawn adds that chain amount to `PlayerScore` and to the pool stake. Materials add the chain amount times the multiplier below, with no further division. The same number is added to the guild's silver counter when this wallet is in a guild. That guild counter is not pool stake.
+Silver withdrawn adds that chain amount to `PlayerScore` and to the pool stake. Materials add the chain amount multiplied by the factor below, from 100× to 600×. Apply the factor directly with no division by 100. The same number is added to the guild's silver counter when this wallet is in a guild. That guild counter is not pool stake.
 
 | Id  | Material          | Page name | Multiplier |
 | --- | ----------------- | --------- | ---------- |
-| 0   | Unknown           | —         | 100        |
-| 1   | Water crystals    | 水晶体    | 105        |
-| 2   | Living wood       | 活木      | 110        |
-| 3   | Wind steel        | 风钢      | 120        |
-| 4   | Aurorium          | 极光金    | 130        |
-| 5   | Mycelium          | 菌胶      | 150        |
-| 6   | Sand glass        | 沙玻璃    | 180        |
-| 7   | Cryostone         | 冰晶石    | 200        |
-| 8   | Scrapium          | 废金      | 250        |
-| 9   | Pyrosteel         | 火钢      | 300        |
-| 10  | Blackalloy        | 黑合金    | 400        |
-| 11  | Corrupted crystal | 腐化水晶  | 600        |
+| 0   | Unknown           | —         | 100×       |
+| 1   | Water crystals    | 水晶体    | 105×       |
+| 2   | Living wood       | 活木      | 110×       |
+| 3   | Wind steel        | 风钢      | 120×       |
+| 4   | Aurorium          | 极光金    | 130×       |
+| 5   | Mycelium          | 菌胶      | 150×       |
+| 6   | Sand glass        | 沙玻璃    | 180×       |
+| 7   | Cryostone         | 冰晶石    | 200×       |
+| 8   | Scrapium          | 废金      | 250×       |
+| 9   | Pyrosteel         | 火钢      | 300×       |
+| 10  | Blackalloy        | 黑合金    | 400×       |
+| 11  | Corrupted crystal | 腐化水晶  | 600×       |
 
 Dead space is the corrupted biome and grows blackalloy and corrupted crystal. Other space types grow one material. Nebula is water crystals, living wood, or wind steel. Space is aurorium, mycelium, or sand glass. Deep space is cryostone, scrapium, or pyrosteel. Which of the three depends on the biome base: below 15 the first, below 17 the second, otherwise the third.
 

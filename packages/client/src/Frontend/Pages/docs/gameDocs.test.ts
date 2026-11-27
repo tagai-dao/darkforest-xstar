@@ -77,6 +77,19 @@ describe("game docs", () => {
     });
   });
 
+  it("shows material score multipliers as factors", () => {
+    const multipliers = findChapter("resources").blocks.find(
+      (block) => block.kind === "table" && block.headers[2] === "倍率",
+    );
+    expect(
+      multipliers?.kind === "table" && multipliers.rows.map((row) => row[2]),
+    ).toEqual(
+      [100, 105, 110, 120, 130, 150, 180, 200, 250, 300, 400, 600].map(
+        (factor) => `${factor} 倍`,
+      ),
+    );
+  });
+
   it("compares all five planet types with distinct labels and their uses", () => {
     const planets = findChapter("planets");
     expect(chapterHeadings(planets)[0]?.id).toBe("types");

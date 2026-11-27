@@ -466,43 +466,63 @@ export function MaterialsDisplay({
   planet: Planet | undefined;
   style?: React.CSSProperties;
 }) {
-  if (!planet || !planet.materials || planet.materials.length === 0) {
+  if (!planet) {
     return null;
   }
 
-  // Filter out materials with 0 amount and UNKNOWN type
-  const activeMaterials = planet.materials.filter(
-    (mat) => mat.materialId !== 0 && Number(mat.materialAmount) > 0,
-  );
+  const materials = planet.materials ?? [];
+  const inventory = materials
+    .filter((mat) => mat.materialId !== 0 && mat.materialAmount > 0)
+    .map((mat) => ({
+      materialId: mat.materialId,
+      amount: `${mat.growth ? `+${formatNumber(mat.growthRate, 2)} ` : ""}${formatNumber(mat.materialAmount, 0)} / ${formatNumber(mat.cap, 0)}`,
+    }));
+  const preview = (planet.materialRegistrationPreview ?? []).flatMap((mat) => {
+    const current =
+      materials.find((item) => item.materialId === mat.materialId)
+        ?.materialAmount ?? 0;
+    const amount = Math.min(mat.materialAmount, planet.silverCap - current);
+    return amount > 0
+      ? [{ materialId: mat.materialId, amount: `+${formatNumber(amount, 0)}` }]
+      : [];
+  });
 
-  if (activeMaterials.length === 0) {
+  if (inventory.length === 0 && preview.length === 0) {
     return null;
   }
 
   return (
     <div style={style}>
-      <MaterialsScrollable>
-        <MaterialsGrid>
-          {activeMaterials.map((mat) => {
-            const materialColor = getMaterialColor(mat.materialId);
-
-            return (
-              <MaterialItem key={mat.materialId}>
-                <TooltipTrigger name={getMaterialTooltipName(mat.materialId)}>
-                  <MaterialIcon color={materialColor}>
-                    {getMaterialIcon(mat.materialId)}
-                  </MaterialIcon>
-                </TooltipTrigger>
-                <MaterialValues>
-                  {mat.growth && `+${formatNumber(Number(mat.growthRate), 2)} `}
-                  {formatNumber(Number(mat.materialAmount), 0)} /{" "}
-                  {formatNumber(Number(mat.cap), 0)}
-                </MaterialValues>
-              </MaterialItem>
-            );
-          })}
-        </MaterialsGrid>
-      </MaterialsScrollable>
+      {preview.length > 0 && inventory.length === 0 && <Sub>当前库存为空</Sub>}
+      {[
+        {
+          title: "当前库存",
+          showTitle: preview.length > 0,
+          rows: inventory,
+        },
+        { title: "首次登记可获得", showTitle: true, rows: preview },
+      ].map(
+        ({ title, showTitle, rows }) =>
+          rows.length > 0 && (
+            <div key={title}>
+              {showTitle && <Sub>{title}</Sub>}
+              <MaterialsScrollable>
+                <MaterialsGrid>
+                  {rows.map(({ materialId, amount }) => (
+                    <MaterialItem key={materialId}>
+                      <TooltipTrigger name={getMaterialTooltipName(materialId)}>
+                        <MaterialIcon color={getMaterialColor(materialId)}>
+                          {getMaterialIcon(materialId)}
+                        </MaterialIcon>
+                      </TooltipTrigger>
+                      <MaterialValues>{amount}</MaterialValues>
+                    </MaterialItem>
+                  ))}
+                </MaterialsGrid>
+              </MaterialsScrollable>
+            </div>
+          ),
+      )}
     </div>
   );
 }

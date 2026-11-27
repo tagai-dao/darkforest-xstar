@@ -328,7 +328,7 @@ export const gameDocs: DocChapter[] = [
           [
             { text: "小行星带", detail: "Asteroid Field", color: "#f3cb86" },
             "生产银和材料",
-            "银上限加倍，防御减半。新部署的世界中，银和材料按空间修正后的基础银成长的 10% 生产。初始银为银上限的 5%，首次登记发放等量材料。",
+            "银上限加倍，防御减半。银和材料共用一个产速，按空间修正后的原始银成长除以 5，再向下取整。初始银为银上限的 5%，首次登记发放等量材料。",
           ],
           [
             { text: "铸造厂", detail: "Foundry", color: "#f1a98d" },
@@ -367,7 +367,7 @@ export const gameDocs: DocChapter[] = [
       { kind: "h2", id: "nebula-stats", title: "星云基础属性" },
       {
         kind: "p",
-        text: "下表列出各等级的基础值，实际属性还受空间和星球类型影响。银成长适用于小行星带，新部署的世界按空间修正后的银成长的 10% 计算。",
+        text: "下表列出各等级的基础值，实际属性还受空间和星球类型影响。小行星带的银和材料产速都是空间修正后原始银成长的 20%，按链上整数精度向下取整。",
       },
       {
         kind: "table",
@@ -574,7 +574,7 @@ export const gameDocs: DocChapter[] = [
       { kind: "h2", id: "growth", title: "成长" },
       {
         kind: "p",
-        text: "成长使用登记垃圾和上次更新里较晚的那个 tick，并且只在拥有者与垃圾拥有者相同的时候发生。银每个 tick 增加银成长，直到银上限；银成长为 0 时不增加。材料用同一个银成长，上限是银上限，并且只在小行星带（Asteroid Field）上。",
+        text: "成长使用登记垃圾和上次更新里较晚的那个 tick，并且只在拥有者与垃圾拥有者相同的时候发生。银每个 tick 增加银成长，直到银上限。材料只在小行星带（Asteroid Field）产出，产速和上限与银相同。结算时使用当时读到的产速计算尚未结算的时段。",
       },
       { kind: "h2", id: "energy-curve", title: "能量曲线" },
       {
@@ -697,7 +697,7 @@ export const gameDocs: DocChapter[] = [
       },
       {
         kind: "p",
-        text: "提取银时按链上数量计分，提取材料时按「链上数量 × 材料倍率」计分。每次新增分数同步计入个人质押，并计入所属公会的银统计。",
+        text: "提取银时按链上数量计分，提取材料时按「链上数量 × 材料倍率」计分，倍率为 100 到 600 倍。每次新增分数同步计入个人质押，并计入所属公会的银统计。",
       },
       { kind: "h2", id: "multipliers-table", title: "材料倍率" },
       {
@@ -705,59 +705,63 @@ export const gameDocs: DocChapter[] = [
         numericColumns: [0, 2],
         headers: ["编号", "材料", "倍率"],
         rows: [
-          ["0", materialLabel(MaterialType.UNKNOWN, "未知（Unknown）"), "100%"],
+          [
+            "0",
+            materialLabel(MaterialType.UNKNOWN, "未知（Unknown）"),
+            "100 倍",
+          ],
           [
             "1",
             materialLabel(
               MaterialType.WATER_CRYSTALS,
               "水晶体（Water Crystals）",
             ),
-            "105%",
+            "105 倍",
           ],
           [
             "2",
             materialLabel(MaterialType.LIVING_WOOD, "活木（Living Wood）"),
-            "110%",
+            "110 倍",
           ],
           [
             "3",
             materialLabel(MaterialType.WINDSTEEL, "风钢（Wind Steel）"),
-            "120%",
+            "120 倍",
           ],
           [
             "4",
             materialLabel(MaterialType.AURORIUM, "极光金（Aurorium）"),
-            "130%",
+            "130 倍",
           ],
           [
             "5",
             materialLabel(MaterialType.MYCELIUM, "菌胶（Mycelium）"),
-            "150%",
+            "150 倍",
           ],
           [
             "6",
             materialLabel(MaterialType.SANDGLASS, "沙玻璃（Sand Glass）"),
-            "180%",
+            "180 倍",
           ],
           [
             "7",
             materialLabel(MaterialType.CRYOSTONE, "冰晶石（Cryostone）"),
-            "200%",
+            "200 倍",
           ],
           [
             "8",
             materialLabel(MaterialType.SCRAPIUM, "废金（Scrapium）"),
-            "250%",
+            "250 倍",
           ],
           [
             "9",
             materialLabel(MaterialType.PYROSTEEL, "火钢（Pyrosteel）"),
-            "300%",
+            "300 倍",
           ],
           [
             "10",
             materialLabel(MaterialType.BLACKALLOY, "黑合金（Blackalloy）"),
-            "400%",
+            "400 倍",
           ],
           [
             "11",
@@ -765,7 +769,7 @@ export const gameDocs: DocChapter[] = [
               MaterialType.CORRUPTED_CRYSTAL,
               "腐化水晶（Corrupted Crystal）",
             ),
-            "600%",
+            "600 倍",
           ],
         ],
       },

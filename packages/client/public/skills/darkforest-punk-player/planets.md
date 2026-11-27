@@ -12,7 +12,7 @@ Read this when a round turns a chain row into a planet object. The names below a
 
 When `useProps` is true, those stored props are the stats to write on the planet object. When it is false, the planet has not had an upgrade written back. Read `PlanetMetadata` for `(spaceType, planetType, level)` and then apply the two adjustments below before writing `range`, `speed`, `defense`, `energyCap`, `energyGrowth`, `silverCap`, and `silverGrowth`.
 
-`PlanetMetadata` is `0x74626466000000000000000000000000506c616e65744d657461646174610000`. The key is three left-padded bytes: space type, planet type, level. Its static data has the same seven stats as `PlanetProps`, then `uint8 level`, planet type, and space type.
+`PlanetMetadata` is `0x74626466000000000000000000000000506c616e65744d657461646174610000`. Its key tuple has three left-padded 32-byte entries in this order: space type, planet type, level. Its static data has the same seven stats as `PlanetProps`, ending with `uint32 silverGrowth`.
 
 The first adjustment is five independent doubles taken from the planet hash shifted right by 32 bits. Each following byte is used once. A byte below 16 doubles, in order, energy cap, energy growth, range, speed, and defense.
 
@@ -36,13 +36,13 @@ The second adjustment is the upgrade counts. Each upgrade level, in any stat, mu
 
 `type` is the planet type.
 
-| type | Name           | What it changes                                                                                                                                                                                                                |
-| ---- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1    | Planet         | Energy grows. Silver growth is 0. This is the only type that can be upgraded, and only above level 0. Silver can be bought here. Score cannot be withdrawn here.                                                               |
-| 2    | Asteroid field | Materials grow, and only here. The material cap equals `silverCap`. The growth per tick equals `silverGrowth`. The biome chooses the material. The first junk registration initializes those materials. It cannot be upgraded. |
-| 3    | Foundry        | The only place `prospect` and `find-artifact` work. Prospect opens a 256-block find window. Find inside it creates the artifact and sets the explored flag. The client calls this type ruins. It cannot be upgraded.           |
-| 4    | Spacetime rip  | The only place silver and materials can be withdrawn into score and stake. Buy silver reverts here. Artifact NFTs move in and out only here. The client calls this type a trading post. It cannot be upgraded.                 |
-| 5    | Quasar         | A voyage to it uses half the distance. Energy that arrives is cut down to `energyCap`. The client calls this type a silver bank. It cannot be upgraded.                                                                        |
+| type | Name           | What it changes                                                                                                                                                                                                                                    |
+| ---- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Planet         | Energy grows. Silver growth is 0. This is the only type that can be upgraded, and only above level 0. Silver can be bought here. Score cannot be withdrawn here.                                                                                   |
+| 2    | Asteroid field | Materials grow, and only here. The material cap equals `silverCap`. Silver and material growth both use the stored `silverGrowth`. The biome chooses the material. The first junk registration initializes those materials. It cannot be upgraded. |
+| 3    | Foundry        | The only place `prospect` and `find-artifact` work. Prospect opens a 256-block find window. Find inside it creates the artifact and sets the explored flag. The client calls this type ruins. It cannot be upgraded.                               |
+| 4    | Spacetime rip  | The only place silver and materials can be withdrawn into score and stake. Buy silver reverts here. Artifact NFTs move in and out only here. The client calls this type a trading post. It cannot be upgraded.                                     |
+| 5    | Quasar         | A voyage to it uses half the distance. Energy that arrives is cut down to `energyCap`. The client calls this type a silver bank. It cannot be upgraded.                                                                                            |
 
 A destroyed planet has the destroyed flag set. Moves and other planet calls revert on it.
 
@@ -55,5 +55,7 @@ A destroyed planet has the destroyed flag set. Moves and other planet calls reve
 `defense` starts near 100. On an attack, the defender loses `arrivedEnergy * 100 / defense`. If that is less than the defender's energy, the defender keeps the planet. If it is not, the attacker takes the planet and keeps `arrivedEnergy - defenderEnergy * defense / 100`, at least 1. A quasar then caps the result at `energyCap`. A fleet from the owner, or from the same guild, adds its energy instead of attacking.
 
 `silver` can be carried by a move and is capped at `silverCap` on arrival. `silverGrowth` adds that much silver per advanced tick, until the cap, on a planet whose stored silver growth is not 0. Bought silver is added immediately and is also capped.
+
+**Asteroid production.** The default `PlanetMetadata.silverGrowth` is one fifth of the original rate after applying the space-type scale and rounding down. Read the effective rate from the same pinned Multicall3 snapshot as the planet record. Settlement uses that rate for the elapsed ticks since the latest settlement or junk registration.
 
 `lastUpdateTick` is the last tick at which this planet applied growth and arrivals. The stored numbers do not include growth since that tick while the clock is paused, because the tick does not move.

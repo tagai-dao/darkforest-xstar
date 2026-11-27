@@ -1,6 +1,6 @@
 ---
 name: darkforest-punk-player
-version: 1.1.1
+version: 1.1.2
 description: Join Dark Forest on BSC (chain 56), stake a game-pass NFT, spawn a home, explore, and play with a named strategy file. When speaking to the owner, call map hashing 探索. Every explore program must merge knownBoard chunks as they grow. Use when the owner wants an agent to start playing, stake the game-pass NFT, spawn a home, explore, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_REVERT_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, DARKFOREST_BUY_JUNK, DARKFOREST_FIND_ARTIFACT, DARKFOREST_USE_ARTIFACT, DARKFOREST_CLEAR_JUNK, DARKFOREST_CLAIM_REWARDS, or DARKFOREST_CLAIM_COMMUNITY.
 ---
 
@@ -21,7 +21,7 @@ The owner does not know the chain, contracts, or price. Do not ask for them. The
 | Player          | The wallet the owner connected for this run. Do not write that address into this skill.                                  |
 | Game page       | `https://starlinkdf.tagai.fun/redpill/0xfaD1cDDAD97113e4c0335FF5A815955c21b2ddca`                                        |
 
-This is the live BSC deployment. Keep these addresses. Do not switch chains. Do not deploy contracts. The five Nutbox addresses are in [nutbox.md](nutbox.md).
+This is the live BSC deployment. Keep these addresses. Do not switch chains. Do not deploy contracts. The Nutbox bindings and purchase checks are in [nutbox.md](nutbox.md).
 
 This map uses planet hash key `20261119`, space key `20261120`, biome key `20261121`, and scale `8192`. At the start of a run, verify the World, locker, NFT, handle registry, and pool on chain before opening a wallet save. A matching folder name does not prove that its files belong to this map. If `SpawnPlanet` for this wallet is zero and the folder already contains `homeLocations.json` or `knownBoard.ndjson`, stop and ask the owner for an empty directory. Do not use those files. Create fresh files only after the current chain and wallet state have been read. Keep stopped mining and strategy processes stopped until the owner explicitly starts them for this run. Any 探索 code path — default or custom — must merge `knownBoard.ndjson` as [mining.md](mining.md) requires; do not ship an explorer that only appends unmerged side-16 lines.
 
@@ -78,11 +78,13 @@ Call World `df__withdrawSilver` with `planetHash` and `amount`. There is no proo
 
 ## Pasted silver purchase
 
-The game page does not buy silver. On a planet that can buy it, the page copies a block. The first line is `DARKFOREST_BUY_SILVER`. The next line is one JSON object with `"kind": "darkforest-buy-silver"`.
+The game page copies a `DARKFOREST_BUY_SILVER` line followed by one JSON object with `"kind": "darkforest-buy-silver"` and `"call": "df__buySilver"`. The order records `chainId`, `worldAddress`, `planetHash`, `planetHashHex`, `tier`, `paymentToken`, `buySilverSystem`, `priceWei`, `priceWhole`, `silverDisplay`, and `entryFeeWei`. Treat these as the owner's proposed order, pending verification.
 
-That JSON is the whole purchase. The moment it is recognized, approve and send it in this turn. Do not wait for another message. Do not ask to start, do not ask which planet, and do not ask which tier. Do not change `planetHash`, `tier`, `priceWei`, `paymentToken`, or `buySilverSystem`. Do not mine and do not open the map. `tier` is 0, 1, 2, or 3. The call does not take a silver amount.
+Before signing an approval or purchase, save the pasted block to a temporary order file and run `node check-buy-silver.mjs --player <active signer address> --signer-chain-id <verified live wallet chain ID> --order-file <path>` from this skill bundle. Follow the purchase preflight in [nutbox.md](nutbox.md#verify-a-buy-before-signing). Verify the active wallet and RPC chain and compare the order's chain and World with the independent BSC deployment in this skill. On a single pinned Multicall3 snapshot, compare the token from `DFXStarConfig`, the actual registered spender from the World `Systems` table, that spender's `trustedWorld()`, and the live quote and World fee with the order. If a required field, deployment binding, quote, or read is missing or mismatched, stop before either transaction and tell the owner why. For a stale or incomplete clipboard order, ask the owner to copy a fresh one.
 
-If `allowance(player, buySilverSystem)` is below `priceWei`, approve `paymentToken` to `buySilverSystem` for `priceWei`. Do not approve the World. Then call World `df__buySilver` with `planetHash` and `tier`. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Record `priceWhole` in `spends.ndjson` and record `buy-silver` as [actions.md](actions.md) describes. If the approval or the receipt reverts, tell the owner and do not write `actions.ndjson` or `spends.ndjson`.
+Use only the verified addresses and amounts from that preflight. If the verified allowance is insufficient, approve `paymentToken` to the verified `buySilverSystem` for exactly the verified `priceWei` and wait for a successful approval receipt. Re-run the helper after that receipt against one newly pinned block and confirm the allowance before signing the purchase. If the check still passes, call the verified World `df__buySilver(planetHash, tier)` with the verified entry fee, using the same player wallet. When all checks pass, continue with the selected tier in this turn.
+
+Wait for a successful purchase receipt, then record the verified `priceWhole` in `spends.ndjson` and record `buy-silver` as [actions.md](actions.md) describes. If either transaction fails or the second preflight blocks the purchase, report the reason and any allowance granted by this order. Only a successful purchase creates a spend or action record.
 
 ## Pasted upgrade
 
@@ -136,7 +138,7 @@ The game page does not clear junk. It copies a block. The first line is `DARKFOR
 
 That JSON is the whole clear. The moment it is recognized, send it in this turn. Do not wait for another message. Do not ask to start, and do not ask which planet. Do not change `planetHash`. There is no proof. Call World `df__clearJunk` with `planetHash`. Attach `entryFeeWei` wei. Sign with the player wallet. Wait for a successful receipt. Then record `clear-junk` as [actions.md](actions.md) describes. When `ownsPlanet` is true, the planet was abandoned. If the receipt reverts, tell the owner and do not write `actions.ndjson`.
 
-A message can contain more than one of these blocks. Send every fleet first, then every fleet recall, then every junk purchase, then every junk registration, then every artifact find, then every artifact use, then every silver withdrawal, then every material withdrawal, then every silver purchase, then every upgrade, then every junk clear, then every game-reward claim, then every community-reward claim, all in this turn.
+A message can contain more than one of these blocks. Send every fleet first, then every fleet recall, then every junk purchase, then every junk registration, then every artifact find, then every artifact use, then every silver withdrawal, then every material withdrawal, then every silver purchase, then every upgrade, then every junk clear, then every game-reward claim, then every community-reward claim, all in this turn. Every silver purchase in the message needs its own verification before approval.
 
 ## Pasted junk purchase
 

@@ -27,7 +27,7 @@ contract AsteroidResourceDefaultsTest is Test, InitializeSystem {
   function testAsteroidSeedAndSharedGrowth() public view {
     PlanetMetadataData memory metadata = PlanetMetadata.get(SpaceType.DEEP_SPACE, PlanetType.ASTEROID_FIELD, 6);
     assertEq(metadata.silverCap, 300_000_000);
-    assertEq(metadata.silverGrowth, 416);
+    assertEq(metadata.silverGrowth, 833);
 
     Planet memory asteroid;
     asteroid.planetHash = 1;
@@ -51,8 +51,8 @@ contract AsteroidResourceDefaultsTest is Test, InitializeSystem {
     assertEq(asteroid.getMaterialCap(MaterialType.WATER_CRYSTALS), 300_000_000);
 
     asteroid.naturalGrowth(120);
-    assertEq(asteroid.silver, 15_041_600);
-    assertEq(asteroid.getMaterial(MaterialType.WATER_CRYSTALS), 15_041_600);
+    assertEq(asteroid.silver, 15_083_300);
+    assertEq(asteroid.getMaterial(MaterialType.WATER_CRYSTALS), 15_083_300);
   }
 
   function testOtherTypesKeepTheirSilverDefaults() public view {

@@ -198,7 +198,7 @@ World `df__move` takes the Groth16 proof, the 11 public signals in this order, t
 
 **Send.** World `df__withdrawMaterial(uint256 planetHash, uint8 materialType, uint256 amount)`. The planet must be an owned spacetime rip and this wallet must be its junk owner. The amount is chain units and must be at least one fifth of that material's cap. Material ids are 0 unknown, 1 water crystals, 2 living wood, 3 wind steel, 4 aurorium, 5 mycelium, 6 sand glass, 7 cryostone, 8 scrapium, 9 pyrosteel, 10 blackalloy, 11 corrupted crystal.
 
-**Effect.** That material on the planet falls by the amount. Score added is `amount * multiplier`, with multipliers 100, 105, 110, 120, 130, 150, 180, 200, 250, 300, 400, and 600 for ids 0 through 11. `PlayerScore` rises by that score and the same delta is staked with `depositFromGame`. No AIPRO moves.
+**Effect.** That material on the planet falls by the amount. Score added is `amount * multiplier`, with multipliers 100×, 105×, 110×, 120×, 130×, 150×, 180×, 200×, 250×, 300×, 400×, and 600× for IDs 0 through 11. Apply the factor directly with no division by 100. `PlayerScore` rises by that score and the same delta is staked with `depositFromGame`. No AIPRO moves.
 
 **Impact.** The score shown on the page rises by the display amount of that score. Stake share rises with it, so later buy-silver payments pay this wallet a larger share. Guild silver rises by the same score when this wallet is in a guild. The material is no longer on the planet to withdraw again. Record `withdraw-material`.
 

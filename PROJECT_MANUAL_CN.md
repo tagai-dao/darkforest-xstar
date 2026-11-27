@@ -294,7 +294,7 @@
 材料来源：
 
 - `ASTEROID_FIELD` 被 add junk 后，按 biome 初始化对应材料。
-- 材料增长率目前复用星球 `silverGrowth`。
+- 小行星带的银和材料共用 `silverGrowth`。将空间修正后的原始银成长除以 5，再向下取整，即为每 tick 的产量。
 - 材料上限目前复用 `silverCap`。
 
 材料可通过移动运输，撤回时材料减半。

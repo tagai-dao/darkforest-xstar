@@ -470,7 +470,8 @@ export function PlanetCard({
         </ElevatedContainer>
 
         {/* Materials Display */}
-        {planet.materials && planet.materials.length > 0 && (
+        {(!!planet.materials?.length ||
+          !!planet.materialRegistrationPreview?.length) && (
           <>
             <MaterialsDisplay planet={planet} />
             <EmSpacer height={0.5} />

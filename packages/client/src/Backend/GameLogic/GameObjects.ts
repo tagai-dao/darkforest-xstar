@@ -606,36 +606,7 @@ export class GameObjects {
     const loc =
       this.planetLocationMap.get(planet.locationId) || revealedLocation;
     if (loc) {
-      (planet as LocatablePlanet).location = loc;
-      (planet as LocatablePlanet).biome = this.getBiome(loc);
-
-      if (planet.addJunkTick === 0) {
-        const materials = this.planetUtils.getDefaultMaterials(
-          (planet as LocatablePlanet).biome,
-          planet,
-        );
-
-        planet.materials = planet.materials.map((existing) => {
-          const defaultMaterial = materials.find(
-            (mat) => mat.materialId === existing.materialId,
-          );
-
-          if (defaultMaterial && defaultMaterial.materialAmount > 0) {
-            const newAmount = Math.min(
-              existing.materialAmount + defaultMaterial.materialAmount,
-              defaultMaterial.cap,
-            );
-            console.log(
-              `Adding ${defaultMaterial.materialAmount} to ${existing.materialAmount} = ${newAmount}`,
-            );
-            return {
-              ...existing,
-              materialAmount: newAmount,
-            };
-          }
-          return existing;
-        });
-      }
+      this.applyPlanetLocation(planet as LocatablePlanet, loc);
     }
     if (revealedLocation) {
       this.markLocationRevealed(revealedLocation);
@@ -760,9 +731,19 @@ export class GameObjects {
     const planet = this.planets.get(planetLocation.hash);
 
     if (planet) {
-      (planet as LocatablePlanet).location = planetLocation;
-      (planet as LocatablePlanet).biome = this.getBiome(planetLocation);
+      this.applyPlanetLocation(planet as LocatablePlanet, planetLocation);
     }
+  }
+
+  private applyPlanetLocation(
+    planet: LocatablePlanet,
+    location: WorldLocation,
+  ) {
+    const biome = this.getBiome(location);
+    planet.location = location;
+    planet.biome = biome;
+    planet.materialRegistrationPreview =
+      this.planetUtils.getMaterialRegistrationPreview(biome, planet);
   }
 
   // marks that a location is revealed on-chain
