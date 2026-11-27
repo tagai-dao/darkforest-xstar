@@ -12,8 +12,6 @@ export class BackgroundRenderer implements BackgroundRendererType {
 
   borderRenderer: RectRenderer;
 
-  chunkShadowRenderer: RectRenderer;
-
   highQuality = true;
 
   rendererType = RendererType.Background;
@@ -23,8 +21,6 @@ export class BackgroundRenderer implements BackgroundRendererType {
     this.renderer = manager.renderer;
 
     this.borderRenderer = new RectRenderer(manager);
-
-    this.chunkShadowRenderer = new RectRenderer(manager);
   }
 
   queueChunks(
@@ -81,10 +77,6 @@ export class BackgroundRenderer implements BackgroundRendererType {
         // add this chunk to the verts array
         if (this.highQuality) {
           spaceRenderer.queueChunk(exploredChunk);
-          this.chunkShadowRenderer.queueChunkBorderWithPadding(
-            exploredChunk,
-            1 + 1 * viewport.scale,
-          );
         } else {
           perlinRenderer.queueChunk(exploredChunk);
         }
@@ -142,10 +134,23 @@ export class BackgroundRenderer implements BackgroundRendererType {
     const { unminedRenderer, spaceRenderer, perlinRenderer } = this.renderer;
     if (this.highQuality) {
       unminedRenderer.flush();
-      this.chunkShadowRenderer.flush();
-      spaceRenderer.flush();
-    } else {
-      perlinRenderer.flush();
+    }
+
+    const { gl } = this.manager;
+    // Imported chunks can overlap. Blend the explored background once per pixel.
+    gl.enable(gl.STENCIL_TEST);
+    gl.stencilFunc(gl.NOTEQUAL, 1, 0xff);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
+    try {
+      if (this.highQuality) {
+        spaceRenderer.flush();
+      } else {
+        perlinRenderer.flush();
+      }
+    } finally {
+      gl.disable(gl.STENCIL_TEST);
+      gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+      gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
     }
     this.borderRenderer.flush();
   }

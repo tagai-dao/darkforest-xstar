@@ -61,9 +61,7 @@ export function getPerlinChunks(
     throw "getPerlinChunks called on a small chunk";
   }
 
-  const perlinChunks: Set<Rectangle> = new Set();
-
-  perlinChunks.add(footprint);
+  const perlinChunks: Rectangle[] = [];
 
   for (let x = bottomLeft.x; x < bottomLeft.x + sideLength; x += lengthScale) {
     for (
@@ -71,7 +69,7 @@ export function getPerlinChunks(
       y < bottomLeft.y + sideLength;
       y += lengthScale
     ) {
-      perlinChunks.add({ bottomLeft: { x, y }, sideLength: lengthScale });
+      perlinChunks.push({ bottomLeft: { x, y }, sideLength: lengthScale });
     }
   }
 
