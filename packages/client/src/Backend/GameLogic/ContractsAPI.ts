@@ -459,22 +459,11 @@ export class ContractsAPI extends EventEmitter {
         );
       });
 
-    this.moveSubscription = this.components.Move.update$.subscribe((update) => {
-      const entity = update.entity;
-      const [nextValue] = update.value;
-      const keyTuple = decodeEntity(
-        this.components.Move.metadata.keySchema,
-        entity,
-      );
-
-      if (nextValue) {
-        const fromId = locationIdFromHexStr(nextValue.from);
-        const toId = locationIdFromHexStr(keyTuple.to);
-        const arrivalId = nextValue.id.toString() as VoyageId;
-
+    this.moveSubscription = this.moveUtils
+      .observeQueuedArrivals()
+      .subscribe(({ arrivalId, fromId, toId }) => {
         this.emit(ContractsAPIEvent.ArrivalQueued, arrivalId, fromId, toId);
-      }
-    });
+      });
 
     this.playerScoreSubscription =
       this.components.PlayerScore.update$.subscribe((update) => {

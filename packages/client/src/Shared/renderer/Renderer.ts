@@ -62,6 +62,7 @@ import type {
 import { RendererType, Setting } from "@df/types";
 import autoBind from "auto-bind";
 
+import type { LocalVoyages } from "../../Backend/GameLogic/LocalVoyages";
 import { AIZoneRenderer } from "./Entities/AIZoneRenderer";
 import { AsteroidRenderer } from "./Entities/AsteroidRenderer";
 import { BackgroundRenderer } from "./Entities/BackgroundRenderer";
@@ -148,6 +149,7 @@ export interface RendererGameContext extends DiagnosticUpdater {
   convertTickToMs(tick: number): number;
   // tickerRangeToTime(left: number, right: number): number;
   getAllVoyages(): QueuedArrival[];
+  readonly localVoyages?: LocalVoyages;
   getPlayer(address?: EthAddress): Player | undefined;
   getUnconfirmedMoves(): Transaction<UnconfirmedMove>[];
   spaceTypeFromPerlin(perlin: number, distFromOrigin: number): SpaceType;

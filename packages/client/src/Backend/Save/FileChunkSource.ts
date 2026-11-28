@@ -277,6 +277,8 @@ export type ActionRecord = {
   action: string;
   detail?: string;
   tx?: string;
+  from?: string;
+  to?: string;
 };
 
 export type AiproPrice = {
@@ -314,7 +316,7 @@ export function asActionRecord(value: unknown): ActionRecord | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
   }
-  const { action, time, at, strategy, detail, tx } = value as Record<
+  const { action, time, at, strategy, detail, tx, from, to } = value as Record<
     string,
     unknown
   >;
@@ -329,6 +331,8 @@ export function asActionRecord(value: unknown): ActionRecord | undefined {
     detail:
       typeof detail === "string" ? detail : JSON.stringify(detail ?? undefined),
     tx: typeof tx === "string" ? tx : undefined,
+    ...(typeof from === "string" && { from }),
+    ...(typeof to === "string" && { to }),
   };
 }
 
@@ -354,6 +358,30 @@ async function readGrowingLog(
   return { values: parsed.values, offset: next + parsed.byteLength };
 }
 
+export async function readWalletActions(
+  root: FileSystemDirectoryHandle,
+  cursor: BoardCursor,
+): Promise<ActionRecord[]> {
+  const actions: ActionRecord[] = [];
+  try {
+    const log = await readGrowingLog(
+      root,
+      "actions.ndjson",
+      cursor.actionsOffset ?? 0,
+    );
+    cursor.actionsOffset = log.offset;
+    for (const value of log.values) {
+      const action = asActionRecord(value);
+      if (action) {
+        actions.push(action);
+      }
+    }
+  } catch {
+    // 还没有动作记录。
+  }
+  return actions;
+}
+
 export async function readWalletTail(
   root: FileSystemDirectoryHandle,
   cursor: BoardCursor,
@@ -362,7 +390,6 @@ export async function readWalletTail(
   /** 文件被整份重写过，调用方应先丢掉内存里的旧块。 */
   replace: boolean;
   homeText?: string;
-  actions: ActionRecord[];
   priceText?: string;
 }> {
   const chunks: PersistedChunk[] = [];
@@ -406,24 +433,6 @@ export async function readWalletTail(
     // 还没有家。
   }
 
-  const actions: ActionRecord[] = [];
-  try {
-    const log = await readGrowingLog(
-      root,
-      "actions.ndjson",
-      cursor.actionsOffset ?? 0,
-    );
-    cursor.actionsOffset = log.offset;
-    for (const value of log.values) {
-      const action = asActionRecord(value);
-      if (action) {
-        actions.push(action);
-      }
-    }
-  } catch {
-    // 还没有动作记录。
-  }
-
   let priceText: string | undefined;
   try {
     const handle = await root.getFileHandle("price.json");
@@ -446,7 +455,7 @@ export async function readWalletTail(
     // 价格口子还没写。
   }
 
-  return { chunks, replace, homeText, actions, priceText };
+  return { chunks, replace, homeText, priceText };
 }
 
 /**

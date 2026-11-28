@@ -86,7 +86,7 @@ export class VoyageRenderer implements VoyageRendererType {
 
     if (!fromPlanet || !toLoc || !toPlanet) return;
 
-    const { proportion, timeLeft } = this.getVoyageTiming(voyage);
+    const { visualProportion, timeLeft } = this.getVoyageTiming(voyage);
     const color = getVoyageColor(
       fromPlanet,
       toPlanet,
@@ -140,43 +140,17 @@ export class VoyageRenderer implements VoyageRendererType {
       const tier = getFleetTier(departureEnergy ?? voyage.energyArriving);
       this.drawVoyagePath(fromLoc.coords, toLoc.coords, color, tier, emphasis);
 
-      const shipsLocation = this.getFleetPosition(
+      const marker = this.drawFleetMarkerAt(
         fromLoc.coords,
         toLoc.coords,
-        proportion,
+        visualProportion,
+        color,
+        tier,
+        emphasized,
       );
+      if (!marker) return;
+      const { position, fleetRadius } = marker;
       const viewport = this.renderer.getViewport();
-      const position = viewport.worldToCanvasCoords(shipsLocation);
-      const { viewportWidth, viewportHeight } = viewport;
-      const margin = 112;
-      if (
-        position.x < -margin ||
-        position.y < -margin ||
-        position.x > viewportWidth + margin ||
-        position.y > viewportHeight + margin
-      ) {
-        return;
-      }
-
-      const origin = viewport.worldToCanvasCoords(fromLoc.coords);
-      const destination = viewport.worldToCanvasCoords(toLoc.coords);
-      const shortRoute =
-        Math.hypot(destination.x - origin.x, destination.y - origin.y) < 8;
-      let fleetRadius = 4;
-      if (shortRoute) {
-        cR.queueCircleWorldCenterOnly(shipsLocation, fleetRadius, color);
-      } else {
-        fleetRadius =
-          this.renderer.overlay2dRenderer.drawFleetMarker(
-            position,
-            origin,
-            destination,
-            color,
-            tier,
-            emphasized,
-            gameUIManager.getIsHighPerfMode(),
-          ) ?? fleetRadius;
-      }
       const alpha = emphasized ? 255 : 214;
       const artifactSizePixels = 20;
       if (voyage.artifactId) {
@@ -266,6 +240,47 @@ export class VoyageRenderer implements VoyageRendererType {
     }
   }
 
+  private drawFleetMarkerAt(
+    from: WorldCoords,
+    to: WorldCoords,
+    progress: number,
+    color: RGBAVec,
+    tier: FleetTier,
+    emphasized: boolean,
+  ) {
+    const { context, circleRenderer, overlay2dRenderer } = this.renderer;
+    const viewport = this.renderer.getViewport();
+    const location = this.getFleetPosition(from, to, progress);
+    const position = viewport.worldToCanvasCoords(location);
+    const { viewportWidth, viewportHeight } = viewport;
+    const margin = 112;
+    if (
+      position.x < -margin ||
+      position.y < -margin ||
+      position.x > viewportWidth + margin ||
+      position.y > viewportHeight + margin
+    )
+      return;
+
+    const origin = viewport.worldToCanvasCoords(from);
+    const destination = viewport.worldToCanvasCoords(to);
+    if (Math.hypot(destination.x - origin.x, destination.y - origin.y) < 8) {
+      circleRenderer.queueCircleWorldCenterOnly(location, 4, color);
+      return { position, fleetRadius: 4 };
+    }
+    const fleetRadius =
+      overlay2dRenderer.drawFleetMarker(
+        position,
+        origin,
+        destination,
+        color,
+        tier,
+        emphasized,
+        context.getIsHighPerfMode(),
+      ) ?? 4;
+    return { position, fleetRadius };
+  }
+
   private getVoyageTiming(voyage: QueuedArrival) {
     const { context, now, currentTick } = this.renderer;
     const departure = context.convertTickToMs(voyage.departureTick);
@@ -277,8 +292,12 @@ export class VoyageRenderer implements VoyageRendererType {
     if (wallClock) progress = (now - departure) / duration;
     else if (tickDuration > 0)
       progress = (currentTick - voyage.departureTick) / tickDuration;
+    const proportion = Math.max(0.01, Math.min(0.99, progress));
     return {
-      proportion: Math.max(0.01, Math.min(0.99, progress)),
+      proportion,
+      visualProportion:
+        context.localVoyages?.getVisualProgress(voyage, proportion) ??
+        proportion,
       timeLeft: wallClock
         ? Math.max(0, Math.ceil((arrival - now) / 1000))
         : undefined,
@@ -298,6 +317,21 @@ export class VoyageRenderer implements VoyageRendererType {
 
   queueVoyages(): void {
     const { context: gameUIManager, currentTick } = this.renderer;
+    for (const voyage of gameUIManager.localVoyages?.getActive(
+      this.renderer.now,
+    ) ?? []) {
+      const tier = getFleetTier(voyage.energy);
+      this.drawVoyagePath(voyage.from, voyage.to, mineA, tier, 0, false);
+      this.drawFleetMarkerAt(
+        voyage.from,
+        voyage.to,
+        voyage.progress,
+        mineA,
+        tier,
+        false,
+      );
+    }
+
     const voyages = gameUIManager.getAllVoyages();
     const account = gameUIManager.getAccount();
     const playerAddress = gameUIManager.getPlayer()?.address;
@@ -440,11 +474,11 @@ export class VoyageRenderer implements VoyageRendererType {
         const toLoc = gameUIManager.getLocationOfPlanet(voyage.toPlanet);
 
         if (fromLoc && toLoc) {
-          const { proportion } = this.getVoyageTiming(voyage);
+          const { proportion, visualProportion } = this.getVoyageTiming(voyage);
           const shipsLocation = this.getFleetPosition(
             fromLoc.coords,
             toLoc.coords,
-            proportion,
+            visualProportion,
           );
 
           // Check if can revert using proper logic

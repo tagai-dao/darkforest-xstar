@@ -11,57 +11,38 @@ import {
 } from "@latticexyz/common";
 import { transactionQueue, writeObserver } from "@latticexyz/common/actions";
 import { observer } from "@latticexyz/explorer/observer";
-import { encodeEntity, syncToRecs } from "@latticexyz/store-sync/recs";
-import { syncToZustand } from "@latticexyz/store-sync/zustand";
-/*
- * Import our MUD config, which includes strong types for
- * our tables and other config options. We use this to generate
- * things like RECS components and get back strong types for them.
- *
- * See https://mud.dev/templates/typescript/contracts#mudconfigts
- * for the source of this information.
- */
-import mudConfig from "contracts/mud.config";
+import { encodeEntity } from "@latticexyz/store-sync/recs";
 import IWorldAbi from "contracts/out/IWorld.sol/IWorld.abi.json";
 import { share, Subject } from "rxjs";
 import {
   type ClientConfig,
   createPublicClient,
   createWalletClient,
-  fallback,
   getContract,
   type Hex,
   http,
-  webSocket,
 } from "viem";
 import { bsc } from "viem/chains";
 
-import {
-  syncFilters as extraSyncFilters,
-  tables as extraTables,
-} from "./extraTables";
+import { LocalVoyages } from "../Backend/GameLogic/LocalVoyages";
 import { getNetworkConfig } from "./getNetworkConfig";
+import { syncGameStore } from "./syncGameStore";
 import { world } from "./world";
 
 export type SetupNetworkResult = Awaited<ReturnType<typeof setupNetwork>>;
 
 export async function setupNetwork() {
   const networkConfig = getNetworkConfig();
+  const isBsc = networkConfig.chain.id === bsc.id;
 
-  //PUNK
-  console.log("show indexer url");
-  console.log(networkConfig.indexerUrl);
-
-  const waitForStateChange = Promise.withResolvers<WaitForStateChange>();
   /*
    * Create a viem public (read only) client
    * (https://viem.sh/docs/clients/public.html)
    */
   const clientOptions = {
     chain: networkConfig.chain,
-    // transport: transportObserver(fallback([webSocket(), http()])),
     transport: transportObserver(http(networkConfig.provider.jsonRpcUrl)),
-    pollingInterval: 1000,
+    pollingInterval: isBsc ? 3000 : 1000,
   } as const satisfies ClientConfig;
 
   const publicClient = createPublicClient(clientOptions);
@@ -71,21 +52,24 @@ export async function setupNetwork() {
    * pass into MUD dev tools for transaction observability.
    */
   const write$ = new Subject<ContractWrite>();
-  /*
-   * The SQLite indexer supplies a snapshot. MUD falls back to the public RPC
-   * for live events when the indexer's live stream is unavailable.
-   */
   const { components, latestBlock$, storedBlockLogs$, waitForTransaction } =
-    await syncToRecs({
-      world,
-      config: mudConfig,
-      address: networkConfig.worldAddress as Hex,
-      publicClient,
-      indexerUrl: networkConfig.indexerUrl,
-      startBlock: BigInt(networkConfig.initialBlockNumber),
-      maxBlockRange: networkConfig.chain.id === bsc.id ? 500n : undefined,
-      tables: extraTables,
-    });
+    await syncGameStore(
+      {
+        address: networkConfig.worldAddress as Hex,
+        publicClient,
+        indexerUrl: networkConfig.indexerUrl,
+        startBlock: BigInt(networkConfig.initialBlockNumber),
+        maxBlockRange: isBsc ? 500n : undefined,
+      },
+      isBsc,
+    );
+
+  const localVoyages = new LocalVoyages();
+  const voyageSubscription = storedBlockLogs$.subscribe({
+    next: (block) => localVoyages.confirmBlock(block),
+    error: (error) => console.error("Unable to reconcile local voyages", error),
+  });
+  world.registerDisposer(() => voyageSubscription.unsubscribe());
 
   /*
    * Create a temporary wallet and a viem client for it
@@ -109,7 +93,6 @@ export async function setupNetwork() {
     client: { public: publicClient, wallet: burnerWalletClient },
   });
 
-  waitForStateChange.resolve(waitForTransaction);
   return {
     world,
     worldAddress: networkConfig.worldAddress,
@@ -122,6 +105,7 @@ export async function setupNetwork() {
     walletClient: burnerWalletClient,
     latestBlock$,
     storedBlockLogs$,
+    localVoyages,
     waitForTransaction,
     worldContract,
     write$: write$.asObservable().pipe(share()),

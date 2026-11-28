@@ -93,6 +93,7 @@ import type { GameManager } from "./GameManager";
 import { GameManagerEvent } from "./GameManager";
 import type { GameObjects } from "./GameObjects";
 import type { GuildUtils } from "./GuildUtils";
+import type { LocalVoyages } from "./LocalVoyages";
 import { copyText, formatMoveOrder } from "./moveOrder";
 import { PluginManager } from "./PluginManager";
 import TutorialManager, { TutorialState } from "./TutorialManager";
@@ -212,6 +213,7 @@ export class GameUIManager extends EventEmitter {
   private constructor(
     gameManager: GameManager,
     terminalHandle: React.MutableRefObject<TerminalHandle | undefined>,
+    public readonly localVoyages?: LocalVoyages,
   ) {
     super();
 
@@ -301,11 +303,16 @@ export class GameUIManager extends EventEmitter {
   public static async create(
     gameManager: GameManager,
     terminalHandle: React.MutableRefObject<TerminalHandle | undefined>,
+    localVoyages?: LocalVoyages,
   ) {
     listenForKeyboardEvents();
     const uiEmitter = UIEmitter.getInstance();
 
-    const uiManager = new GameUIManager(gameManager, terminalHandle);
+    const uiManager = new GameUIManager(
+      gameManager,
+      terminalHandle,
+      localVoyages,
+    );
     const modalManager = await ModalManager.create(gameManager.getChunkStore());
 
     uiManager.setModalManager(modalManager);

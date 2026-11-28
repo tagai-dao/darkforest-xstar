@@ -17,8 +17,9 @@ import type {
 } from "@df/types";
 import { ArrivalType, getMaxMaterialType } from "@df/types";
 import { getComponentValue } from "@latticexyz/recs";
-import { encodeEntity } from "@latticexyz/store-sync/recs";
+import { decodeEntity, encodeEntity } from "@latticexyz/store-sync/recs";
 import type { ClientComponents } from "@mud/createClientComponents";
+import { asapScheduler, filter, map, observeOn } from "rxjs";
 
 interface MoveUtilsConfig {
   components: ClientComponents;
@@ -29,6 +30,25 @@ export class MoveUtils {
 
   public constructor({ components }: MoveUtilsConfig) {
     this.components = components;
+  }
+
+  public observeQueuedArrivals() {
+    const { Move } = this.components;
+    return Move.update$.pipe(
+      // The log that adds the move to PendingMove can follow the Move record
+      // in the same block. Let the storage adapter finish applying the block.
+      observeOn(asapScheduler),
+      map(({ entity, value: [move] }) => {
+        if (!move) return undefined;
+        const { to } = decodeEntity(Move.metadata.keySchema, entity);
+        return {
+          arrivalId: move.id.toString() as VoyageId,
+          fromId: locationIdFromHexStr(move.from),
+          toId: locationIdFromHexStr(to),
+        };
+      }),
+      filter((arrival) => arrival !== undefined),
+    );
   }
 
   public getArrivalsForPlanet(planetId: LocationId): QueuedArrival[] {

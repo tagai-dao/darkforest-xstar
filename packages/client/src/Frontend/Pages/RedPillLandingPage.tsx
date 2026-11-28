@@ -68,6 +68,7 @@ import {
 import {
   type ActionRecord,
   type BoardCursor,
+  readWalletActions,
   readWalletTail,
   readWatchedHome,
 } from "../../Backend/Save/FileChunkSource";
@@ -180,7 +181,7 @@ export function RedPillLandingPage() {
   const params = new URLSearchParams(location.search);
   const queryParam = params.toString();
   const {
-    network: { playerEntity, waitForTransaction },
+    network: { localVoyages },
     components: components, //{ SyncProgress },
   } = useMUD();
 
@@ -1021,6 +1022,7 @@ export function RedPillLandingPage() {
       const newGameUIManager = await GameUIManager.create(
         newGameManager,
         terminal,
+        localVoyages,
       );
 
       window.ui = newGameUIManager;
@@ -1073,7 +1075,14 @@ export function RedPillLandingPage() {
         setStep(TerminalPromptStep.ALL_CHECKS_PASS);
       }
     },
-    [ethConnection, contractAddress, spectate, folderSave, components],
+    [
+      ethConnection,
+      contractAddress,
+      spectate,
+      folderSave,
+      components,
+      localVoyages,
+    ],
   );
 
   const advanceStateFromAskAddAccount = useCallback(
@@ -1712,6 +1721,47 @@ export function RedPillLandingPage() {
 
   useEffect(() => {
     const handle = folderHandleRef.current;
+    if (!handle || watchToken === 0) return;
+    const cursor = boardCursorRef.current;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let firstRead = true;
+    const pending: ActionRecord[] = [];
+
+    const read = async () => {
+      try {
+        const actions = await readWalletActions(handle, cursor);
+        if (stopped) return;
+        if (actions.length > 0)
+          setActionLog((current) => [...current, ...actions]);
+        if (!firstRead) pending.push(...actions);
+        firstRead = false;
+        const manager = gameUIManagerRef.current;
+        if (manager) {
+          for (const action of pending.splice(0)) {
+            localVoyages.add(
+              action,
+              manager,
+              components.getChainClockOffsetMs(),
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Unable to load local actions", error);
+      } finally {
+        if (!stopped) timer = setTimeout(() => void read(), 1000);
+      }
+    };
+    void read();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      localVoyages.clearPreviews();
+    };
+  }, [watchToken, localVoyages, components]);
+
+  useEffect(() => {
+    const handle = folderHandleRef.current;
     if (!handle || watchToken === 0) {
       return;
     }
@@ -1721,15 +1771,12 @@ export function RedPillLandingPage() {
     const watch = async () => {
       while (!stopped) {
         try {
-          const { chunks, replace, homeText, actions } = await readWalletTail(
+          const { chunks, replace, homeText } = await readWalletTail(
             handle,
             boardCursorRef.current,
           );
           if (stopped) {
             return;
-          }
-          if (actions.length > 0) {
-            setActionLog((current) => [...current, ...actions]);
           }
           const manager = gameManagerRef.current;
           if (manager) {
