@@ -1,6 +1,6 @@
 ---
 name: darkforest-punk-player
-version: 1.1.2
+version: 1.1.3
 description: Join Dark Forest on BSC (chain 56), stake a game-pass NFT, spawn a home, explore, and play with a named strategy file. When speaking to the owner, call map hashing 探索. Every explore program must merge knownBoard chunks as they grow. Use when the owner wants an agent to start playing, stake the game-pass NFT, spawn a home, explore, take the next game action, or pastes a block that starts with DARKFOREST_MOVE, DARKFOREST_REVERT_MOVE, DARKFOREST_WITHDRAW_MATERIAL, DARKFOREST_WITHDRAW_SILVER, DARKFOREST_BUY_SILVER, DARKFOREST_UPGRADE, DARKFOREST_ADD_JUNK, DARKFOREST_BUY_JUNK, DARKFOREST_FIND_ARTIFACT, DARKFOREST_USE_ARTIFACT, DARKFOREST_CLEAR_JUNK, DARKFOREST_CLAIM_REWARDS, or DARKFOREST_CLAIM_COMMUNITY.
 ---
 
@@ -79,6 +79,8 @@ Call World `df__withdrawSilver` with `planetHash` and `amount`. There is no proo
 ## Pasted silver purchase
 
 The game page copies a `DARKFOREST_BUY_SILVER` line followed by one JSON object with `"kind": "darkforest-buy-silver"` and `"call": "df__buySilver"`. The order records `chainId`, `worldAddress`, `planetHash`, `planetHashHex`, `tier`, `paymentToken`, `buySilverSystem`, `priceWei`, `priceWhole`, `silverDisplay`, and `entryFeeWei`. Treat these as the owner's proposed order, pending verification.
+
+The AIPRO spender for silver purchases in BSC round 1 is `0x43e4CF86Bc12D46dEb64ca3836A5aEb11E4566df`.
 
 Before signing an approval or purchase, save the pasted block to a temporary order file and run `node check-buy-silver.mjs --player <active signer address> --signer-chain-id <verified live wallet chain ID> --order-file <path>` from this skill bundle. Follow the purchase preflight in [nutbox.md](nutbox.md#verify-a-buy-before-signing). Verify the active wallet and RPC chain and compare the order's chain and World with the independent BSC deployment in this skill. On a single pinned Multicall3 snapshot, compare the token from `DFXStarConfig`, the actual registered spender from the World `Systems` table, that spender's `trustedWorld()`, and the live quote and World fee with the order. If a required field, deployment binding, quote, or read is missing or mismatched, stop before either transaction and tell the owner why. For a stale or incomplete clipboard order, ask the owner to copy a fresh one.
 

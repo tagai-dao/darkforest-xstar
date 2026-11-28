@@ -608,6 +608,12 @@ export const gameDocs: DocChapter[] = [
       },
       { kind: "h2", id: "buy", title: "买银" },
       {
+        kind: "link",
+        label:
+          "在 BSC 购买银时，将 AIPRO 授权给 0x43e4CF86Bc12D46dEb64ca3836A5aEb11E4566df",
+        href: "https://bscscan.com/address/0x43e4CF86Bc12D46dEb64ca3836A5aEb11E4566df",
+      },
+      {
         kind: "p",
         text: "银到账后可用于升级行星，也可以运往时空裂隙提取。购买使用的 AIPRO 中有 50% 会直接销毁，50% 会分给游戏的积分排行榜，由玩家瓜分。",
       },

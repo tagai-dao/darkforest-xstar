@@ -20,7 +20,7 @@ const publishedFiles = readdirSync(src)
 
 const manifest = {
   name: "darkforest-punk-player",
-  version: "1.1.2",
+  version: "1.1.3",
   description:
     "BSC Dark Forest player skill. Entry is SKILL.md; fetch every path in files.",
   basePath: "/skills/darkforest-punk-player/",

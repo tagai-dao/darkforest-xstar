@@ -13,13 +13,13 @@ Score withdrawals stake into this pool. The unburned part of a buy-silver paymen
 
 `DFXStarConfig` on this world is:
 
-| Role            | Address                                                |
-| --------------- | ------------------------------------------------------ |
-| Pool            | `0x375dED0C49aEb8DdD3E9DB6A4b5c84A0adD93C9F`           |
-| Staking factory | `0xd436Bb8fF9BdF45b85aAC0dB038F14a9Ad14610B`           |
-| Community       | `0xfB710BE94918e999877b55003173C04375774d46`           |
-| Payment token   | `0x935FB3D106c259840d4abE96351867fb63123333`           |
-| BuySilverSystem | Resolved from the trusted World's live `Systems` table |
+| Role            | Address                                      |
+| --------------- | -------------------------------------------- |
+| Pool            | `0x375dED0C49aEb8DdD3E9DB6A4b5c84A0adD93C9F` |
+| Staking factory | `0xd436Bb8fF9BdF45b85aAC0dB038F14a9Ad14610B` |
+| Community       | `0xfB710BE94918e999877b55003173C04375774d46` |
+| Payment token   | `0x935FB3D106c259840d4abE96351867fb63123333` |
+| BuySilverSystem | `0x43e4CF86Bc12D46dEb64ca3836A5aEb11E4566df` |
 
 The community address is a contract. Do not send AIPRO to it as if it were a wallet. The pool stores this World once and cannot change it. `depositFromGame` accepts only that World. Do not call `addAdmin`, `removeAdmin`, or fee setters. Do not mint AIPRO.
 

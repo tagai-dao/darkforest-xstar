@@ -90,6 +90,7 @@ export function ContractsDocTable() {
         { label: "Game Pass 保管", address: locker },
         { label: "Game Pass NFT", address: nft },
         { label: "支付代币", address: configured(star?.paymentToken) },
+        { label: "购银扣款合约", address: configured(star?.buySilverSystem) },
         { label: "DFXStar 矿池", address: configured(star?.scoreStakingPool) },
         { label: "社区合约", address: configured(star?.community) },
         { label: "质押工厂", address: configured(star?.stakingFactory) },
@@ -103,6 +104,7 @@ export function ContractsDocTable() {
   }, [
     pass?.addr,
     publicClient,
+    star?.buySilverSystem,
     star?.community,
     star?.paymentToken,
     star?.scoreStakingPool,
