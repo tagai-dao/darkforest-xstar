@@ -17,6 +17,7 @@ import { Planet } from "../src/lib/Planet.sol";
 import { PlanetType, SpaceType, ArtifactStatus, PlanetFlagType } from "../src/codegen/common.sol";
 import { Artifact, ArtifactLib } from "../src/lib/Artifact.sol";
 import { TempConfigSet } from "../src/codegen/index.sol";
+import { ArtifactPortalSystem } from "../src/systems/ArtifactPortalSystem.sol";
 import { ArtifactNFT } from "../src/tokens/ArtifactNFT.sol";
 import { IArtifactNFT } from "../src/tokens/IArtifactNFT.sol";
 import { ArtifactNFT as ArtifactNFTTable } from "../src/codegen/tables/ArtifactNFT.sol";
@@ -47,6 +48,16 @@ contract ArtifactNFTTest is BaseTest {
     portalSystem = Systems.getSystem(
       WorldResourceIdLib.encode({ typeId: RESOURCE_SYSTEM, namespace: DF_NAMESPACE, name: ARTIFACT_PORTAL_SYSTEM_NAME })
     );
+  }
+
+  function testRegressionPortalRejectsNonWorldCaller() public {
+    vm.expectRevert(ArtifactPortalSystem.UntrustedArtifactWorld.selector);
+    ArtifactPortalSystem(portalSystem).withdrawArtifact(1, 1);
+  }
+
+  function testRegressionPortalRejectsNonWorldDeposit() public {
+    vm.expectRevert(ArtifactPortalSystem.UntrustedArtifactWorld.selector);
+    ArtifactPortalSystem(portalSystem).depositArtifact(1, 1);
   }
 
   function testMint() public {

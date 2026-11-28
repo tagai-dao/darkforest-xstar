@@ -14,17 +14,14 @@ contract PlanetEmojiSystem is BaseSystem {
    * @param planetHash Planet hash
    * @param emoji Emoji you like
    */
-  function setPlanetEmoji(
-    uint256 planetHash,
-    string memory emoji
-  ) public requireGamePass requireSameOwnerAndJunkOwner(planetHash) {
+  function setPlanetEmoji(uint256 planetHash, string memory emoji) public requireGamePass {
     GlobalStats.setSetPlanetEmojiCount(GlobalStats.getSetPlanetEmojiCount() + 1);
     PlayerStats.setSetPlanetEmojiCount(_msgSender(), PlayerStats.getSetPlanetEmojiCount(_msgSender()) + 1);
 
     address worldAddress = _world();
     DFUtils.tick(worldAddress);
 
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    Planet memory planet = DFUtils.readJunkCheckedPlanet(worldAddress, planetHash);
     address executor = _msgSender();
 
     if (planet.owner != executor) revert NotPlanetOwner();

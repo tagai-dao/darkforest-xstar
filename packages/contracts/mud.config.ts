@@ -77,6 +77,9 @@ export default defineWorld({
     // ],
   },
   systems: {
+    ArtifactPortalSystem: {
+      deploy: { disabled: true },
+    },
     BuySilverSystem: {
       // PostDeploy supplies its World constructor argument and registers it.
       deploy: { disabled: true },

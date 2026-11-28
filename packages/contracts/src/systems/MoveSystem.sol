@@ -191,6 +191,8 @@ contract MoveSystem is BaseSystem {
       revert Errors.NotPlanetOwner();
     }
 
+    if (moveData.artifact != 0 && !fromPlanet.hasArtifactSlot()) revert Errors.ArtifactStorageFull();
+
     PendingMoveQueueLib.RemoveMove(queue, moveIndex);
     queue.WriteToStore();
     Move.deleteRecord(toPlanetHash, moveIndex);

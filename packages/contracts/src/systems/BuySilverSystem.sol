@@ -50,10 +50,7 @@ contract BuySilverSystem is BaseSystem {
    * @param planetHash 目标星球。等级决定档位，种类和空间加成不改价格和数量。
    * @param tier 0=20%，1=50%，2=80%，3=150% 的星云行星基础银上限
    */
-  function buySilver(
-    uint256 planetHash,
-    uint8 tier
-  ) public onlyTrustedWorld requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  function buySilver(uint256 planetHash, uint8 tier) public onlyTrustedWorld requireGamePass entryFee {
     address pool = DFXStarConfig.getScoreStakingPool();
     if (pool == address(0)) revert DFXStarPoolNotConfigured();
 
@@ -66,7 +63,7 @@ contract BuySilverSystem is BaseSystem {
     address worldAddress = _world();
     DFUtils.tick(worldAddress);
 
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    Planet memory planet = DFUtils.readJunkCheckedPlanet(worldAddress, planetHash);
 
     if (planet.owner != executor) revert NotPlanetOwner();
     if (planet.planetType == PlanetType.SPACETIME_RIP) revert BuySilverOnSpacetimeRip();

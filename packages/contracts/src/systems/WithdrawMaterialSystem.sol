@@ -25,7 +25,7 @@ contract WithdrawMaterialSystem is BaseSystem {
     uint256 planetHash,
     MaterialType materialType,
     uint256 materialToWithdraw
-  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  ) public requireGamePass entryFee {
     _updateStats();
     _processWithdrawal(planetHash, materialType, materialToWithdraw);
   }
@@ -39,7 +39,7 @@ contract WithdrawMaterialSystem is BaseSystem {
     address worldAddress = _world();
     DFUtils.tick(worldAddress);
 
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    Planet memory planet = DFUtils.readJunkCheckedPlanet(worldAddress, planetHash);
     address executor = _msgSender();
 
     _validateWithdrawal(planet, executor, materialType, materialToWithdraw);

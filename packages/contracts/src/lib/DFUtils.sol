@@ -12,6 +12,7 @@ import { Proof } from "libraries/SnarkProof.sol";
 import { MoveInput, SpawnInput, RevealInput, BiomebaseInput } from "libraries/VerificationInput.sol";
 import { Planet } from "libraries/Planet.sol";
 import { Ticker, TickerData } from "codegen/tables/Ticker.sol";
+import { JunkConfig } from "codegen/tables/JunkConfig.sol";
 import { PlanetStatus } from "codegen/common.sol";
 import { Errors } from "interfaces/errors.sol";
 import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
@@ -96,6 +97,14 @@ library DFUtils {
     }
     if (planet.status != PlanetStatus.DEFAULT) {
       revert Errors.PlanetNotAvailable();
+    }
+  }
+
+  /// @dev Resolve pending arrivals before checking the owner used by the operation.
+  function readJunkCheckedPlanet(address worldAddress, uint256 planetHash) internal returns (Planet memory planet) {
+    planet = readInitedPlanet(worldAddress, planetHash);
+    if (JunkConfig.getSPACE_JUNK_ENABLED() && planet.owner != planet.junkOwner) {
+      revert Errors.NotSameOwnerAndJunkOwner();
     }
   }
 

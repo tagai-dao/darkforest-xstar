@@ -8,6 +8,7 @@ import { stdToml } from "forge-std/StdToml.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { ResourceId, WorldResourceIdLib } from "@latticexyz/world/src/WorldResourceId.sol";
 import { Systems } from "@latticexyz/world/src/codegen/tables/Systems.sol";
+import { ArtifactPortalSystem } from "../src/systems/ArtifactPortalSystem.sol";
 import { BuySilverSystem } from "../src/systems/BuySilverSystem.sol";
 import { StakeScoreSystem } from "../src/systems/StakeScoreSystem.sol";
 import { DFXStarStakingLib } from "../src/lib/DFXStarStakingLib.sol";
@@ -108,6 +109,7 @@ contract PostDeploy is Script {
       IArtifactNFT(artifactNftAddress).setDF(roundNum, worldAddress);
     }
     _setSilverPurchaseConfig(toml);
+    _registerArtifactPortal(IWorld(worldAddress));
     _registerBuySilverSystem(worldAddress);
     // 付费铸造要扣本地 AIPRO，所以先建社区代币，再部署 NFT。
     _setDFXStarConfig(toml, worldAddress);
@@ -236,6 +238,13 @@ contract PostDeploy is Script {
     console.log("Installed bloom filter with index", index);
     index = installPinkBomb(worldAddress);
     console.log("Installed pinkbomb with index", index);
+  }
+
+  function _registerArtifactPortal(IWorld world) internal {
+    ResourceId id = WorldResourceIdLib.encode("sy", "df", "ArtifactPortalSy");
+    world.registerSystem(id, new ArtifactPortalSystem(address(world)), true);
+    world.registerFunctionSelector(id, "depositArtifact(uint256,uint256)");
+    world.registerFunctionSelector(id, "withdrawArtifact(uint256,uint256)");
   }
 
   function _registerBuySilverSystem(address worldAddress) internal {

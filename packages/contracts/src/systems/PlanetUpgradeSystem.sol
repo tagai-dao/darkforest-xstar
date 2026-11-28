@@ -20,14 +20,14 @@ contract PlanetUpgradeSystem is BaseSystem {
     uint256 rangeUpgrades,
     uint256 speedUpgrades,
     uint256 defenseUpgrades
-  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  ) public requireGamePass entryFee {
     GlobalStats.setUpgradePlanetCount(GlobalStats.getUpgradePlanetCount() + 1);
     PlayerStats.setUpgradePlanetCount(_msgSender(), PlayerStats.getUpgradePlanetCount(_msgSender()) + 1);
 
     address worldAddress = _world();
     DFUtils.tick(worldAddress);
 
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    Planet memory planet = DFUtils.readJunkCheckedPlanet(worldAddress, planetHash);
 
     address executor = _msgSender();
     planet.upgrade(executor, rangeUpgrades, speedUpgrades, defenseUpgrades);

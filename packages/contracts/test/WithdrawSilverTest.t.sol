@@ -11,6 +11,9 @@ import { Planet } from "../src/lib/Planet.sol";
 import { Ticker, TickerData } from "../src/codegen/index.sol";
 import { Errors } from "../src/interfaces/errors.sol";
 
+import { JunkConfig } from "../src/codegen/tables/JunkConfig.sol";
+import { MaterialType } from "../src/codegen/common.sol";
+
 contract WithdrawSilverTest is BaseTest {
   uint256 planetHash = type(uint256).max;
 
@@ -36,6 +39,33 @@ contract WithdrawSilverTest is BaseTest {
       0
     );
     vm.stopPrank();
+  }
+
+  function _mockSettledCapture() internal {
+    vm.prank(admin);
+    JunkConfig.setSPACE_JUNK_ENABLED(true);
+    Planet memory settled = IWorld(worldAddress).df__readPlanet(planetHash);
+    settled.owner = user2;
+    settled.junkOwner = user1;
+    vm.mockCall(
+      worldAddress,
+      abi.encodeWithSignature("df__readPlanetWithKillStats(uint256)", planetHash),
+      abi.encode(settled)
+    );
+  }
+
+  function testRegressionSilverChecksSettledJunkOwner() public {
+    _mockSettledCapture();
+    vm.prank(user2);
+    vm.expectRevert(Errors.NotSameOwnerAndJunkOwner.selector);
+    IWorld(worldAddress).df__withdrawSilver(planetHash, 300000000);
+  }
+
+  function testRegressionMaterialChecksSettledJunkOwner() public {
+    _mockSettledCapture();
+    vm.prank(user2);
+    vm.expectRevert(Errors.NotSameOwnerAndJunkOwner.selector);
+    IWorld(worldAddress).df__withdrawMaterial(planetHash, MaterialType(1), 1);
   }
 
   function testWithdrawSilver() public {

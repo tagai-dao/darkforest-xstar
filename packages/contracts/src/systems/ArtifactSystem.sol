@@ -21,11 +21,7 @@ contract ArtifactSystem is BaseSystem {
     ArtifactRegistry.set(bytes32(artifactId), true);
   }
 
-  function chargeArtifact(
-    uint256 planetHash,
-    uint256 artifactId,
-    bytes memory data
-  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  function chargeArtifact(uint256 planetHash, uint256 artifactId, bytes memory data) public requireGamePass entryFee {
     GlobalStats.setChargeArtifactCount(GlobalStats.getChargeArtifactCount() + 1);
     PlayerStats.setChargeArtifactCount(_msgSender(), PlayerStats.getChargeArtifactCount(_msgSender()) + 1);
 
@@ -37,10 +33,7 @@ contract ArtifactSystem is BaseSystem {
     planet.writeToStore();
   }
 
-  function shutdownArtifact(
-    uint256 planetHash,
-    uint256 artifactId
-  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  function shutdownArtifact(uint256 planetHash, uint256 artifactId) public requireGamePass entryFee {
     GlobalStats.setShutdownArtifactCount(GlobalStats.getShutdownArtifactCount() + 1);
     PlayerStats.setShutdownArtifactCount(_msgSender(), PlayerStats.getShutdownArtifactCount(_msgSender()) + 1);
 
@@ -52,11 +45,7 @@ contract ArtifactSystem is BaseSystem {
     planet.writeToStore();
   }
 
-  function activateArtifact(
-    uint256 planetHash,
-    uint256 artifactId,
-    bytes memory data
-  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  function activateArtifact(uint256 planetHash, uint256 artifactId, bytes memory data) public requireGamePass entryFee {
     GlobalStats.setActivateArtifactCount(GlobalStats.getActivateArtifactCount() + 1);
     PlayerStats.setActivateArtifactCount(_msgSender(), PlayerStats.getActivateArtifactCount(_msgSender()) + 1);
 
@@ -75,7 +64,7 @@ contract ArtifactSystem is BaseSystem {
   ) private returns (Planet memory planet, Artifact memory artifact) {
     DFUtils.tick(worldAddress);
 
-    planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    planet = DFUtils.readJunkCheckedPlanet(worldAddress, planetHash);
     artifact = planet.mustGetArtifact(artifactId);
     if (planet.owner != _msgSender()) {
       revert NotPlanetOwner();

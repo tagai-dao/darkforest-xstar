@@ -11,9 +11,6 @@ import { FeeRecipient } from "codegen/tables/FeeRecipient.sol";
 import { Errors } from "interfaces/errors.sol";
 import { RevenueStats } from "codegen/tables/RevenueStats.sol";
 import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
-import { JunkConfig } from "codegen/tables/JunkConfig.sol";
-import { PlanetOwner } from "codegen/tables/PlanetOwner.sol";
-import { PlanetJunkOwner } from "codegen/tables/PlanetJunkOwner.sol";
 import { GamePassNFT } from "codegen/tables/GamePassNFT.sol";
 import { IGamePassNFT } from "tokens/IGamePassNFT.sol";
 
@@ -74,15 +71,6 @@ contract BaseSystem is System, Errors {
 
   function _checkGamePass(address pass, address player) internal view {
     if (pass != address(0) && !IGamePassNFT(pass).isPlayerInActiveSeason(player)) revert GamePassRequired();
-  }
-
-  modifier requireSameOwnerAndJunkOwner(uint256 planetHash) {
-    if (JunkConfig.getSPACE_JUNK_ENABLED()) {
-      if (PlanetOwner.get(bytes32(planetHash)) != PlanetJunkOwner.get(bytes32(planetHash))) {
-        revert NotSameOwnerAndJunkOwner();
-      }
-    }
-    _;
   }
 
   // TODO: move planet and artifact read/write to here as internal functions

@@ -23,7 +23,8 @@ contract DfDelegationControlSystem is DelegationControl {
 
     address playerAddress = BurnerToPlayer.get(bytes32(uint256(uint160(_msgSender()))));
 
-    if (playerAddress == address(0)) {
+    // Historical rotations may have left a reverse record for an expired burner.
+    if (playerAddress == address(0) || Player.getBurner(playerAddress) != _msgSender()) {
       playerAddress = _msgSender();
     }
 

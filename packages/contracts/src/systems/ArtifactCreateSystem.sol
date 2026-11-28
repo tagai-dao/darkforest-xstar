@@ -12,22 +12,19 @@ import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
 
 contract ArtifactCreateSystem is BaseSystem {
-  function prospectPlanet(uint256 planetHash) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  function prospectPlanet(uint256 planetHash) public requireGamePass entryFee {
     GlobalStats.setProspectPlanetCount(GlobalStats.getProspectPlanetCount() + 1);
     PlayerStats.setProspectPlanetCount(_msgSender(), PlayerStats.getProspectPlanetCount(_msgSender()) + 1);
 
     address worldAddress = _world();
     DFUtils.tick(worldAddress);
 
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    Planet memory planet = DFUtils.readJunkCheckedPlanet(worldAddress, planetHash);
     planet.prospect(_msgSender());
     planet.writeToStore();
   }
 
-  function findingArtifact(
-    Proof memory proof,
-    BiomebaseInput memory input
-  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(input.planetHash) {
+  function findingArtifact(Proof memory proof, BiomebaseInput memory input) public requireGamePass entryFee {
     GlobalStats.setFindArtifactCount(GlobalStats.getFindArtifactCount() + 1);
     PlayerStats.setFindArtifactCount(_msgSender(), PlayerStats.getFindArtifactCount(_msgSender()) + 1);
 
@@ -36,7 +33,7 @@ contract ArtifactCreateSystem is BaseSystem {
 
     DFUtils.verify(worldAddress, proof, input);
 
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, input.planetHash);
+    Planet memory planet = DFUtils.readJunkCheckedPlanet(worldAddress, input.planetHash);
     Artifact memory artifact = planet.findArtifact(_msgSender(), input.biomebase);
 
     Counter.setArtifact(uint24(artifact.id));

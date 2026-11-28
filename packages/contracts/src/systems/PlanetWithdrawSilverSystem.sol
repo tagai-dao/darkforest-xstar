@@ -19,17 +19,14 @@ contract PlanetWithdrawSilverSystem is BaseSystem {
    * @param planetHash Planet hash
    * @param silverToWithdraw Silver amount to withdraw
    */
-  function withdrawSilver(
-    uint256 planetHash,
-    uint256 silverToWithdraw
-  ) public requireGamePass entryFee requireSameOwnerAndJunkOwner(planetHash) {
+  function withdrawSilver(uint256 planetHash, uint256 silverToWithdraw) public requireGamePass entryFee {
     GlobalStats.setWithdrawSilverCount(GlobalStats.getWithdrawSilverCount() + 1);
     PlayerStats.setWithdrawSilverCount(_msgSender(), PlayerStats.getWithdrawSilverCount(_msgSender()) + 1);
 
     address worldAddress = _world();
     DFUtils.tick(worldAddress);
 
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    Planet memory planet = DFUtils.readJunkCheckedPlanet(worldAddress, planetHash);
 
     address executor = _msgSender();
     uint256 playerWithdrawSilverAmount = PlayerWithdrawSilver.get(executor);

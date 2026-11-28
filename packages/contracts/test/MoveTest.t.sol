@@ -18,6 +18,8 @@ import { MaterialMove } from "../src/lib/Material.sol";
 import { PlanetMaterial } from "../src/codegen/tables/PlanetMaterial.sol";
 import { PlanetMaterialStorage } from "../src/codegen/tables/PlanetMaterialStorage.sol";
 
+import { PlanetArtifact } from "../src/codegen/tables/PlanetArtifact.sol";
+
 contract MoveTest is BaseTest {
   function _mats(MaterialMove memory m1) internal pure returns (MaterialMove[] memory a) {
     a = new MaterialMove[](1);
@@ -385,6 +387,30 @@ contract MoveTest is BaseTest {
     assertEq(latestPlanet2.owner, user1);
     assertEq(latestPlanet2.population, move2.population + _getPopulationAtTick(planet2, move2.arrivalTick));
     assertEq(latestPlanet2.silver, move2.silver + planet2.silver);
+  }
+
+  function testRegressionRecallChecksArtifactCapacity() public {
+    vm.warp(block.timestamp + 1000);
+    _sendFleet(user1, 1, 2, 80);
+    bytes32 destination = bytes32(uint256(2));
+    MoveData memory outbound = _queuedMove(2, 0);
+    vm.startPrank(admin);
+    Move.setArtifact(destination, _getIndexAt(PendingMove.get(destination), 0), 9);
+    uint256 inventory;
+    for (uint256 id = 1; id <= 8; ++id) inventory = (inventory << 32) | id;
+    PlanetArtifact.setArtifacts(bytes32(uint256(1)), inventory);
+    vm.stopPrank();
+    vm.warp(_getTimestampAtTick(outbound.departureTick + 5));
+    vm.prank(user1);
+    vm.expectRevert(Errors.ArtifactStorageFull.selector);
+    IWorld(worldAddress).df__revertMove(outbound.id, destination);
+    assertEq(_queuedMove(2, 0).artifact, 9);
+
+    vm.prank(admin);
+    PlanetArtifact.setArtifacts(bytes32(uint256(1)), inventory >> 32);
+    vm.prank(user1);
+    IWorld(worldAddress).df__revertMove(outbound.id, destination);
+    assertEq(_queuedMove(1, 0).artifact, 9);
   }
 
   function testRevertMovePreservesOtherFlightsAndReusesFreedSlot() public {

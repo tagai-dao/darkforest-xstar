@@ -17,17 +17,28 @@ import { GlobalStats } from "codegen/tables/GlobalStats.sol";
 import { PlayerStats } from "codegen/tables/PlayerStats.sol";
 
 contract ArtifactPortalSystem is BaseSystem {
-  function withdrawArtifact(
-    uint256 planetHash,
-    uint256 artifactId
-  ) public requireGamePass requireSameOwnerAndJunkOwner(planetHash) {
+  error UntrustedArtifactWorld();
+
+  address private immutable trustedWorld;
+
+  constructor(address worldAddress) {
+    if (worldAddress.code.length == 0) revert UntrustedArtifactWorld();
+    trustedWorld = worldAddress;
+  }
+
+  modifier onlyTrustedWorld() {
+    if (msg.sender != trustedWorld) revert UntrustedArtifactWorld();
+    _;
+  }
+
+  function withdrawArtifact(uint256 planetHash, uint256 artifactId) public onlyTrustedWorld requireGamePass {
     GlobalStats.setWithdrawArtifactCount(GlobalStats.getWithdrawArtifactCount() + 1);
     PlayerStats.setWithdrawArtifactCount(_msgSender(), PlayerStats.getWithdrawArtifactCount(_msgSender()) + 1);
 
     address worldAddress = _world();
     DFUtils.tick(worldAddress);
 
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    Planet memory planet = DFUtils.readJunkCheckedPlanet(worldAddress, planetHash);
 
     if (planet.planetType != PlanetType.SPACETIME_RIP) {
       revert InvalidPlanetType();
@@ -62,17 +73,14 @@ contract ArtifactPortalSystem is BaseSystem {
     }
   }
 
-  function depositArtifact(
-    uint256 planetHash,
-    uint256 artifactId
-  ) public requireGamePass requireSameOwnerAndJunkOwner(planetHash) {
+  function depositArtifact(uint256 planetHash, uint256 artifactId) public onlyTrustedWorld requireGamePass {
     GlobalStats.setDepositArtifactCount(GlobalStats.getDepositArtifactCount() + 1);
     PlayerStats.setDepositArtifactCount(_msgSender(), PlayerStats.getDepositArtifactCount(_msgSender()) + 1);
 
     address worldAddress = _world();
     DFUtils.tick(worldAddress);
 
-    Planet memory planet = DFUtils.readInitedPlanet(worldAddress, planetHash);
+    Planet memory planet = DFUtils.readJunkCheckedPlanet(worldAddress, planetHash);
 
     if (planet.planetType != PlanetType.SPACETIME_RIP) {
       revert InvalidPlanetType();

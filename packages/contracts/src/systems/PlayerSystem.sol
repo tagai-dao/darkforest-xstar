@@ -86,6 +86,8 @@ contract PlayerSystem is BaseSystem {
       revert BurnerAlreadyTaken();
     }
 
+    bytes32 previousKey = bytes32(uint256(uint160(Player.getBurner(player))));
+    if (BurnerToPlayer.get(previousKey) == player) BurnerToPlayer.deleteRecord(previousKey);
     BurnerToPlayer.set(bytes32(uint256(uint160(newBurner))), player);
     Player.setBurner(player, newBurner);
   }

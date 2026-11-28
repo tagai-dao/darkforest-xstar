@@ -14,6 +14,9 @@ import { Planet } from "../src/lib/Planet.sol";
 import { PlanetType, SpaceType } from "../src/codegen/common.sol";
 import { BaseTest } from "./BaseTest.t.sol";
 
+import { IWorldErrors } from "@latticexyz/world/src/IWorldErrors.sol";
+import { BurnerToPlayer } from "../src/codegen/tables/BurnerToPlayer.sol";
+
 contract PlayerTest is BaseTest {
   function setUp() public override {
     super.setUp();
@@ -77,6 +80,27 @@ contract PlayerTest is BaseTest {
     IWorld(worldAddress).df__changePlayerName("test1");
     player = Player.get(address(this));
     assertEq(player.name, "test1");
+  }
+
+  function testRegressionRotationClearsPreviousBinding() public {
+    IWorld(worldAddress).df__registerPlayer("rotation", user1);
+    IWorld(worldAddress).df__changeBurnerWallet(user2);
+    assertEq(BurnerToPlayer.get(bytes32(uint256(uint160(user1)))), address(0));
+  }
+
+  function testRegressionHistoricalBurnerCannotDelegate() public {
+    IWorld world = IWorld(worldAddress);
+    world.df__registerPlayer("rotation", user2);
+    vm.prank(admin);
+    BurnerToPlayer.set(bytes32(uint256(uint160(user1))), address(this));
+    bytes memory query = abi.encodeWithSignature("isMoveReverted(uint64)", uint64(0));
+    vm.prank(user2);
+    assertFalse(
+      abi.decode(world.callFrom(address(this), WorldResourceIdLib.encode("sy", "df", "MoveSystem"), query), (bool))
+    );
+    vm.prank(user1);
+    vm.expectRevert(abi.encodeWithSelector(IWorldErrors.World_DelegationNotFound.selector, address(this), user1));
+    world.callFrom(address(this), WorldResourceIdLib.encode("sy", "df", "MoveSystem"), query);
   }
 
   function testChangeBurnerWallet() public {
