@@ -1,5 +1,5 @@
 import { EMPTY_ADDRESS } from "@df/constants";
-import { formatWholeToken } from "@df/gamelogic";
+import { formatWholeToken, getInnerCircleShrinkPercent } from "@df/gamelogic";
 import type { MaterialType, Planet } from "@df/types";
 import { useComponentValue } from "@latticexyz/react";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
@@ -500,12 +500,13 @@ export function PublicGameStatus({
       let nextRadius = keptRadius;
       let nextTick = keptTick;
       try {
-        nextRadius = Math.round(uiManager.getInnerRadius());
+        nextRadius = uiManager.getInnerRadius();
         nextTick = uiManager.getCurrentTick();
         keptRadius = nextRadius;
         keptTick = nextTick;
-        if (!homeReady && !framed && nextRadius > 0) {
-          Viewport.getInstance().focus({ x: 0, y: 0 }, nextRadius * 2.4);
+        const framingRadius = Math.round(nextRadius);
+        if (!homeReady && !framed && framingRadius > 0) {
+          Viewport.getInstance().focus({ x: 0, y: 0 }, framingRadius * 2.4);
           framed = true;
         }
       } catch {
@@ -601,8 +602,16 @@ export function PublicGameStatus({
         </TitleRow>
         {!collapsed && (
           <>
-            <BoundaryRadius>收缩圈半径 {innerRadius ?? "..."}</BoundaryRadius>
-            <div>当前 tick {tick ?? "..."}</div>
+            <BoundaryRadius>
+              收缩圈半径{" "}
+              {innerRadius === undefined ? "..." : Math.round(innerRadius)}
+            </BoundaryRadius>
+            <div>
+              当前 tick {tick ?? "..."}
+              {tick !== undefined &&
+                innerRadius !== undefined &&
+                `（${getInnerCircleShrinkPercent(innerRadius).toFixed(1)}%）`}
+            </div>
             <WalletDetails aria-label="钱包资产">
               <dt>AIPRO 余额</dt>
               <dd

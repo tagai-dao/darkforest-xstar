@@ -281,7 +281,7 @@ export const SPACE_PROGRAM_DEFINITION = {
 
       // The transparent map tint lets the dim, screen-space star field show
       // through while explored chunks still carry their sector color.
-      vec3 base = vec3(.021, .032, .061);
+      vec3 base = vec3(.037, .055, .092);
       vec3 lit = base + sector * (.55 + variation * cloud * .54);
       lit += vec3(.035, .058, .096) * pow(cloud, 2.4);
       float stars = dustStars((${v.position}.xy + world * .021) / 31.0);
