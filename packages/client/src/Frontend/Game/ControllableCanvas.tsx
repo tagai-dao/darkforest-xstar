@@ -1,5 +1,6 @@
 import { Renderer } from "@df/renderer";
 import { CursorState, ModalManagerEvent, Setting } from "@df/types";
+import { useMUD } from "@mud/MUDContext";
 // import * as fabric from 'fabric'; // v6
 import {
   useCallback,
@@ -21,6 +22,7 @@ import {
 } from "../Utils/ShortcutConstants";
 import UIEmitter, { UIEmitterEvent } from "../Utils/UIEmitter";
 import { bindCanvasPointerEvents } from "./canvasPointerEvents";
+import { MapShareTools } from "./MapShareTools";
 import Viewport from "./Viewport";
 
 const CanvasWrapper = styled.div`
@@ -83,6 +85,9 @@ export default function ControllableCanvas({
   // const [fCanvas, setFCanvas] = useState<fabric.Canvas | null>(null);
 
   const gameUIManager = useUIManager();
+  const { network } = useMUD();
+  const [sharingMap, setSharingMap] = useState(false);
+  const [inputReady, setInputReady] = useState(false);
 
   const modalManager = gameUIManager.getModalManager();
   const [targeting, setTargeting] = useState<boolean>(false);
@@ -220,12 +225,14 @@ export default function ControllableCanvas({
 
     const initialResizeFrameId = window.requestAnimationFrame(() => {
       uiEmitter.emit(UIEmitterEvent.WindowResize);
+      setInputReady(true);
       onInputReadyChange?.(true);
     });
 
     return () => {
       initializedRef.current = false;
       window.cancelAnimationFrame(initialResizeFrameId);
+      setInputReady(false);
       onInputReadyChange?.(false);
       unbindPointerEvents();
       Viewport.destroyInstance();
@@ -253,6 +260,7 @@ export default function ControllableCanvas({
 
   // Continuous movement using animation frame
   useEffect(() => {
+    if (sharingMap) return;
     let animationId: number;
 
     const moveCamera = () => {
@@ -287,7 +295,7 @@ export default function ControllableCanvas({
         cancelAnimationFrame(animationId);
       }
     };
-  }, [isUpPressed, isDownPressed, isLeftPressed, isRightPressed]);
+  }, [isUpPressed, isDownPressed, isLeftPressed, isRightPressed, sharingMap]);
 
   return (
     <CanvasWrapper
@@ -297,6 +305,16 @@ export default function ControllableCanvas({
       <canvas ref={glRef} width={width} height={height} />
       <canvas data-guide-map ref={canvasRef} width={width} height={height} />
       <canvas ref={bufferRef} id="buffer" />
+      {inputReady && (
+        <MapShareTools
+          game={{
+            chainId: network.publicClient.chain.id,
+            world: gameUIManager.getContractAddress(),
+          }}
+          manager={gameUIManager.getGameManager()}
+          onSelectionChange={setSharingMap}
+        />
+      )}
     </CanvasWrapper>
   );
 }

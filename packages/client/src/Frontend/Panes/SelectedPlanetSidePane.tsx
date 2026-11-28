@@ -772,6 +772,15 @@ export function SelectedPlanetSidePane() {
   if (!selected || !isLocatable(selected)) return null;
 
   const { x, y } = selected.location.coords;
+  const copyIdentity = (text: string, label: string) => {
+    void copyText(text).then((copied) => {
+      UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
+        text,
+        copied,
+        label,
+      });
+    });
+  };
 
   return (
     <Side $top={top} data-guide-panel="planet-details">
@@ -784,19 +793,20 @@ export function SelectedPlanetSidePane() {
         <CopyCoordButton
           type="button"
           title="复制坐标"
-          onClick={() => {
-            const text = `${formatCoord(x)}, ${formatCoord(y)}`;
-            void copyText(text).then((copied) => {
-              UIEmitter.getInstance().emit(UIEmitterEvent.MoveOrderCopied, {
-                text,
-                copied,
-                label: "已复制坐标",
-              });
-            });
-          }}
+          aria-label="复制坐标"
+          onClick={() =>
+            copyIdentity(`${formatCoord(x)}, ${formatCoord(y)}`, "已复制坐标")
+          }
         >
           <CopyCoordIcon />
         </CopyCoordButton>
+        <CopyHashButton
+          type="button"
+          title="复制星球 Hash"
+          onClick={() => copyIdentity(selected.locationId, "已复制星球 Hash")}
+        >
+          复制 Hash
+        </CopyHashButton>
       </Coords>
       <DepartureSliders planet={selected} />
       <JunkCopy planet={selected} />
@@ -853,6 +863,20 @@ const CopyCoordButton = styled.button`
   background: transparent;
   border: 0;
   cursor: pointer;
+`;
+
+const CopyHashButton = styled(CopyCoordButton)`
+  align-items: center;
+  padding: 2px 5px;
+  border: 1px solid #385470;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+
+  &:hover {
+    background: #21384e;
+  }
 `;
 
 function CopyCoordIcon() {

@@ -1781,12 +1781,11 @@ export function RedPillLandingPage() {
           const manager = gameManagerRef.current;
           if (manager) {
             if (replace) {
-              for (const previous of [...manager.getExploredChunks()]) {
-                manager.deleteChunk(previous);
+              manager.replaceWatchedChunks(chunks.map(toExploredChunk));
+            } else {
+              for (const chunk of chunks) {
+                manager.ingestWatchedChunk(toExploredChunk(chunk));
               }
-            }
-            for (const chunk of chunks) {
-              manager.ingestWatchedChunk(toExploredChunk(chunk));
             }
             const home = readWatchedHome(homeText);
             if (home && !manager.getHomeCoords()) {

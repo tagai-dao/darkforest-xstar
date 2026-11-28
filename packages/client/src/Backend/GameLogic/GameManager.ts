@@ -4,7 +4,6 @@ import {
   EMPTY_ADDRESS,
   MIN_PLANET_LEVEL,
 } from "@df/constants";
-import { quoteSilverPurchase } from "@df/silverMarket";
 import type { Monomitter, Subscription } from "@df/events";
 import { monomitter } from "@df/events";
 import {
@@ -65,6 +64,7 @@ import {
   locationIdToDecStr,
   locationIdToHexStr,
 } from "@df/serde";
+import { quoteSilverPurchase } from "@df/silverMarket";
 import type {
   RevealInput,
   RevealSnarkContractCallArgs,
@@ -244,6 +244,8 @@ import {
 import type { SerializedPlugin } from "../Plugins/SerializedPlugin";
 import type { WatchChunkStore } from "../Save/FileChunkSource";
 import type { GameSaveFiles } from "../Save/GameSave";
+import { missingSharedChunks } from "../Save/SharedMap";
+import { saveSharedMapChunks } from "../Save/SharedMapCache";
 import { easeInAnimation, emojiEaseOutAnimation } from "../Utils/Animation";
 import type SnarkArgsHelper from "../Utils/SnarkArgsHelper";
 import { hexifyBigIntNestedArray } from "../Utils/Utils";
@@ -520,6 +522,7 @@ export class GameManager extends EventEmitter {
     paused: boolean,
     // halfPrice: boolean,
     components: ClientComponents,
+    private readonly watchedSharedMap?: { scope: string; chunks: Chunk[] },
   ) {
     super();
 
@@ -6651,6 +6654,75 @@ export class GameManager extends EventEmitter {
       this.deleteChunk(existing);
     }
     return this.addNewChunk(chunk);
+  }
+
+  public replaceWatchedChunks(chunks: Chunk[]): void {
+    for (const previous of [...this.getExploredChunks()])
+      this.deleteChunk(previous);
+    for (const chunk of chunks) this.ingestWatchedChunk(chunk);
+    const shared = this.watchedSharedMap?.chunks ?? [];
+    for (const chunk of missingSharedChunks(this.getExploredChunks(), shared)) {
+      this.addNewChunk(chunk);
+    }
+  }
+
+  public async importSharedChunks(
+    chunks: Chunk[],
+  ): Promise<{ chunks: number; planets: number }> {
+    const missing = missingSharedChunks(this.getExploredChunks(), chunks);
+    const verified: Chunk[] = [];
+    let frameStart = performance.now();
+    for (const chunk of missing) {
+      const planetLocations: WorldLocation[] = [];
+      for (const location of chunk.planetLocations) {
+        const known = this.getLocationOfPlanet(location.hash);
+        const canonical = known ?? this.locationFromCoords(location.coords);
+        if (
+          canonical.hash !== location.hash ||
+          canonical.coords.x !== location.coords.x ||
+          canonical.coords.y !== location.coords.y
+        )
+          throw new Error("地图文件的星球坐标与当前游戏不匹配。");
+        planetLocations.push(canonical);
+        if (performance.now() - frameStart > 8) {
+          await sleep(0);
+          frameStart = performance.now();
+        }
+      }
+      const { bottomLeft, sideLength } = chunk.chunkFootprint;
+      const center = {
+        x: bottomLeft.x + sideLength / 2,
+        y: bottomLeft.y + sideLength / 2,
+      };
+      verified.push({
+        ...chunk,
+        planetLocations,
+        perlin: this.spaceTypePerlin(center, false),
+      });
+      if (performance.now() - frameStart > 8) {
+        await sleep(0);
+        frameStart = performance.now();
+      }
+    }
+    const shared = this.watchedSharedMap;
+    if (shared && verified.length) {
+      try {
+        await saveSharedMapChunks(shared.scope, verified);
+      } catch {
+        throw new Error("无法将地图保存到浏览器，请检查可用存储空间。");
+      }
+      shared.chunks = shared.chunks.concat(verified);
+    }
+    // The wallet watcher or another import may have filled part of the area during validation.
+    const additions = missingSharedChunks(this.getExploredChunks(), verified);
+    if (additions.length) await this.bulkAddNewChunks(additions);
+    return {
+      chunks: additions.length,
+      planets: additions.reduce(
+        (count, chunk) => count + chunk.planetLocations.length,
+        0,
+      ),
+    };
   }
 
   /**

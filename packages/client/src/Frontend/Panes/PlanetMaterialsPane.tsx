@@ -1,4 +1,4 @@
-import { formatNumber } from "@df/gamelogic";
+import { formatNumber, getMaterialScoreMultiplier } from "@df/gamelogic";
 import type { LocationId, Materials, MaterialType } from "@df/types";
 import { ModalName } from "@df/types";
 import { MaterialSprite } from "@frontend/Components/MaterialSprite";
@@ -339,36 +339,8 @@ export function getMaterialIcon(
   return <MaterialSprite materialId={materialId} size={size} />;
 }
 
-export function getMaterialScoreMultiplier(materialId: MaterialType): number {
-  switch (materialId) {
-    case 1:
-      return 105;
-    case 2:
-      return 110;
-    case 3:
-      return 120;
-    case 4:
-      return 130;
-    case 5:
-      return 150;
-    case 6:
-      return 180;
-    case 7:
-      return 200;
-    case 8:
-      return 250;
-    case 9:
-      return 300;
-    case 10:
-      return 400;
-    case 11:
-      return 600;
-    default:
-      return 100;
-  }
-}
-
 export { getMaterialColor } from "../Utils/materialColor";
+export { getMaterialScoreMultiplier } from "@df/gamelogic";
 
 export function getMaterialDescription(id: number): string {
   switch (id) {

@@ -1,5 +1,9 @@
-import { EMPTY_ADDRESS } from "@df/constants";
-import { formatWholeToken, getInnerCircleShrinkPercent } from "@df/gamelogic";
+import { CONTRACT_PRECISION, EMPTY_ADDRESS } from "@df/constants";
+import {
+  formatWholeToken,
+  getInnerCircleShrinkPercent,
+  getMaterialScoreMultiplier,
+} from "@df/gamelogic";
 import type { MaterialType, Planet } from "@df/types";
 import { useComponentValue, useEntityQuery } from "@latticexyz/react";
 import { Has } from "@latticexyz/recs";
@@ -14,6 +18,7 @@ import {
   formatClaimCommunityOrder,
   formatClaimRewardsOrder,
 } from "../../Backend/GameLogic/moveOrder";
+import { engineConsts } from "../../Shared/renderer/EngineConsts";
 import Viewport from "../Game/Viewport";
 import { useUIManager } from "../Utils/AppHooks";
 import { getMaterialColor } from "../Utils/materialColor";
@@ -32,6 +37,7 @@ import {
   type GameAccountSnapshot,
   readGameAccountSnapshot,
 } from "./gameAccountSnapshot";
+import { RippleText } from "./Labels/SpacetimeRipLabel";
 import {
   collectOwnedArtifacts,
   type OwnedArtifactLine,
@@ -154,6 +160,45 @@ const ClaimButton = styled.button`
 // 垃圾额度和购买按钮排在同一行。
 const JunkLine = styled(RewardLine)``;
 
+const CombatStats = styled.dl`
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 12px;
+  margin: 6px 0;
+  padding: 4px 8px 5px;
+  border: 1px solid #344966;
+  border-radius: 5px;
+  background: linear-gradient(120deg, #172941, #111d2c);
+  color: #bfd6ed;
+
+  dd {
+    margin: 0;
+    text-align: right;
+  }
+`;
+
+const ScoreValue = styled.dd`
+  color: #ffbbd8;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.4;
+`;
+
+const KillValue = styled.dd`
+  color: #ffbf9b;
+  font-weight: 650;
+`;
+
+const SilverLine = styled.div`
+  color: rgb(${engineConsts.colors.gold.join(" ")});
+`;
+
+const MaterialMultiplier = styled.span`
+  margin-left: 0.4em;
+  font-weight: 650;
+`;
+
 const OpenButton = styled.button`
   display: flex;
   align-items: center;
@@ -243,6 +288,7 @@ type WalletFacts = {
   junkLimit?: number;
   // PlayerScore 与提取量同一单位。这里除以 1000，和银的显示一致。
   score?: number;
+  kills?: number;
   materials: MaterialLine[];
 };
 
@@ -544,7 +590,10 @@ export function PublicGameStatus({
             next.junkUsed = player.junk;
             next.junkLimit = player.junkLimit;
             if (player.score !== undefined) {
-              next.score = Math.floor(player.score / 1000);
+              next.score = Math.floor(player.score / CONTRACT_PRECISION);
+            }
+            if (player.kills !== undefined) {
+              next.kills = Math.floor(player.kills / CONTRACT_PRECISION);
             }
           }
         }
@@ -564,6 +613,7 @@ export function PublicGameStatus({
         next.junkUsed,
         next.junkLimit,
         next.score,
+        next.kills,
         next.energy,
         next.silver,
         next.materials
@@ -684,6 +734,18 @@ export function PublicGameStatus({
                 拥有神器 <span>{facts.artifacts.length}</span>
               </OpenButton>
             </AssetButtons>
+            <CombatStats>
+              <dt>分数</dt>
+              <ScoreValue>
+                {facts.score === undefined ? (
+                  whole(facts.score)
+                ) : (
+                  <RippleText text={whole(facts.score)} />
+                )}
+              </ScoreValue>
+              <dt title="累计摧毁的敌方人口">击杀</dt>
+              <KillValue>{whole(facts.kills)}</KillValue>
+            </CombatStats>
             <JunkLine>
               <span>
                 垃圾额度 {whole(facts.junkUsed)} / {whole(facts.junkLimit)}
@@ -702,7 +764,6 @@ export function PublicGameStatus({
                 购买
               </ClaimButton>
             </JunkLine>
-            <div>分数 {whole(facts.score)}</div>
             <RewardLine data-guide-target="game-rewards">
               <span>
                 游戏奖励：{reward ? wholeAipro(reward.game) : "..."} AIPRO
@@ -736,7 +797,7 @@ export function PublicGameStatus({
               <div role="alert">{currentClaim.error}</div>
             )}
             <div>能量 {whole(facts.energy)}</div>
-            <div>银 {whole(facts.silver)}</div>
+            <SilverLine>银 {whole(facts.silver)}</SilverLine>
             {facts.materials.length === 0 ? (
               <div>材料 无</div>
             ) : (
@@ -746,6 +807,9 @@ export function PublicGameStatus({
                   style={{ color: getMaterialColor(material.id) }}
                 >
                   {material.name} {whole(material.amount)}
+                  <MaterialMultiplier title="提取积分倍率">
+                    ×{getMaterialScoreMultiplier(material.id)}
+                  </MaterialMultiplier>
                 </div>
               ))
             )}

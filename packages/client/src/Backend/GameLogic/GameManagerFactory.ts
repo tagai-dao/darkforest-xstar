@@ -66,6 +66,7 @@ import type {
   Transaction,
   WorldLocation,
 } from "@df/types";
+import type { Chunk } from "@df/types";
 import {
   ArtifactRarity,
   ArtifactType,
@@ -82,6 +83,7 @@ import {
   singletonEntity,
 } from "@latticexyz/store-sync/recs";
 import type { ClientComponents } from "@mud/createClientComponents";
+import { getNetworkConfig } from "@mud/getNetworkConfig";
 import delay from "delay";
 
 import { ContractsAPIEvent } from "../../_types/darkforest/api/ContractsAPITypes";
@@ -90,7 +92,9 @@ import NotificationManager from "../../Frontend/Game/NotificationManager";
 import { pollSetting } from "../../Frontend/Utils/SettingsHooks";
 import type { TerminalHandle } from "../../Frontend/Views/Terminal";
 import { memoryChunkStoreFromSave } from "../Save/FileChunkSource";
-import type { GameSaveFiles } from "../Save/GameSave";
+import { type GameSaveFiles, walletFolderName } from "../Save/GameSave";
+import { missingSharedChunks } from "../Save/SharedMap";
+import { loadSharedMapChunks } from "../Save/SharedMapCache";
 import PersistentChunkStore from "../Storage/PersistentChunkStore";
 import SnarkArgsHelper from "../Utils/SnarkArgsHelper";
 import { makeContractsAPI } from "./ContractsAPI";
@@ -158,6 +162,34 @@ export class GameManagerFactory {
           account,
           contractAddress,
         });
+
+    const watchedSharedMap = fileSave
+      ? {
+          scope: walletFolderName({
+            game: {
+              chainId: getNetworkConfig().chainId,
+              world: contractAddress,
+            },
+            wallet: fileSave.agent.address,
+          }),
+          chunks: [] as Chunk[],
+        }
+      : undefined;
+    if (watchedSharedMap) {
+      try {
+        watchedSharedMap.chunks = await loadSharedMapChunks(
+          watchedSharedMap.scope,
+        );
+        for (const chunk of missingSharedChunks(
+          persistentChunkStore.allChunks(),
+          watchedSharedMap.chunks,
+        )) {
+          persistentChunkStore.addChunk(chunk);
+        }
+      } catch (error) {
+        console.warn("Unable to restore shared map chunks", error);
+      }
+    }
 
     terminal.current?.println("Downloading data from Ethereum blockchain...");
     terminal.current?.println(
@@ -276,6 +308,7 @@ export class GameManagerFactory {
       initialState.paused,
       // initialState.halfPrice,
       components,
+      watchedSharedMap,
     );
 
     // gameManager.setPlayerTwitters(initialState.twitters);

@@ -7,6 +7,12 @@ const Wrap = styled.span`
   top: -5px;
 `;
 
+const TextWrap = styled.span`
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+`;
+
 const Static = styled.span`
   opacity: 0;
 `;
@@ -22,10 +28,14 @@ const bounce = keyframes`
   }
 `;
 
-const AnimDelay = styled.span<{ i: number }>`
+const AnimDelay = styled.span<{ $index: number }>`
   position: relative;
   animation: ${bounce} 0.5s ease-in-out infinite alternate;
-  ${({ i }) => `animation-delay: ${-i * 0.04}s;`}
+  animation-delay: ${({ $index }) => -$index * 0.04}s;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 `;
 
 const Anim = styled.span`
@@ -38,17 +48,25 @@ const Anim = styled.span`
   left: 0;
 `;
 
-function SpacetimeRipLabelRaw() {
+export function RippleText({ text }: { text: string }) {
   return (
-    <Wrap>
-      <Static>{PlanetTypeNames[PlanetType.TRADING_POST]}</Static>
-      <Anim>
-        {PlanetTypeNames[PlanetType.TRADING_POST].split("").map((c, i) => (
-          <AnimDelay i={i} key={i}>
-            {c === " " ? <>&nbsp;</> : c}
+    <TextWrap>
+      <Static>{text}</Static>
+      <Anim aria-hidden="true">
+        {Array.from(text, (character, index) => (
+          <AnimDelay $index={index} key={index}>
+            {character === " " ? "\u00a0" : character}
           </AnimDelay>
         ))}
       </Anim>
+    </TextWrap>
+  );
+}
+
+function SpacetimeRipLabelRaw() {
+  return (
+    <Wrap>
+      <RippleText text={PlanetTypeNames[PlanetType.TRADING_POST]} />
     </Wrap>
   );
 }
