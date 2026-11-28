@@ -1,7 +1,8 @@
 import { EMPTY_ADDRESS } from "@df/constants";
 import { formatWholeToken, getInnerCircleShrinkPercent } from "@df/gamelogic";
 import type { MaterialType, Planet } from "@df/types";
-import { useComponentValue } from "@latticexyz/react";
+import { useComponentValue, useEntityQuery } from "@latticexyz/react";
+import { Has } from "@latticexyz/recs";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
 import { useEffect, useRef, useState } from "react";
@@ -40,6 +41,7 @@ import {
   MATERIAL_NAME,
   OwnedArtifactsPanel,
   OwnedPlanetsPanel,
+  RevealedPlanetsPanel,
 } from "./OwnedPlanetsPanel";
 
 const Panel = styled.div`
@@ -327,6 +329,7 @@ export function PublicGameStatus({
     });
   };
   const [planetsOpen, setPlanetsOpen] = useState(false);
+  const [revealedOpen, setRevealedOpen] = useState(false);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
   const [junkBuyOpen, setJunkBuyOpen] = useState(false);
   const [accountRead, setAccountRead] = useState<AccountRead>();
@@ -341,8 +344,9 @@ export function PublicGameStatus({
   const refreshAccount = useRef<(() => Promise<void>) | undefined>(undefined);
   const {
     network: { publicClient, worldAddress },
-    components: { DFXStarConfig, GamePassNFT },
+    components: { DFXStarConfig, GamePassNFT, RevealedPlanet },
   } = useMUD();
+  const revealedEntities = useEntityQuery([Has(RevealedPlanet)]);
   const star = useComponentValue(DFXStarConfig, singletonEntity);
   const pass = useComponentValue(GamePassNFT, singletonEntity);
   const account = uiManager.getAccount()?.toLowerCase() as Address | undefined;
@@ -649,6 +653,7 @@ export function PublicGameStatus({
                 onClick={() => {
                   setArtifactsOpen(false);
                   setJunkBuyOpen(false);
+                  setRevealedOpen(false);
                   setPlanetsOpen((open) => !open);
                 }}
               >
@@ -656,10 +661,23 @@ export function PublicGameStatus({
               </OpenButton>
               <OpenButton
                 type="button"
+                aria-expanded={revealedOpen}
+                onClick={() => {
+                  setPlanetsOpen(false);
+                  setArtifactsOpen(false);
+                  setJunkBuyOpen(false);
+                  setRevealedOpen((open) => !open);
+                }}
+              >
+                已公开星球 <span>{revealedEntities.length}</span>
+              </OpenButton>
+              <OpenButton
+                type="button"
                 aria-expanded={artifactsOpen}
                 onClick={() => {
                   setPlanetsOpen(false);
                   setJunkBuyOpen(false);
+                  setRevealedOpen(false);
                   setArtifactsOpen((open) => !open);
                 }}
               >
@@ -677,6 +695,7 @@ export function PublicGameStatus({
                 onClick={() => {
                   setPlanetsOpen(false);
                   setArtifactsOpen(false);
+                  setRevealedOpen(false);
                   setJunkBuyOpen(true);
                 }}
               >
@@ -735,6 +754,15 @@ export function PublicGameStatus({
       </Panel>
       {planetsOpen && (
         <OwnedPlanetsPanel onClose={() => setPlanetsOpen(false)} />
+      )}
+      {revealedOpen && (
+        <RevealedPlanetsPanel
+          planets={uiManager
+            .getGameManager()
+            .getContractAPI()
+            .getRevealedPlanetsCoords()}
+          onClose={() => setRevealedOpen(false)}
+        />
       )}
       {artifactsOpen && (
         <OwnedArtifactsPanel

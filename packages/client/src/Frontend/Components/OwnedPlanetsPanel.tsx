@@ -1,7 +1,13 @@
 import { MAX_ARTIFACT_TYPE, MIN_ARTIFACT_TYPE } from "@df/constants";
 import { formatNumber, isLocatable } from "@df/gamelogic";
 import { getPlanetName } from "@df/procedural";
-import type { ArtifactId, LocationId, MaterialType, Planet } from "@df/types";
+import type {
+  ArtifactId,
+  LocationId,
+  MaterialType,
+  Planet,
+  RevealedCoords,
+} from "@df/types";
 import { PlanetType } from "@df/types";
 import { useEffect, useState } from "react";
 import styled from "styled-components";
@@ -478,6 +484,62 @@ const ArtifactLocation = styled.div`
     gap: 2px;
   }
 `;
+
+export function RevealedPlanetsPanel({
+  planets,
+  onClose,
+}: {
+  planets: RevealedCoords[];
+  onClose: () => void;
+}) {
+  const uiManager = useUIManager();
+  const rows = [...planets].sort(
+    (left, right) => left.x - right.x || left.y - right.y,
+  );
+
+  return (
+    <GameListPanel
+      title="已公开星球"
+      count={`${rows.length} 颗`}
+      width={560}
+      onClose={onClose}
+    >
+      {rows.length === 0 ? (
+        <ListEmpty>暂无链上公开的星球</ListEmpty>
+      ) : (
+        <ListTable>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">坐标</th>
+                <th scope="col">揭示者</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ hash, x, y, revealer }) => (
+                <tr key={hash}>
+                  <td>
+                    <ListButton
+                      type="button"
+                      onClick={() => uiManager.centerCoords({ x, y })}
+                    >
+                      ({x}, {y})
+                    </ListButton>
+                  </td>
+                  <td>
+                    <Muted title={revealer}>
+                      {revealer.slice(0, 6)}…{revealer.slice(-4)}
+                    </Muted>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ListTable>
+      )}
+    </GameListPanel>
+  );
+}
 
 /** 和占领星球同一块弹窗。点位置时，镜头移到放着这件神器的星球。 */
 export function OwnedArtifactsPanel({
