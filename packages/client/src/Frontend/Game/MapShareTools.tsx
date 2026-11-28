@@ -2,6 +2,7 @@ import type { CanvasCoords, Chunk } from "@df/types";
 import {
   type ChangeEvent,
   type PointerEvent,
+  type ReactNode,
   useEffect,
   useRef,
   useState,
@@ -19,6 +20,10 @@ import {
   sharedChunksInBounds,
   sharedMapBounds,
 } from "../../Backend/Save/SharedMap";
+import {
+  GameToolbarButton,
+  GameToolbarLink,
+} from "../Components/GameToolbarButton";
 import Viewport from "./Viewport";
 
 const Tools = styled.div`
@@ -30,48 +35,40 @@ const Tools = styled.div`
   align-items: flex-start;
   flex-direction: column;
   gap: 6px;
-  max-width: min(340px, calc(100% - 104px));
-  font:
-    13px/1.5 system-ui,
-    "PingFang SC",
-    sans-serif;
-  color: #e7f2ff;
+  max-width: calc(100% - 32px);
+  pointer-events: none;
 `;
 
 const Buttons = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+
+  & > * {
+    pointer-events: auto;
+  }
 `;
 
-const Button = styled.button`
-  padding: 5px 10px;
-  border: 1px solid #385470;
-  border-radius: 5px;
-  background: #132438;
-  color: #dbedff;
-  font: inherit;
-  cursor: pointer;
+const ExportButton = styled(GameToolbarButton)`
+  border-color: #59a7cf;
+  background: #194767;
 
   &:hover:not(:disabled) {
-    background: #1d3854;
-  }
-  &:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
-  &[data-primary] {
-    border-color: #59a7cf;
-    background: #194767;
+    background: #235a7d;
   }
 `;
 
 const Notice = styled.div`
+  max-width: 340px;
   border: 1px solid #385470;
   border-radius: 5px;
   padding: 6px 9px;
   background: rgb(10 20 35 / 96%);
   color: #cadff3;
+  font:
+    13px/1.5 system-ui,
+    "PingFang SC",
+    sans-serif;
 `;
 
 const DragSurface = styled.div`
@@ -108,12 +105,18 @@ function canvasPoint(event: PointerEvent<HTMLDivElement>): CanvasCoords {
 }
 
 export function MapShareTools({
+  children,
   game,
   manager,
+  mapReady,
+  onReturnHome,
   onSelectionChange,
 }: {
+  children: ReactNode;
   game: GameId;
   manager: Pick<GameManager, "chunksNear" | "importSharedChunks">;
+  mapReady: boolean;
+  onReturnHome?: () => void;
   onSelectionChange: (selecting: boolean) => void;
 }) {
   const [selecting, setSelecting] = useState(false);
@@ -274,19 +277,24 @@ export function MapShareTools({
           )}
         </DragSurface>
       )}
-      <Tools aria-label="地图分享">
+      <Tools role="group" aria-label="游戏导航与地图工具">
         <Buttons>
-          {selecting ? (
+          {onReturnHome && (
+            <GameToolbarButton type="button" onClick={onReturnHome}>
+              返回首页
+            </GameToolbarButton>
+          )}
+          <GameToolbarLink to="/docs/overview">文档</GameToolbarLink>
+          {selecting && (
             <>
-              <Button
+              <ExportButton
                 type="button"
-                data-primary
                 disabled={!selection?.chunks.length}
                 onClick={exportMap}
               >
                 导出地图
-              </Button>
-              <Button
+              </ExportButton>
+              <GameToolbarButton
                 type="button"
                 onClick={() => {
                   clearDrag();
@@ -296,11 +304,12 @@ export function MapShareTools({
                 }}
               >
                 取消
-              </Button>
+              </GameToolbarButton>
             </>
-          ) : (
+          )}
+          {!selecting && mapReady && (
             <>
-              <Button
+              <GameToolbarButton
                 type="button"
                 disabled={importing}
                 onClick={() => {
@@ -309,14 +318,14 @@ export function MapShareTools({
                 }}
               >
                 分享地图
-              </Button>
-              <Button
+              </GameToolbarButton>
+              <GameToolbarButton
                 type="button"
                 disabled={importing}
                 onClick={() => input.current?.click()}
               >
                 导入地图
-              </Button>
+              </GameToolbarButton>
             </>
           )}
         </Buttons>
@@ -334,6 +343,7 @@ export function MapShareTools({
               `拖动鼠标框选地图，边缘按 ${MIN_CHUNK_SIZE} 单位区块向内对齐。`}
           </Notice>
         )}
+        <div hidden={selecting}>{children}</div>
       </Tools>
     </>
   );

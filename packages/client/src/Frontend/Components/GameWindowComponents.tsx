@@ -81,13 +81,3 @@ export const CanvasWrapper = styled.div`
   width: 100%;
   height: 100%;
 `;
-
-export const UpperLeft = styled.div`
-  position: absolute;
-  left: 0;
-
-  display: flex;
-  flex-direction: row;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-`;

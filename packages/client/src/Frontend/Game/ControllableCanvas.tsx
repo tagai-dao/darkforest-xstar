@@ -3,6 +3,7 @@ import { CursorState, ModalManagerEvent, Setting } from "@df/types";
 import { useMUD } from "@mud/MUDContext";
 // import * as fabric from 'fabric'; // v6
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -66,9 +67,13 @@ const CanvasWrapper = styled.div`
 `;
 
 export default function ControllableCanvas({
+  children,
   onInputReadyChange,
+  onReturnHome,
 }: {
+  children: ReactNode;
   onInputReadyChange?: (ready: boolean) => void;
+  onReturnHome?: () => void;
 }) {
   // html canvas element width and height. viewport dimensions are tracked by viewport obj
   const [width, setWidth] = useState(0);
@@ -305,16 +310,18 @@ export default function ControllableCanvas({
       <canvas ref={glRef} width={width} height={height} />
       <canvas data-guide-map ref={canvasRef} width={width} height={height} />
       <canvas ref={bufferRef} id="buffer" />
-      {inputReady && (
-        <MapShareTools
-          game={{
-            chainId: network.publicClient.chain.id,
-            world: gameUIManager.getContractAddress(),
-          }}
-          manager={gameUIManager.getGameManager()}
-          onSelectionChange={setSharingMap}
-        />
-      )}
+      <MapShareTools
+        game={{
+          chainId: network.publicClient.chain.id,
+          world: gameUIManager.getContractAddress(),
+        }}
+        manager={gameUIManager.getGameManager()}
+        mapReady={inputReady}
+        onReturnHome={onReturnHome}
+        onSelectionChange={setSharingMap}
+      >
+        {children}
+      </MapShareTools>
     </CanvasWrapper>
   );
 }

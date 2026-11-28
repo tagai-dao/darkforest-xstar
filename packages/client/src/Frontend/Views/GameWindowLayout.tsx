@@ -12,7 +12,6 @@ import {
   CanvasContainer,
   CanvasWrapper,
   MainWindow,
-  UpperLeft,
   WindowWrapper,
 } from "../Components/GameWindowComponents";
 import {
@@ -22,7 +21,6 @@ import {
 import { PublicGameStatus } from "../Components/PublicGameStatus";
 import { SelectedVoyageDisplay } from "../Components/SelectedVoyageDisplay";
 import ControllableCanvas from "../Game/ControllableCanvas";
-import { DocsCorner } from "../Pages/docs/DocsCorner";
 import { AIChatPane } from "../Panes/AIChatPane";
 import { ArtifactHoverPane } from "../Panes/ArtifactHoverPane";
 import { CoordsPane } from "../Panes/CoordsPane";
@@ -372,7 +370,6 @@ export function GameWindowLayout({
 
   return (
     <WindowWrapper>
-      <DocsCorner fixed />
       {showPublicStatus && (
         <PublicGameStatus homeReady={homeReady} onOpenGuide={openGuide} />
       )}
@@ -483,16 +480,6 @@ export function GameWindowLayout({
 
       <MainWindow>
         <CanvasContainer>
-          <UpperLeft>
-            {onReturnHome && (
-              <ReturnHomeButton type="button" onClick={onReturnHome}>
-                返回首页
-              </ReturnHomeButton>
-            )}
-            <AmbiencePane />
-            {paneVisible && <ZoomPane />}
-          </UpperLeft>
-
           {!spectate && paneVisible && (
             <SidebarPane
               aiChatHook={[aiChatVisible, setAIChatVisible]}
@@ -515,7 +502,15 @@ export function GameWindowLayout({
             />
           )}
           <CanvasWrapper>
-            <ControllableCanvas onInputReadyChange={setMapInputReady} />
+            <ControllableCanvas
+              onInputReadyChange={setMapInputReady}
+              onReturnHome={onReturnHome}
+            >
+              <MapViewControls>
+                <AmbiencePane />
+                {paneVisible && <ZoomPane />}
+              </MapViewControls>
+            </ControllableCanvas>
           </CanvasWrapper>
           <NotificationsPane />
           {paneVisible && <CoordsPane />}
@@ -546,16 +541,14 @@ export function GameWindowLayout({
   );
 }
 
-const ReturnHomeButton = styled.button`
-  margin: 8px;
-  z-index: 6;
-  padding: 8px 10px;
-  border: 1px solid #00dc82;
-  background: rgba(0, 0, 0, 0.82);
-  color: #d7ffe4;
-  font-family: "Start Press 2P", sans-serif;
-  font-size: 10px;
-  cursor: pointer;
+const MapViewControls = styled.div`
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+
+  & > :first-child {
+    width: auto;
+  }
 `;
 
 const TopBarPaneContainer = styled.div`

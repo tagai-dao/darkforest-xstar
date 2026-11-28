@@ -4,12 +4,13 @@ import {
   getInnerCircleShrinkPercent,
   getMaterialScoreMultiplier,
 } from "@df/gamelogic";
+import { locationIdFromHexStr } from "@df/serde";
 import type { MaterialType, Planet } from "@df/types";
 import { useComponentValue, useEntityQuery } from "@latticexyz/react";
 import { Has } from "@latticexyz/recs";
 import { singletonEntity } from "@latticexyz/store-sync/recs";
 import { useMUD } from "@mud/MUDContext";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import { type Address, formatUnits } from "viem";
 
@@ -393,6 +394,17 @@ export function PublicGameStatus({
     components: { DFXStarConfig, GamePassNFT, RevealedPlanet },
   } = useMUD();
   const revealedEntities = useEntityQuery([Has(RevealedPlanet)]);
+  const revealedPlanets = useMemo(() => {
+    if (!revealedOpen) return [];
+    const contracts = uiManager.getGameManager().getContractAPI();
+    return revealedEntities.flatMap((entity) => {
+      const coords = contracts.getRevealedCoordsByIdIfExists(
+        locationIdFromHexStr(entity),
+      );
+      return coords ? [coords] : [];
+    });
+  }, [revealedOpen, revealedEntities, uiManager]);
+  const closeRevealed = useCallback(() => setRevealedOpen(false), []);
   const star = useComponentValue(DFXStarConfig, singletonEntity);
   const pass = useComponentValue(GamePassNFT, singletonEntity);
   const account = uiManager.getAccount()?.toLowerCase() as Address | undefined;
@@ -821,11 +833,8 @@ export function PublicGameStatus({
       )}
       {revealedOpen && (
         <RevealedPlanetsPanel
-          planets={uiManager
-            .getGameManager()
-            .getContractAPI()
-            .getRevealedPlanetsCoords()}
-          onClose={() => setRevealedOpen(false)}
+          planets={revealedPlanets}
+          onClose={closeRevealed}
         />
       )}
       {artifactsOpen && (

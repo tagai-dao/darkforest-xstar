@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import styled from "styled-components";
 
+import { GameToolbarLink } from "../../Components/GameToolbarButton";
 import { BiomeTable } from "./BiomeTable";
 import { ContractsDocTable } from "./ContractsDocTable";
 import { DocTable, DocTableFrame } from "./DocTable";
@@ -70,17 +71,6 @@ const Brand = styled(Link)`
   span {
     padding-left: 14px;
     border-left: 1px solid var(--doc-border);
-  }
-`;
-
-const BackLink = styled(Link)`
-  color: var(--doc-accent);
-  font-size: 14px;
-  white-space: nowrap;
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
   }
 `;
 
@@ -465,9 +455,9 @@ export function DocsPage() {
             <img src="/darkforest_punk_logo.png" alt="Dark Forest Punk" />
             <span>游戏文档</span>
           </Brand>
-          <BackLink to="/">
+          <GameToolbarLink to="/">
             <span aria-hidden="true">←</span> 返回游戏
-          </BackLink>
+          </GameToolbarLink>
         </HeaderInner>
       </Header>
       <Layout>

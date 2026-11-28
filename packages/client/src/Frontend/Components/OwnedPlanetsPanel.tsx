@@ -1,6 +1,10 @@
-import { MAX_ARTIFACT_TYPE, MIN_ARTIFACT_TYPE } from "@df/constants";
+import {
+  EMPTY_ADDRESS,
+  MAX_ARTIFACT_TYPE,
+  MIN_ARTIFACT_TYPE,
+} from "@df/constants";
 import { formatNumber, isLocatable } from "@df/gamelogic";
-import { getPlanetName } from "@df/procedural";
+import { getPlanetName, getPlanetNameHash } from "@df/procedural";
 import type {
   ArtifactId,
   LocationId,
@@ -9,9 +13,11 @@ import type {
   RevealedCoords,
 } from "@df/types";
 import { PlanetType } from "@df/types";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useReducer, useState } from "react";
 import styled from "styled-components";
 
+import { getPlanetRank } from "../../Backend/Utils/Utils";
+import { displayPlayerName, shortAddress } from "../Pages/homeLeaderboard";
 import { PlanetThumb } from "../Panes/PlanetDexPane";
 import { useUIManager } from "../Utils/AppHooks";
 import { getMaterialColor } from "../Utils/materialColor";
@@ -485,7 +491,7 @@ const ArtifactLocation = styled.div`
   }
 `;
 
-export function RevealedPlanetsPanel({
+export const RevealedPlanetsPanel = memo(function RevealedPlanetsPanel({
   planets,
   onClose,
 }: {
@@ -493,53 +499,100 @@ export function RevealedPlanetsPanel({
   onClose: () => void;
 }) {
   const uiManager = useUIManager();
-  const rows = [...planets].sort(
-    (left, right) => left.x - right.x || left.y - right.y,
+  const game = uiManager.getGameManager();
+  const [, refresh] = useReducer((revision: number) => revision + 1, 0);
+  const rows = useMemo(
+    () =>
+      [...planets].sort((left, right) => left.x - right.x || left.y - right.y),
+    [planets],
   );
+
+  useEffect(() => {
+    const ids = new Set(planets.map(({ hash }) => hash));
+    const subscription = game
+      .getGameObjects()
+      .planetUpdated$.subscribe((id) => {
+        if (ids.has(id)) refresh();
+      });
+    return subscription.unsubscribe;
+  }, [game, planets]);
 
   return (
     <GameListPanel
       title="已公开星球"
       count={`${rows.length} 颗`}
-      width={560}
+      width={810}
       onClose={onClose}
     >
       {rows.length === 0 ? (
         <ListEmpty>暂无链上公开的星球</ListEmpty>
       ) : (
-        <ListTable>
+        <ListTable $minWidth={640}>
           <table>
             <thead>
               <tr>
+                <th scope="col">星球</th>
                 <th scope="col">坐标</th>
+                <th scope="col">类型</th>
+                <th scope="col">等级</th>
+                <th scope="col">Rank</th>
+                <th scope="col">占领者</th>
                 <th scope="col">揭示者</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ hash, x, y, revealer }) => (
-                <tr key={hash}>
-                  <td>
-                    <ListButton
-                      type="button"
-                      onClick={() => uiManager.centerCoords({ x, y })}
-                    >
-                      ({x}, {y})
-                    </ListButton>
-                  </td>
-                  <td>
-                    <Muted title={revealer}>
-                      {revealer.slice(0, 6)}…{revealer.slice(-4)}
-                    </Muted>
-                  </td>
-                </tr>
-              ))}
+              {rows.map(({ hash, x, y, revealer }) => {
+                const planet =
+                  game.getStalePlanetWithId(hash) ??
+                  game.getContractAPI().getPlanetById(hash);
+                const owner = planet?.owner;
+                let ownerName = "—";
+                if (owner) {
+                  ownerName =
+                    owner === EMPTY_ADDRESS
+                      ? "未占领"
+                      : displayPlayerName(owner, game.getPlayer(owner)?.name);
+                }
+                return (
+                  <tr key={hash}>
+                    <td>
+                      <Identity>{getPlanetNameHash(hash)}</Identity>
+                    </td>
+                    <td>
+                      <ListButton
+                        type="button"
+                        onClick={() => uiManager.centerCoords({ x, y })}
+                      >
+                        ({x}, {y})
+                      </ListButton>
+                    </td>
+                    <td>
+                      {planet ? (
+                        <Tag $color={PLANET_COLORS[planet.planetType]}>
+                          {PLANET_TYPE_NAME[planet.planetType] ?? "未知"}
+                        </Tag>
+                      ) : (
+                        <Muted>—</Muted>
+                      )}
+                    </td>
+                    <td>{planet?.planetLevel ?? "—"}</td>
+                    <td>{planet ? getPlanetRank(planet) : "—"}</td>
+                    <td>
+                      <Muted title={owner}>{ownerName}</Muted>
+                    </td>
+                    <td>
+                      <Muted title={revealer}>{shortAddress(revealer)}</Muted>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </ListTable>
       )}
     </GameListPanel>
   );
-}
+});
 
 /** 和占领星球同一块弹窗。点位置时，镜头移到放着这件神器的星球。 */
 export function OwnedArtifactsPanel({
